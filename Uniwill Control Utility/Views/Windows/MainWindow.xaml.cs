@@ -1056,6 +1056,16 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (fan is null || battery is null)
                 return;
 
+            // Auto-apply the saved fan curve on startup - unless a stock preset
+            // owns the fans. ApplyOemStockMode hands the EC back to the
+            // firmware's per-mode table and the fan page is locked, so this
+            // write must not fight it. It used to: this task and ApplyOnStart run
+            // in parallel from ApplyStartupSettingsAsync, so the curve landed
+            // whenever it happened to finish last - field, 2026-11-02, "Office
+            // applied" with the fans running the saved Full Speed curve until
+            // the preset was re-applied by hand.
+            bool fansOwnedByPreset = PresetProfileApplier.IsBuiltInProfile(Properties.Settings.Default.presetProfile);
+
             // Auto-apply the saved fan curve on startup.
             try
             {
@@ -1090,7 +1100,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                 // If Smart Fan Mode is enabled, start it instead of applying
                 // the normal curve.
-                if (settings.EcSmartFanMode)
+                if (settings.EcSmartFanMode && !fansOwnedByPreset)
                 {
                     try
                     {
@@ -1110,10 +1120,14 @@ namespace Uniwill_Control_Utility.Views.Windows
                         fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                     }
                 }
-                else
+                else if (!fansOwnedByPreset)
                 {
                     fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                     System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-applied on startup");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-apply skipped - the stock preset owns the fans");
                 }
             }
             catch (Exception ex)

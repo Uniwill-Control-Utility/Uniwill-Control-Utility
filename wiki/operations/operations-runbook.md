@@ -243,6 +243,22 @@ Cause: on battery the powered-down dGPU reports 0 load, so the GPU row falls bac
 
 `HardwareMonitoringService.PlausibleGpuPowerWatts` now drops anything above 600 W to 0 ("--"), and warns once a minute with the hardware name and the raw value (`[LHM] Rejected GPU power ...`). Pins: `Uniwill Control Utility.Tests/Services/GpuPowerPlausibilityTests.cs`. The same RAPL-underflow shape exists for the Intel CPU package power sensor in that library; if a CPU-watt spike is ever reported, the same guard slots in beside it.
 
+### A stock preset applied at startup, but the fans ran the saved curve (fixed)
+
+Field 2026-11-02 (same box, right after an MSI install): launch showed "Office applied", the Fan Control page was locked, yet the fans ran the previously saved **Full Speed** curve until the Office preset was re-applied by hand.
+
+Cause is an ordering race with a definite loser. `App.ApplyStartupSettingsAsync` runs the power-preset apply (`MainWindow.ApplyOnStart`) and the saved-fan-curve apply (`MainWindow.ApplyEcSettingsOnStart`) **in parallel**, and a stock preset hands the fans to the firmware (`ApplyOemStockMode` clears the custom-profile bit, `0x0751` gets the mode's own profile byte, and the fan page locks itself). Whether the user's curve overrode the preset therefore depended on which write landed last - the engine log shows the stock-mode assertion and then, two seconds later, `Applied fan curves - CPU 'Off'`.
+
+`ApplyEcSettingsOnStart` now skips the fan apply (and the Smart Fan start) whenever `PresetProfileApplier.IsBuiltInProfile(presetProfile)` is true, logging `fan curve auto-apply skipped - the stock preset owns the fans`. Custom presets are unaffected: they carry their own fan settings and are still applied. Pin: `Uniwill Control Utility.Tests/Services/FanStartupOwnershipTests.cs`.
+
+### The "OEM Control Center running" chip on a machine where it is not running (fixed)
+
+Field 2026-11-02 (tester laptop): GCUBridge installed but stopped, Control Center not running, and the title-bar chip still claimed the OEM stack was running. "Pause stack" then answered "Nothing to pause", and the only way out was "Not now" (session-only dismissal, so it returns next launch).
+
+The two decisions used different truths. `OemTakeoverService.ShouldWarn` asked for `ServicesInstalled > 0` plus state `Active`/`PartiallyPaused`, and `TakeoverPolicy.DecideState` returns `Active` for "installed, nothing live, no pause evidence" - a fallback, not a liveness test. The pause path counts **mutations**: a stopped demand-start service with no live process and no enabled task produces zero, hence the toast.
+
+`ShouldWarn` now also requires live evidence (`ServicesRunning > 0 || OemProcessesRunning > 0`), which is what the chip's own text says and what guarantees the Pause button has something to do. An installed-but-idle stack no longer warns; it still shows in Settings with its own state. Pins: `OemWarningTests.Silent_WhenTheStackIsInstalledButNothingIsRunning` and `Warns_WhenOnlyAnOemProcessIsLive`. If product ever wants a "the OEM stack will fight you after the next reboot" pre-warning, that is a separate, explicit message - it must not be this chip.
+
 ### Display brightness is missing
 
 Display → **Display brightness** (U-205) writes through the panel's WDDM brightness control (`root\WMI` → `WmiMonitorBrightnessMethods.WmiSetBrightness`), then re-reads `WmiMonitorBrightness.CurrentBrightness` as the evidence — the row is hidden entirely when the panel exposes no such class, so a missing slider means "this display has no WDDM brightness control", not a bug (external monitors are handled by their own DDC/CI controls, not by this row). The warning `[Display] brightness write to N% did not verify` means the panel accepted the call but reports a different value (driver clamp); the label then shows the readback, never the request.
