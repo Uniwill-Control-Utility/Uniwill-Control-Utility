@@ -286,6 +286,25 @@ namespace Uniwill_Control_Utility
 
                 Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
 
+                // Mixed-install guard. Installing the MSI while the app is running
+                // leaves the running exe in place (Windows cannot replace a locked
+                // image) while the new DLLs land beside it - field, 2026-11-02: an
+                // old app exe next to a new UCU.Core.dll, so every preset apply
+                // died with MissingMethodException and the EC kept the previous
+                // session's fan curve. Fail loudly at startup instead of half
+                // working: nothing below can be trusted in that state.
+                if (!IsInstallationConsistent())
+                {
+                    Log.Error("[Startup] Mixed installation: this exe and the UCU.* assemblies beside it come from different builds");
+                    MessageBox.Show(
+                        LocalizationService.Get("This installation mixes files from different builds because the app was running while it was updated. Close the app and run the installer again."),
+                        LocalizationService.Get("Installation needs repair"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    Shutdown();
+                    return;
+                }
+
                 // Uninstall self-heal (see UninstallSentinel): start it right
                 // here, before anything can block - the post-startup task
                 // queue it lived in first waits behind the PawnIO installer
@@ -1614,6 +1633,37 @@ namespace Uniwill_Control_Utility
         /// AppData, so no elevation is involved. Runs before the first
         /// UpdateManager call.
         /// </summary>
+        /// <summary>
+        /// True when this exe can actually reach the newest API on the UCU
+        /// assemblies shipped beside it. A method that exists in the source but
+        /// not in the deployed assembly throws MissingMethodException at the call
+        /// site, which is the signature of an install that overwrote the DLLs
+        /// while the app was running (the locked exe survives, everything else
+        /// moves on) - field, 2026-11-02: BatteryPowerPolicy.ClampForBattery gone
+        /// from the new core, every preset apply dead, fans left on the previous
+        /// session's curve.
+        /// </summary>
+        internal static bool IsInstallationConsistent()
+        {
+            try
+            {
+                _ = UCU.Core.Power.BatteryPowerPolicy.ClampCpu(1, 1, onBattery: false, cpuCeiling: 1);
+                return true;
+            }
+            catch (MissingMethodException)
+            {
+                return false;
+            }
+            catch (TypeLoadException)
+            {
+                return false;
+            }
+            catch (System.IO.FileLoadException)
+            {
+                return false;
+            }
+        }
+
         private static void SelfHealStaleVelopackRoot()
         {
             try
