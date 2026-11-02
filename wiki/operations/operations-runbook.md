@@ -267,6 +267,8 @@ The firmware enforces those, not the request: a Custom preset asking for 115 W G
 - One toast on a clamp: "On battery, power is limited to the platform envelope (CPU N W, GPU M W)." plus a `[Power] battery envelope:` log line naming requested vs applied.
 
 Undervolt, clock offsets and fan curves are untouched: the firmware clamps power only, and undervolting is the one tuning that still pays off on DC. Presets are therefore *not* disabled on battery, and no second set of battery slots exists - the clamp makes the numbers honest without duplicating the preset model.
+Who wins an AC/DC edge: the Automations page's per-edge preset when that edge has one selected (`EnableAutoNavigation` **and** the edge's combo not `None`), otherwise the app re-applies the active Custom preset so the clamp lands. Gating on the master switch alone was wrong - automation enabled with both combos on "None" is the common configuration, and it silently disabled the re-apply.
+
 The clamp is applied when a preset is applied, so the Presets page status card shows the effective pair while on battery ("160 W -> 40 W", "+25 W -> Off") instead of the AC numbers, and a `PowerModeChanged` edge re-applies the active Custom preset so unplugging (or plugging back in) takes effect without touching the UI. That re-apply yields to the user's own AC/DC automation (`EnableAutoNavigation`) and never runs for stock presets, which the firmware owns.
 
 ### Every preset is re-applied at startup ("Apply on startup" is gone)
