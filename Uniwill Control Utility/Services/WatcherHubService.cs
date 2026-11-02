@@ -345,6 +345,47 @@ namespace Uniwill_Control_Utility.Services
                 : WatcherPowerEventKind.AcDisconnected;
 
             _ = NotifyPowerEventAsync(edge, _clock());
+
+            // The battery envelope clamp is applied when a preset is applied, so a
+            // Custom preset applied on AC keeps its AC numbers after unplugging -
+            // the hardware is capped by the firmware either way, but the app would
+            // keep claiming the AC values (field, 2026-11-02). Re-request the saved
+            // preset on the edge unless the user's own AC/DC automation owns it.
+            _ = ReapplyPresetForPowerEdgeAsync(online);
+        }
+
+        private static async Task ReapplyPresetForPowerEdgeAsync(bool online)
+        {
+            try
+            {
+                // An AC/DC automation re-applies its own choice on this edge; two
+                // applies racing the same transition is how a preset ping-pongs.
+                if (Properties.Settings.Default.EnableAutoNavigation)
+                    return;
+
+                // Stock presets are the firmware's to apply (no app-side clamp), so
+                // only a Custom preset needs the re-apply.
+                string profile = Properties.Settings.Default.presetProfile;
+                if (PresetProfileApplier.IsBuiltInProfile(profile))
+                    return;
+
+                PresetArbiter? arbiter = App.GetService<PresetArbiter>();
+                if (arbiter is null)
+                    return;
+
+                Serilog.Log.Information(
+                    "[Power] {Edge}: re-applying '{Profile}' so the battery envelope takes effect",
+                    online ? "AC connected" : "on battery",
+                    profile);
+
+                await arbiter.RequestAsync(
+                    online ? PresetIntentSource.AutomationAc : PresetIntentSource.AutomationBattery,
+                    profile).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "[Power] re-apply on the power-source edge failed");
+            }
         }
 
         private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)

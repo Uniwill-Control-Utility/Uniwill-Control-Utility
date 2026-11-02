@@ -243,6 +243,14 @@ The preset used to raise the curve duties to 100 % and stop there, but the EC pi
 
 This also explains the older "one fan moved first" confusion: it was never a dropped write - the tables land (they are read back byte-for-byte), the *zone* just decides whether they matter.
 
+### Every SMU command failed with "Command 'x' not found" (fixed)
+
+Field 2026-11-02 (XMG Neo 16, Ryzen 9 9955HX3D): applying Turbo produced 16 `set-coper` stack traces per apply, plus `slow-limit`/`fast-limit`/`tctl-temp`, and no Core Optimizer or SMU power value ever reached the hardware.
+
+The engine's SMU table was empty: `[AmdSmu] tables configured, 0 commands registered (FireRange gate: false)`. The gate parsed the family/model pair out of the **brand string**, which only carries that shape when Windows falls back to a generic processor name - a machine that resolves a real name ("AMD Ryzen 9 9955HX3D 16-Core Processor") has no "Family"/"Model" words there, so the parse failed and no addresses were registered. The pair lives in the same registry key's `Identifier` value ("AMD64 Family 26 Model 68 Stepping 0"); `CpuModelDetection` now reads that first and keeps the brand string as the fallback. Pins: `CpuModelDetectionTests`.
+
+Log noise is bounded independently: `RyzenAdj_To_UCU.LogCommandFailureOnce` keeps one stack per command name per process and drops repeats to Debug, so a genuinely unsupported command costs one line instead of one per core.
+
 ### Battery envelope, measured (CPU and GPU, both laptops)
 
 With a CPU stress test and a GPU benchmark running together, on battery:
@@ -259,6 +267,7 @@ The firmware enforces those, not the request: a Custom preset asking for 115 W G
 - One toast on a clamp: "On battery, power is limited to the platform envelope (CPU N W, GPU M W)." plus a `[Power] battery envelope:` log line naming requested vs applied.
 
 Undervolt, clock offsets and fan curves are untouched: the firmware clamps power only, and undervolting is the one tuning that still pays off on DC. Presets are therefore *not* disabled on battery, and no second set of battery slots exists - the clamp makes the numbers honest without duplicating the preset model.
+The clamp is applied when a preset is applied, so the Presets page status card shows the effective pair while on battery ("160 W -> 40 W", "+25 W -> Off") instead of the AC numbers, and a `PowerModeChanged` edge re-applies the active Custom preset so unplugging (or plugging back in) takes effect without touching the UI. That re-apply yields to the user's own AC/DC automation (`EnableAutoNavigation`) and never runs for stock presets, which the firmware owns.
 
 ### Every preset is re-applied at startup ("Apply on startup" is gone)
 
