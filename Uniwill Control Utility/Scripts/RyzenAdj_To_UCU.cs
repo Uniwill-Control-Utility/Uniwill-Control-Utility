@@ -273,12 +273,12 @@ namespace Uniwill_Control_Utility.Scripts
                             }
                             else
                             {
-                                DiagnosticLogger.LogError(ex, $"Failed to process command: {ryzenAdjCommand}");
+                                LogCommandFailureOnce(ex, ryzenAdjCommand);
                             }
                         }
                         catch (Exception ex)
                         {
-                            DiagnosticLogger.LogError(ex, $"Failed to process command: {ryzenAdjCommand}");
+                            LogCommandFailureOnce(ex, ryzenAdjCommand);
                         }
                 }
 
@@ -288,6 +288,27 @@ namespace Uniwill_Control_Utility.Scripts
             {
                 DiagnosticLogger.LogError(ex, "Failed to translate RyzenAdj command string");
             }
+        }
+        /// <summary>
+        /// One stack trace per command name per process. A preset apply sends the
+        /// same command once per core (16x --set-coper on a 16-core part), so a
+        /// genuinely unsupported command used to fill the log with 16 identical
+        /// stacks and hide everything around it (field, 2026-11-02). The first
+        /// occurrence keeps the stack; repeats drop to Debug with the message.
+        /// </summary>
+        private static readonly System.Collections.Generic.HashSet<string> _loggedCommandFailures =
+            new(StringComparer.Ordinal);
+
+        private static void LogCommandFailureOnce(Exception ex, string command)
+        {
+            string key = command.Split('=')[0];
+            if (_loggedCommandFailures.Add(key))
+            {
+                DiagnosticLogger.LogError(ex, $"Failed to process command: {command} (further failures of '{key}' log at Debug)");
+                return;
+            }
+
+            DiagnosticLogger.LogDebug($"Failed again: {command}: {ex.Message}");
         }
         private static void NVIDIA(string command, string value)
         {

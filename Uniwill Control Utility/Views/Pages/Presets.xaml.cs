@@ -1181,7 +1181,51 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
+
+            ShowEffectiveBatteryLimits();
         }
+
+        /// <summary>
+        /// On battery the firmware grants only its own ceiling and the app clamps
+        /// its requests to the measured envelope (BatteryPowerPolicy), so the card
+        /// must show what will actually be applied - "160 W -> 40 W" - instead of
+        /// the preset's AC numbers. Field, 2026-11-02: Turbo showed 160 W SPL/FPL
+        /// and 150 W TGP while the hardware sat at ~35/40 W.
+        /// </summary>
+        private void ShowEffectiveBatteryLimits()
+        {
+            if (System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                != System.Windows.Forms.PowerLineStatus.Offline)
+            {
+                return;
+            }
+
+            bool intel = Family.TYPE == Family.ProcessorType.Intel;
+            UCU.Core.Power.BatteryPowerPolicy.Envelope envelope =
+                UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(intel);
+
+            int requestedPl1 = (int)(intel ? _profileIntelPl1 : _profileSustained);
+            int requestedPl2 = (int)(intel ? _profileIntelPl2 : _profileBoost);
+            UCU.Core.Power.BatteryPowerPolicy.Verdict cpu =
+                UCU.Core.Power.BatteryPowerPolicy.ClampCpu(requestedPl1, requestedPl2, onBattery: true, envelope.CpuWatts);
+            UCU.Core.Power.BatteryPowerPolicy.GpuVerdict gpu =
+                UCU.Core.Power.BatteryPowerPolicy.ClampGpu(
+                    (int)_profileGpuTgp,
+                    _profileGpuDb ? (int)_profileGpuDbOffset : 0,
+                    onBattery: true,
+                    envelope.GpuWatts);
+
+            tbPl1.Text = EffectiveWatt(requestedPl1, cpu.Pl1);
+            tbPl2.Text = EffectiveWatt(requestedPl2, cpu.Pl2);
+            tbGpuTgp.Text = EffectiveWatt((int)_profileGpuTgp, gpu.TgpWatts);
+            tbGpuDb.Text = _profileGpuDb
+                ? (gpu.DbWatts > 0 ? $"+{gpu.DbWatts} W" : $"+{_profileGpuDbOffset:F0} W \u2192 Off")
+                : "Off";
+        }
+
+        /// <summary>"40 W" when the request stands, "160 W → 40 W" when clamped.</summary>
+        private static string EffectiveWatt(int requested, int applied) =>
+            requested == applied ? $"{applied} W" : $"{requested} W \u2192 {applied} W";
 
         #endregion
 
