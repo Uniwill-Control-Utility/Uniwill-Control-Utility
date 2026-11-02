@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center قيد التشغيل",
   "On AC power": "على طاقة المحول",
   "On battery": "على البطارية",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "على البطارية، طاقة المعالج محدودة بمغلف Office ({0} واط).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "على البطارية، الطاقة محدودة بمغلف المنصة (المعالج {0} واط، الرسوميات {1} واط).",
   "On enter or exit": "عند الدخول أو الخروج",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "حزمة واحدة للدعم: الإصدارات والعتاد وحالة المحرك والاستلام والسجلات والدفاتر",
   "Open Settings": "فتح الإعدادات",

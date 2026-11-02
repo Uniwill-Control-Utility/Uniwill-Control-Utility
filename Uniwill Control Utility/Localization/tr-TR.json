@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center çalışıyor",
   "On AC power": "Şebeke gücünde",
   "On battery": "Pilde",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "Pilde CPU gücü Office profiliyle sınırlıdır ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "Pilde güç platform zarfıyla sınırlıdır (CPU {0} W, GPU {1} W).",
   "On enter or exit": "Gelişte veya çıkışta",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Destek için tek paket: sürümler, donanım, motor ve devralma durumu, günlükler",
   "Open Settings": "Ayarları aç",

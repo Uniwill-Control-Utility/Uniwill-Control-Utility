@@ -303,28 +303,30 @@ namespace Uniwill_Control_Utility.Services
                             };
                         }
                     }
-                    // Battery envelope (field-measured 2026-11-02): on DC the
-                    // firmware caps package power at the Office level and a
-                    // higher request makes it DROP below that (160 W asked ->
-                    // 30 W actual vs 40 W at Office). Clamp the CPU request to
-                    // the Office envelope while on battery; GPU/DB/fan stay.
-                    var officeProfile = SkuResolver.GetProfile("office");
+                    // Battery envelope (measured 2026-11-02, CPU + GPU loaded:
+                    // Intel 30-40 W CPU / 35 W GPU, AMD 30-40 W CPU / 40 W GPU).
+                    // On DC the firmware owns the limits and a request above its
+                    // ceiling is refused or penalised (160 W asked -> 30 W actual),
+                    // so clamp the CPU pair to the measured envelope and say so.
+                    UCU.Core.Power.BatteryPowerPolicy.Envelope envelope =
+                        UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(
+                            Family.TYPE == Family.ProcessorType.Intel);
                     UCU.Core.Power.BatteryPowerPolicy.Verdict verdict =
-                        UCU.Core.Power.BatteryPowerPolicy.ClampForBattery(
+                        UCU.Core.Power.BatteryPowerPolicy.ClampCpu(
                             pl1, pl2,
                             onBattery: System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
                                        == System.Windows.Forms.PowerLineStatus.Offline,
-                            officePl1: officeProfile?.CpuPl1 ?? UCU.Core.Power.BatteryPowerPolicy.DefaultOfficePl1,
-                            officePl2: officeProfile?.CpuPl2 ?? UCU.Core.Power.BatteryPowerPolicy.DefaultOfficePl2);
+                            cpuCeiling: envelope.CpuWatts);
 
                     if (verdict.Clamped)
                     {
                         Scripts.Misc.DiagnosticLogger.LogInfo(
-                            $"[Power] battery envelope: CPU limits clamped {verdict.RequestedPl1}/{verdict.RequestedPl2} W -> {verdict.Pl1}/{verdict.Pl2} W (Office)");
+                            $"[Power] battery envelope: CPU limits clamped {verdict.RequestedPl1}/{verdict.RequestedPl2} W -> {verdict.Pl1}/{verdict.Pl2} W");
                         Scripts.Misc.ToastNotification.ShowToastNotification(
                             Services.LocalizationService.Get("Power limits"),
                             Services.LocalizationService.Format(
-                                "On battery, CPU power is limited to the Office envelope ({0} W).", verdict.Pl1));
+                                "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).",
+                                verdict.Pl1, envelope.GpuWatts));
                     }
 
                     await ec.ApplyCpuPowerLimitsAsync(verdict.Pl1, verdict.Pl2).ConfigureAwait(false);

@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center запущено",
   "On AC power": "Від мережі",
   "On battery": "Від батареї",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "На батареї потужність CPU обмежена профілем Office ({0} Вт).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "На батареї потужність обмежена межами платформи (CPU {0} Вт, GPU {1} Вт).",
   "On enter or exit": "При появі або зникненні",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Один пакет для підтримки: версії, обладнання, стан рушія й перехоплення, логи та журнали",
   "Open Settings": "Відкрити налаштування",

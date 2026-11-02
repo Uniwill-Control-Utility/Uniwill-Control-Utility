@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center 正在執行",
   "On AC power": "使用交流電源",
   "On battery": "使用電池",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "使用電池時，CPU 功耗限制為 Office 設定（{0} W）。",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "使用電池時，功耗限制為平台上限（CPU {0} W，GPU {1} W）。",
   "On enter or exit": "進入或離開時",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "供支援使用的單一組合：版本、硬體、引擎與接管狀態、記錄與日誌",
   "Open Settings": "開啟設定",

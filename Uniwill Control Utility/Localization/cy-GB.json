@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center yn rhedeg",
   "On AC power": "Ar bŵer y prif gyfrif",
   "On battery": "Ar batri",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "Ar fatri, mae pŵer y CPU wedi'i gyfyngu i broffil Office ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "Ar fatri, mae pŵer wedi'i gyfyngu i amlen y platfform (CPU {0} W, GPU {1} W).",
   "On enter or exit": "Ar ddod i mewn neu allan",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Un bwndel ar gyfer cymorth: fersiynau, caledwedd, cyflwr injan a chymryd drosodd, cofnodion a dyddiaduron",
   "Open Settings": "Agor gosodiadau",

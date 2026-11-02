@@ -307,7 +307,7 @@
   "OEM Control Center running": "Tumatakbo ang OEM Control Center",
   "On AC power": "Sa AC power",
   "On battery": "Sa baterya",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "Sa baterya, limitado ang CPU power sa Office envelope ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "Sa baterya, limitado ang power sa platform envelope (CPU {0} W, GPU {1} W).",
   "On enter or exit": "Sa pagpasok o paglabas",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Isang bundle para sa suporta: mga bersyon, hardware, estado ng engine at pagkuha, mga log at journal",
   "Open Settings": "Buksan ang Mga Setting",

@@ -193,6 +193,27 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     return 0;
                 }
 
+                // Battery envelope (measured 2026-11-02, CPU + GPU loaded:
+                // Intel 35 W GPU, AMD 40 W GPU). On DC the firmware owns the GPU
+                // ceiling and ignores the request - a 115 W Custom TGP sat at
+                // ~30 W while the UI claimed 115 - so clamp the request and drop
+                // Dynamic Boost, which cannot be borrowed on battery either.
+                var envelope = UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(
+                    Family.TYPE == Family.ProcessorType.Intel);
+                UCU.Core.Power.BatteryPowerPolicy.GpuVerdict gpu =
+                    UCU.Core.Power.BatteryPowerPolicy.ClampGpu(
+                        totalWatts, dbOffset,
+                        onBattery: System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                                   == System.Windows.Forms.PowerLineStatus.Offline,
+                        gpuCeiling: envelope.GpuWatts);
+                if (gpu.Clamped)
+                {
+                    DiagnosticLogger.LogInfo(
+                        $"[Power] battery envelope: GPU TGP clamped {gpu.RequestedTgp}W/{gpu.RequestedDb}W DB -> {gpu.TgpWatts}W/{gpu.DbWatts}W DB");
+                    totalWatts = gpu.TgpWatts;
+                    dbOffset = gpu.DbWatts;
+                }
+
                 // Laptop GPUs don't support nvmlDeviceSetPowerManagementLimit (returns NOT_SUPPORTED).
                 // Use EC register writes directly (same method as tuxedo-drivers on Linux).
                 // The EC DB offset register (0x0746) accepts 0-25W to add on top of base TGP.

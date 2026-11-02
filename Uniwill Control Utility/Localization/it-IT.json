@@ -307,7 +307,7 @@
   "OEM Control Center running": "Control Center OEM in esecuzione",
   "On AC power": "A corrente",
   "On battery": "A batteria",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "A batteria, la potenza della CPU è limitata al profilo Office ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "A batteria, la potenza è limitata all'involucro della piattaforma (CPU {0} W, GPU {1} W).",
   "On enter or exit": "All'ingresso o all'uscita",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Un pacchetto per l'assistenza: versioni, hardware, stato del motore e del subentro, log e registri",
   "Open Settings": "Apri impostazioni",
