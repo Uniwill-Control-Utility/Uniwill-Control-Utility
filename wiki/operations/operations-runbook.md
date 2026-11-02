@@ -243,6 +243,14 @@ The preset used to raise the curve duties to 100 % and stop there, but the EC pi
 
 This also explains the older "one fan moved first" confusion: it was never a dropped write - the tables land (they are read back byte-for-byte), the *zone* just decides whether they matter.
 
+### The fan page locked itself under a Custom preset (fixed)
+
+Field 2026-11-02: Custom preset 1 applied, unplug, close, relaunch - the preset was still applied, but the Fan Control page showed the "Stock Preset Active" lockdown captioned **"Custom preset applied - fan control customization is only possible with a Custom preset."**
+
+The lock (`DeviceApplier.SyncManualControlLock`) was derived from the EC's custom-profile bit (0x0727 bit6). That bit is a **GPU-power-control prerequisite, not a fan-ownership signal**: a custom fan table applies with it clear - measured on the dev box, `0x0727 = 0x00` and a Full Speed apply still took both fans to 200/200 (RPM 4607). Any Custom preset that never activated GPU power control (on battery, or a preset without GPU changes) therefore locked its own fan page, and the overlay's caption - which interpolates the active preset name - contradicted itself.
+
+The lock now follows the app's ownership decision: `PresetProfileApplier.IsBuiltInProfile(presetProfile)` engages it, a Custom preset releases it, and both transitions log (`[Fan] manual control lock engaged/released (preset '...')`) so the field can see which side of the decision a machine is on. Pins: `Uniwill Control Utility.Tests/Services/FanLockOwnershipTests.cs`.
+
 ### GPU power reading flapped to absurd values on the Intel laptop (fixed)
 
 Field report 2026-11-02 (PCSpecialist Recoil 3, Core Ultra 9 275HX): on battery, changing the fan curve made the GPU power readout alternate between 22 W and 190286 W, repeatedly. HWiNFO stayed sane, so it is ours.
