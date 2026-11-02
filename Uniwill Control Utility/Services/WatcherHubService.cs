@@ -360,7 +360,19 @@ namespace Uniwill_Control_Utility.Services
             {
                 // An AC/DC automation re-applies its own choice on this edge; two
                 // applies racing the same transition is how a preset ping-pongs.
-                if (Properties.Settings.Default.EnableAutoNavigation)
+                //
+                // The gate is the EDGE's automation, not the master switch: with
+                // automation on but this edge set to "None" (the common case) the
+                // automation applies nothing, so returning here would leave the
+                // preset on its AC values after unplugging - the exact gap this
+                // hook exists to close (found in review, 2026-11-02).
+                string edgePreset = online
+                    ? Properties.Settings.Default.acPreset
+                    : Properties.Settings.Default.dcPreset;
+                bool automationOwnsEdge = Properties.Settings.Default.EnableAutoNavigation
+                    && !string.IsNullOrEmpty(edgePreset)
+                    && !string.Equals(edgePreset, "None", StringComparison.OrdinalIgnoreCase);
+                if (automationOwnsEdge)
                     return;
 
                 // Stock presets are the firmware's to apply (no app-side clamp), so
