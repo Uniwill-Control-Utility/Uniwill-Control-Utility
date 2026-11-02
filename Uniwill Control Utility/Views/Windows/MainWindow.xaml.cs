@@ -387,6 +387,18 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Services.OemMergeReport report = await service.PauseAsync();
                 OemWarnPopup.IsOpen = false;
 
+                // The action just measured the claim: if the engine answered and
+                // paused nothing, there is nothing live to fight us, and leaving
+                // the chip up would keep asserting the opposite of what the
+                // button reported (field, 2026-11-02). Dismiss for the session;
+                // the next launch re-probes, so a stack that comes back re-warns.
+                if (report.EngineReachable && report.State != "Busy" && report.MutationsApplied == 0)
+                {
+                    _oemWarnDismissed = true;
+                    DiagnosticLogger.LogInfo(
+                        "[OEM] pause found nothing to do - the title-bar warning is dismissed for this session");
+                }
+
                 string body = report.State == "Busy"
                     ? LocalizationService.Get("A takeover action is already running.")
                     : !report.EngineReachable

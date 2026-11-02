@@ -184,6 +184,14 @@ The mechanism: Velopack's per-machine registration check is an IN-PROCESS regist
 
 The rule that closes the class (unit-pinned in `VelopackRegistrationGuardTests`): an app running from the per-machine layout - a filesystem fact, no registry consulted - never builds `UpdateManager`; the app log shows `[Update] UpdateManager stays un-built: ... per-machine (MSI) layout ...`. Consequence: installed machines have no in-app update flow (no title-bar card, no auto-check); **updates on installed machines arrive by running a new Setup.msi** - the thin-MSI layout's real update mechanism. Portable/dev layouts keep the full Velopack flow; their per-user root has no MSI registration for a repair to destroy. Do not "improve" this guard into a registry-view condition again: a v1 guard on `MsiEnumProductsW` and a v2 guard on the ARP view each passed its own machine state and each shipped the death from the opposite side.
 
+### A removal sweep must never /x the install it is running from
+
+`EngineInstaller.SweepStaleUserRegistrations` enumerates MSI products named "Uniwill Control Utility" and runs `msiexec /x` on each whose `InstalledLocation` is not this layout - its guard against destroying the live install. That guard used to fail toward destruction: `MsiGetProductInfoW` returning non-zero (the blinded view guarded machines are known for - in-process enumeration sees 421 other products and never ours) fell through to the `/x` branch. An unreadable or empty `InstalledLocation` is now treated as live and skipped; a husk left behind costs one sweep pass, a wrong `/x` costs the install. No unit pin: the decision is inline in a P/Invoke-bound loop (the resolver beside it is pinned).
+
+### "Pause" saying "Nothing to pause" must also retire the warning
+
+The title-bar chip and the pause button measured different things for two rounds (installed vs live, then live vs pausable). The production guard is the live-evidence clause in `OemTakeoverService.ShouldWarn`; the remaining backstop is behavioural: when a pause from the chip returns `MutationsApplied == 0` on a reachable engine, the chip dismisses itself for the session and logs it, because the action just disproved the claim. Next launch re-probes, so a stack that returns re-warns (field, 2026-11-02).
+
 ### The Control Panel uninstall: single entry, bound to the shim at pack time
 
 The packed MSI carries the whole Control Panel story INSIDE the package (build\pack.ps1 step 5a, tool build\msi-edit\MsiEdit.cs). Field-verified end-to-end on the guarded box 2026-10-29 (packs p26-p33): Control Panel → Uninstall → complete sweep, no dialogs. The two key facts:

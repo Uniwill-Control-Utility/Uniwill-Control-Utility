@@ -739,13 +739,21 @@ namespace UCU.Engine
                 // fires it while the install is live (a ghost's /x transaction
                 // mid-flight, the hook spawns the verb). Removing the live
                 // registration from the hook path is self-destruction.
+                //
+                // "Unknown" counts as live. This verb /x-es whatever it decides
+                // is stale, and guarded machines blind in-process MSI reads
+                // (field-proven: MsiEnumProductsW enumerates 421 products and
+                // never ours), so a failed or empty InstalledLocation is not
+                // evidence - it is the blinded view, and acting on it would
+                // remove the install we are running from.
                 var location = new StringBuilder(260);
                 uint locationLength = 260;
-                if (MsiGetProductInfoW(code, "InstalledLocation", location, ref locationLength) == 0 &&
-                    string.Equals(location.ToString().TrimEnd('\\'), InstallLayoutRoot,
-                        StringComparison.OrdinalIgnoreCase))
+                bool locationKnown = MsiGetProductInfoW(code, "InstalledLocation", location, ref locationLength) == 0;
+                string installedAt = locationKnown ? location.ToString().TrimEnd('\\') : string.Empty;
+                if (!locationKnown || installedAt.Length == 0 ||
+                    string.Equals(installedAt, InstallLayoutRoot, StringComparison.OrdinalIgnoreCase))
                 {
-                    Log.Debug("[EngineInstaller] registration {Code} is the live install - left to its own uninstall", code);
+                    Log.Debug("[EngineInstaller] registration {Code} is the live install (or unreadable) - left to its own uninstall", code);
                     continue;
                 }
 
