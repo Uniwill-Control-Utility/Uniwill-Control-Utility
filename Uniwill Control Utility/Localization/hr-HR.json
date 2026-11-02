@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center je pokrenut",
   "On AC power": "Na mrežnom napajanju",
   "On battery": "Na bateriji",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "Na bateriji je snaga CPU-a ograničena na Office profil ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "Na bateriji je snaga ograničena na ovojnicu platforme (CPU {0} W, GPU {1} W).",
   "On enter or exit": "Pri dolasku ili odlasku",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Jedan paket za podršku: verzije, hardver, stanje motora i preuzimanja, zapisi i dnevnici",
   "Open Settings": "Otvori postavke",

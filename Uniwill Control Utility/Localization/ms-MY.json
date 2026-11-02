@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center sedang berjalan",
   "On AC power": "Kuasa AC",
   "On battery": "Kuasa bateri",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "Pada bateri, kuasa CPU dihadkan kepada profil Office ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "Pada bateri, kuasa dihadkan kepada sampul platform (CPU {0} W, GPU {1} W).",
   "On enter or exit": "Apabila masuk atau keluar",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Satu bundel untuk sokongan: versi, perkakasan, status enjin dan pengambilalihan, log dan jurnal",
   "Open Settings": "Buka Tetapan",

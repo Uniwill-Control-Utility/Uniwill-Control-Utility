@@ -140,7 +140,24 @@ namespace Uniwill_Control_Utility.Scripts
                                 {
                                     string[] limits = ryzenAdjCommandValueString.Split(',');
                                     if (limits.Length == 2)
-                                        IntelManagement.changeTDP(int.Parse(limits[0]), int.Parse(limits[1]));
+                                    {
+                                        // Battery envelope: the firmware refuses or
+                                        // penalises requests above its DC ceiling
+                                        // (measured 30-40 W CPU on the 275HX laptop),
+                                        // so clamp the pair and log what changed.
+                                        var envelope = UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(intelCpu: true);
+                                        var clamped = UCU.Core.Power.BatteryPowerPolicy.ClampCpu(
+                                            int.Parse(limits[0]), int.Parse(limits[1]),
+                                            onBattery: System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                                                       == System.Windows.Forms.PowerLineStatus.Offline,
+                                            cpuCeiling: envelope.CpuWatts);
+                                        if (clamped.Clamped)
+                                        {
+                                            DiagnosticLogger.LogInfo(
+                                                $"[Power] battery envelope: Intel PL clamped {clamped.RequestedPl1}/{clamped.RequestedPl2} W -> {clamped.Pl1}/{clamped.Pl2} W");
+                                        }
+                                        IntelManagement.changeTDP(clamped.Pl1, clamped.Pl2);
+                                    }
                                     else
                                         IntelManagement.changeTDPAll(int.Parse(ryzenAdjCommandValueString));
                                 }

@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center กำลังทำงาน",
   "On AC power": "ใช้ไฟบ้าน",
   "On battery": "ใช้แบตเตอรี่",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "เมื่อใช้แบตเตอรี่ กำลัง CPU ถูกจำกัดที่โปรไฟล์ Office ({0} W)",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "เมื่อใช้แบตเตอรี่ กำลังถูกจำกัดที่ขอบเขตของแพลตฟอร์ม (CPU {0} W, GPU {1} W)",
   "On enter or exit": "ทั้งเข้าและออก",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "ชุดเดียวสำหรับการสนับสนุน: เวอร์ชัน ฮาร์ดแวร์ สถานะเอนจินและการเข้าควบคุม บันทึกและเจอร์นัล",
   "Open Settings": "เปิดการตั้งค่า",

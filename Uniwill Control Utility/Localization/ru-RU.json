@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center запущен",
   "On AC power": "От сети",
   "On battery": "От батареи",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "На батарее мощность CPU ограничена профилем Office ({0} Вт).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "На батарее мощность ограничена рамками платформы (CPU {0} Вт, GPU {1} Вт).",
   "On enter or exit": "При появлении или уходе",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Один пакет для поддержки: версии, оборудование, состояние движка и перехвата, логи и журналы",
   "Open Settings": "Открыть настройки",

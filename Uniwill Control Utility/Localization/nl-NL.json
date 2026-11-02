@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center wordt uitgevoerd",
   "On AC power": "Op netstroom",
   "On battery": "Op batterij",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "Op accu is het CPU-vermogen beperkt tot het Office-profiel ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "Op accu is het vermogen beperkt tot de platform-envelop (CPU {0} W, GPU {1} W).",
   "On enter or exit": "Bij naar-voorgrond of van-voorgrond",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "Eén bundel voor support: versies, hardware, engine- en overnamestatus, logboeken en journals",
   "Open Settings": "Instellingen openen",

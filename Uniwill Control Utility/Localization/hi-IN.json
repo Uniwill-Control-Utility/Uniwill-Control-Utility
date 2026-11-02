@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center चल रहा है",
   "On AC power": "AC पावर पर",
   "On battery": "बैटरी पर",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "बैटरी पर CPU पावर Office एनवलप तक सीमित है ({0} W)।",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "बैटरी पर पावर प्लेटफ़ॉर्म एनवलप तक सीमित है (CPU {0} W, GPU {1} W)।",
   "On enter or exit": "आने या जाने पर",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "समर्थन के लिए एक बंडल: संस्करण, हार्डवेयर, इंजन और अधिग्रहण स्थिति, लॉग और जर्नल",
   "Open Settings": "सेटिंग्स खोलें",

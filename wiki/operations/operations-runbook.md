@@ -243,6 +243,23 @@ The preset used to raise the curve duties to 100 % and stop there, but the EC pi
 
 This also explains the older "one fan moved first" confusion: it was never a dropped write - the tables land (they are read back byte-for-byte), the *zone* just decides whether they matter.
 
+### Battery envelope, measured (CPU and GPU, both laptops)
+
+With a CPU stress test and a GPU benchmark running together, on battery:
+
+| laptop | CPU package | GPU |
+|---|---|---|
+| Intel Core Ultra 9 275HX | 30-40 W | 35 W |
+| AMD (XMG Neo 16, Ryzen + RTX) | 30-40 W | 40 W |
+
+The firmware enforces those, not the request: a Custom preset asking for 115 W GPU sat at ~30 W, and asking for 160 W CPU *lowered* package power to 30 W (open-revo documents the same trap). So `UCU.Core.Power.BatteryPowerPolicy` carries the two envelopes (plus a conservative fallback for unknown chassis) and the app clamps its own requests to them on DC:
+
+- CPU, AMD EC path and the Intel `--intel-pl` path: clamp the PL pair to the envelope's CPU ceiling.
+- GPU (`NvTuning.SetPowerLimit`, the single TGP apply site on both platforms): clamp TGP to the GPU ceiling and set Dynamic Boost to 0 - it cannot be borrowed on battery either.
+- One toast on a clamp: "On battery, power is limited to the platform envelope (CPU N W, GPU M W)." plus a `[Power] battery envelope:` log line naming requested vs applied.
+
+Undervolt, clock offsets and fan curves are untouched: the firmware clamps power only, and undervolting is the one tuning that still pays off on DC. Presets are therefore *not* disabled on battery, and no second set of battery slots exists - the clamp makes the numbers honest without duplicating the preset model.
+
 ### Every preset is re-applied at startup ("Apply on startup" is gone)
 
 The Presets page carried an "Apply on startup" checkbox that only affected Custom presets (stock presets always applied). Leaving it off meant a relaunch could show the saved preset as active while the EC still held the previous session's values - the state that made the fan page lock itself under a Custom preset on 2026-11-02, and that makes any post-relaunch fan/power report ambiguous.

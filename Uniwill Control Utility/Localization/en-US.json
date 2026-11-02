@@ -307,7 +307,7 @@
   "OEM Control Center running": "OEM Control Center running",
   "On AC power": "On AC power",
   "On battery": "On battery",
-  "On battery, CPU power is limited to the Office envelope ({0} W).": "On battery, CPU power is limited to the Office envelope ({0} W).",
+  "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).": "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).",
   "On enter or exit": "On enter or exit",
   "One bundle for support: versions, hardware, engine and takeover state, logs and journals": "One bundle for support: versions, hardware, engine and takeover state, logs and journals",
   "Open Settings": "Open Settings",

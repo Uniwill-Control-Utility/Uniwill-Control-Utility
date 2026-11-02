@@ -3,18 +3,19 @@ using UCU.Core.Power;
 namespace UCU.Core.Tests.Power;
 
 /// <summary>
-/// The battery CPU-envelope clamp (U-206 follow-up, field-measured
-/// 2026-11-02). On DC the firmware caps package power at the Office level and
-/// punishes a higher request by dropping below it (160 W requested -> 30 W
-/// actual, vs 40 W at the Office preset). The policy therefore clamps the
-/// request on battery and leaves AC untouched.
+/// The battery envelope clamp. Measured 2026-11-02 with a CPU stress test and a
+/// GPU benchmark together, both laptops on DC:
+///   Intel Core Ultra 9 275HX laptop: CPU 30-40 W, GPU 35 W
+///   AMD (XMG Neo 16)               : CPU 30-40 W, GPU 40 W
+/// Asking above the ceiling is not just ignored - a 160 W CPU request made the
+/// Intel part drop to 30 W - so the app clamps its request and says so.
 /// </summary>
 public sealed class BatteryPowerPolicyTests
 {
     [Fact]
-    public void OnAc_RequestPassesThrough()
+    public void OnAc_CpuRequestPassesThrough()
     {
-        var verdict = BatteryPowerPolicy.ClampForBattery(160, 200, onBattery: false, officePl1: 45, officePl2: 45);
+        var verdict = BatteryPowerPolicy.ClampCpu(160, 200, onBattery: false, cpuCeiling: 40);
 
         Assert.False(verdict.Clamped);
         Assert.Equal(160, verdict.Pl1);
@@ -22,9 +23,9 @@ public sealed class BatteryPowerPolicyTests
     }
 
     [Fact]
-    public void OnBattery_HighRequestIsClampedToTheOfficeEnvelope()
+    public void OnBattery_HighCpuRequestIsClampedToTheEnvelope()
     {
-        var verdict = BatteryPowerPolicy.ClampForBattery(160, 200, onBattery: true, officePl1: 40, officePl2: 40);
+        var verdict = BatteryPowerPolicy.ClampCpu(160, 200, onBattery: true, cpuCeiling: 40);
 
         Assert.True(verdict.Clamped);
         Assert.Equal(40, verdict.Pl1);
@@ -34,31 +35,76 @@ public sealed class BatteryPowerPolicyTests
     }
 
     [Fact]
-    public void OnBattery_RequestBelowTheEnvelopeIsKept()
+    public void OnBattery_CpuRequestBelowTheEnvelopeIsKept()
     {
-        var verdict = BatteryPowerPolicy.ClampForBattery(30, 35, onBattery: true, officePl1: 40, officePl2: 40);
+        var verdict = BatteryPowerPolicy.ClampCpu(25, 30, onBattery: true, cpuCeiling: 40);
 
         Assert.False(verdict.Clamped);
-        Assert.Equal(30, verdict.Pl1);
-        Assert.Equal(35, verdict.Pl2);
+        Assert.Equal(25, verdict.Pl1);
+        Assert.Equal(30, verdict.Pl2);
     }
 
     [Fact]
-    public void OnBattery_MixedRequestClampsOnlyWhatExceeds()
+    public void OnAc_GpuRequestPassesThrough()
     {
-        var verdict = BatteryPowerPolicy.ClampForBattery(35, 120, onBattery: true, officePl1: 40, officePl2: 40);
+        var verdict = BatteryPowerPolicy.ClampGpu(115, 25, onBattery: false, gpuCeiling: 35);
+
+        Assert.False(verdict.Clamped);
+        Assert.Equal(115, verdict.TgpWatts);
+        Assert.Equal(25, verdict.DbWatts);
+    }
+
+    [Fact]
+    public void OnBattery_GpuIsClampedToTheCeilingAndDynamicBoostIsDropped()
+    {
+        var verdict = BatteryPowerPolicy.ClampGpu(115, 25, onBattery: true, gpuCeiling: 35);
 
         Assert.True(verdict.Clamped);
-        Assert.Equal(35, verdict.Pl1);
-        Assert.Equal(40, verdict.Pl2);
+        Assert.Equal(35, verdict.TgpWatts);
+        Assert.Equal(0, verdict.DbWatts);
+        Assert.Equal(115, verdict.RequestedTgp);
+        Assert.Equal(25, verdict.RequestedDb);
     }
 
     [Fact]
-    public void UnknownSkuEnvelope_FallsBackToTheDefaults()
+    public void OnBattery_GpuBelowTheCeilingKeepsItsValueButStillDropsDynamicBoost()
     {
-        var verdict = BatteryPowerPolicy.ClampForBattery(160, 160, onBattery: true, officePl1: 0, officePl2: 0);
+        var verdict = BatteryPowerPolicy.ClampGpu(30, 10, onBattery: true, gpuCeiling: 40);
 
-        Assert.Equal(BatteryPowerPolicy.DefaultOfficePl1, verdict.Pl1);
-        Assert.Equal(BatteryPowerPolicy.DefaultOfficePl2, verdict.Pl2);
+        Assert.True(verdict.Clamped);
+        Assert.Equal(30, verdict.TgpWatts);
+        Assert.Equal(0, verdict.DbWatts);
+    }
+
+    [Theory]
+    [InlineData(true, 40, 35)]
+    [InlineData(false, 40, 40)]
+    public void EnvelopeFollowsTheCpuVendor(bool intelCpu, int expectedCpu, int expectedGpu)
+    {
+        BatteryPowerPolicy.Envelope envelope = BatteryPowerPolicy.EnvelopeFor(intelCpu);
+
+        Assert.Equal(expectedCpu, envelope.CpuWatts);
+        Assert.Equal(expectedGpu, envelope.GpuWatts);
+    }
+
+    [Fact]
+    public void UnknownPlatformFallsBackToTheConservativeEnvelope()
+    {
+        BatteryPowerPolicy.Envelope envelope = BatteryPowerPolicy.EnvelopeFor(null);
+
+        Assert.Equal(BatteryPowerPolicy.ConservativeEnvelope.CpuWatts, envelope.CpuWatts);
+        Assert.Equal(BatteryPowerPolicy.ConservativeEnvelope.GpuWatts, envelope.GpuWatts);
+        Assert.True(envelope.CpuWatts <= BatteryPowerPolicy.IntelEnvelope.CpuWatts);
+        Assert.True(envelope.GpuWatts <= BatteryPowerPolicy.AmdEnvelope.GpuWatts);
+    }
+
+    [Fact]
+    public void MissingCeilingFallsBackToTheConservativeOne()
+    {
+        var cpu = BatteryPowerPolicy.ClampCpu(120, 120, onBattery: true, cpuCeiling: 0);
+        var gpu = BatteryPowerPolicy.ClampGpu(120, 20, onBattery: true, gpuCeiling: 0);
+
+        Assert.Equal(BatteryPowerPolicy.ConservativeEnvelope.CpuWatts, cpu.Pl1);
+        Assert.Equal(BatteryPowerPolicy.ConservativeEnvelope.GpuWatts, gpu.TgpWatts);
     }
 }
