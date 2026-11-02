@@ -279,11 +279,24 @@ The Presets page carried an "Apply on startup" checkbox that only affected Custo
 
 Consequence worth knowing: a Custom preset's power limits, fan curve and GPU settings are written on every launch, so a machine whose EC firmware clamps something (see the battery section) will look exactly the same after a relaunch as it did before it - which is the point.
 
+### Never install over a running app (mixed build = the app half-works)
+
+Field 2026-11-02 (tester laptop): the MSI was installed while UCU was running. Windows cannot replace a running image, so the **old exe stayed** while the new `UCU.Core.dll` landed beside it, and every preset apply died with:
+
+```
+[Arbiter] Preset intent "BootRestore":'Office' failed to apply
+System.MissingMethodException: Method not found: 'Verdict BatteryPowerPolicy.ClampForBattery(...)'
+```
+
+The session then ran on whatever the previous one left: the saved Full Speed fan curve applied (with the FanBoost bit), the fan page showed a curve that was not the preset's, and the lock said a stock preset owned the fans. A MissingMethodException is the signature of this state, not of a logic bug.
+
+Two guards now: `App.IsInstallationConsistent()` touches the newest cross-assembly API at startup and, on `MissingMethodException`/`TypeLoadException`/`FileLoadException`, shows "This installation mixes files from different builds…" and exits instead of half working. The install rule stands: **close UCU (and let the engine stop) before running the MSI** - the staging cycle in this document does exactly that.
+
 ### Power-edge presets and the locked fan page: what the UI now says
 
 Two field-driven corrections (2026-11-02).
 
-**Automations, power edges.** The controls used to read "Preset / None" as if they were a power switch. On battery the firmware owns the ceilings and the app clamps to the measured envelope regardless, so a power-edge preset now only decides fan noise, undervolt and who controls the fans. The rows read "Preset on battery" / "Preset when plugged in" with a caption saying power limits stay capped either way, and the leading item reads "Keep current preset" while still persisting `None` (the value `WatcherHubService` and the MainWindow automation gate compare against - the display text lives in a `Tag`, so no saved selection is re-mapped).
+**Automations, power edges.** The controls used to read "Preset / None" as if they were a power switch. On battery the firmware owns the ceilings and the app clamps to the measured envelope regardless, so a power-edge preset now only decides fan noise and who controls the fans (the caption names those two, not undervolt - undervolting is an AMD-only control and the row exists on both platforms). The rows read "Preset on battery" / "Preset when plugged in" with a caption saying power limits stay capped either way, and the leading item reads "Keep current preset" while still persisting `None` (the value `WatcherHubService` and the MainWindow automation gate compare against - the display text lives in a `Tag`, so no saved selection is re-mapped).
 
 **Fan page, locked state.** With a stock preset applied the page is locked because the firmware drives the fans, but it used to keep displaying the user's saved curve - "Full speed" under an applied Office - so the page claimed a curve the hardware was not running. The whole curve area is now collapsed behind a notice that names the active preset ("Office preset is driving the fans", "{0} preset is driving the fans" in the catalogs) and says the saved curve returns with a Custom preset. The Fan Turbo toggle is disabled by the same lock and now reflects the EC's real turbo state on load (`IFanCapability.GetStatusAsync().TurboActive`) instead of an unset local default; both toggle handlers early-return while the page is syncing.
 

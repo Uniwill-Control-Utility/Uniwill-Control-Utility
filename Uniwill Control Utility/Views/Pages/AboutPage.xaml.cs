@@ -207,14 +207,21 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
         {
-            // The log folder is per-user (App.LOGS_FOLDER): in a per-machine install
-            // the exe's own directory is not writable by the user at all.
-            var logFolder = App.LOGS_FOLDER;
+            // Both logs, because a field report is rarely answered by one of them:
+            // the app log holds the preset/fan decisions, the engine log holds what
+            // reached the EC. The app folder is per-user (App.LOGS_FOLDER) - in a
+            // per-machine install the exe's own directory is not writable at all -
+            // and the engine's lives under ProgramData, readable by an admin.
+            string engineFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "UCU",
+                "engine");
 
-            if (Directory.Exists(logFolder))
-            {
-                Process.Start(new ProcessStartInfo(logFolder) { UseShellExecute = true });
-            }
+            if (Directory.Exists(App.LOGS_FOLDER))
+                Process.Start(new ProcessStartInfo(App.LOGS_FOLDER) { UseShellExecute = true });
+
+            if (Directory.Exists(engineFolder))
+                Process.Start(new ProcessStartInfo(engineFolder) { UseShellExecute = true });
 
             e.Handled = true;
         }

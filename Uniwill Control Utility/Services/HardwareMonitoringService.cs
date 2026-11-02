@@ -744,15 +744,15 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Ceiling for a plausible laptop GPU draw.
         ///
-        /// The value comes from LibreHardwareMonitor, and its Intel iGPU "GPU
-        /// Power" sensor is a derivative of the MSR RAPL energy counter with an
-        /// unchecked 32-bit subtraction - while its PawnIO wrapper reports a
-        /// failed ioctl as a successful read of 0. One dropped read therefore
-        /// yields (2^32 - last)/dt, i.e. ~10^5 W for about a second (field,
-        /// 2026-11-02: an Intel Core Ultra 9 275HX laptop on battery alternated
-        /// 22 W with 190286 W, and only on battery because the powered-down dGPU
-        /// hands the GPU row to the iGPU). Nothing a laptop GPU can draw, so it
-        /// is dropped - 0 renders as "--" everywhere - and logged.
+        /// The value comes from LibreHardwareMonitor, whose vendor back-ends can
+        /// emit garbage: its Intel iGPU "GPU Power" is a RAPL energy-counter
+        /// derivative with an unchecked 32-bit subtraction fed 0 by a failed
+        /// PawnIO read, and the NVIDIA path produced the same class of sample on
+        /// the field 5080 laptop (field, 2026-11-02: 1.9M W alternating with
+        /// sane readings on battery, and 190286 W on the Intel iGPU). Nothing a
+        /// laptop GPU can draw, so it is dropped - 0 renders as "--" everywhere -
+        /// and logged. The guard is deliberately vendor-blind: the sensor, not
+        /// the vendor, is what lies.
         /// </summary>
         internal const int MaxPlausibleGpuWatts = 600;
 
@@ -772,7 +772,7 @@ namespace Uniwill_Control_Utility.Services
                 try
                 {
                     Serilog.Log.Warning(
-                        $"[LHM] Rejected GPU power {watts} W from {gpuType} '{gpu?.Name}' (ceiling {MaxPlausibleGpuWatts} W) - RAPL counter wrap, not a real draw");
+                        $"[LHM] Rejected GPU power {watts} W from {gpuType} '{gpu?.Name}' (ceiling {MaxPlausibleGpuWatts} W) - no laptop GPU draws that; the sensor produced a bogus sample");
                 }
                 catch { /* Serilog may not be ready */ }
             }

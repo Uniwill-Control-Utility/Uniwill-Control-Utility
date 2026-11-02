@@ -135,7 +135,7 @@
                         <ui:TextBlock Margin="0,8,0,0"
                                       FontTypography="Caption"
                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                      Text="Power limits stay capped on battery whichever preset is selected — a preset changes fan noise, undervolt and who controls the fans."
+                                      Text="Power limits stay capped on battery; a preset changes fan noise and who controls the fans."
                                       TextWrapping="Wrap" />
 
                         <!-- Divider (hidden while the GPU row below is hidden) -->
@@ -249,7 +249,7 @@
                         <ui:TextBlock Margin="0,8,0,0"
                                       FontTypography="Caption"
                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                      Text="Power limits stay capped on battery whichever preset is selected — a preset changes fan noise, undervolt and who controls the fans."
+                                      Text="Power limits stay capped on battery; a preset changes fan noise and who controls the fans."
                                       TextWrapping="Wrap" />
 
                         <!-- Divider (hidden while the GPU row below is hidden) -->
