@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Never commit user-story / planning documents
+
+User-story documents, backlogs and plan drafts are **local working notes**, never repository content (user rule, 2026-11-02). They belong in the agent plan directory outside the repo (`~/.opencode/plan/`) or in an ignored local folder (`artifacts/notes/`); `.gitignore` matches `*user-stories*` so an accidental `git add -A` cannot sweep one in. If a story needs to be shared, write a sanitised wiki page instead of committing the story file.
+
+A `git add -A` in this repo is dangerous for the same reason: check `git status --short` before staging and exclude untracked strays explicitly.
+
 ## Localization sync — required before every commit
 
 Any user-visible text **addition, change, or removal** (XAML `Text`/`Content`,
