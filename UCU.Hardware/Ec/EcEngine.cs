@@ -1315,10 +1315,22 @@ namespace UCU.Hardware.Ec
             // Wait for GPU tables to settle before touching control registers.
             Thread.Sleep(150);
 
-            // Clear boost mode
+            // Hardware FanBoost (0x0751 bit6) is the only thing that actually pins
+            // both fans to maximum. A 100 % duty table does NOT: the EC selects a
+            // table zone from the temperature first, so at idle it stays on zone 0
+            // (the zero-RPM standby step, which the firmware forces to 0 duty) and
+            // the fans sit at their floor - the filed "Full Speed preset but the
+            // fans sit at 26 %" bug. Measured on the dev box 2026-11-02: tables at
+            // 200 with 0x0751 = 0x00 -> duty 50/0; setting bit6 -> 200/200 at the
+            // same temperatures. Only the Full Speed preset asks for that state.
+            bool fanBoost = IsFullSpeedCurve(cpuCurve) || IsFullSpeedCurve(gpuCurve);
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
-            fanCtrl = (byte)(fanCtrl & ~FAN_MODE_BOOST);
+            fanCtrl = fanBoost
+                ? (byte)(fanCtrl | FAN_MODE_BOOST)
+                : (byte)(fanCtrl & ~FAN_MODE_BOOST);
             WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
+            if (fanBoost)
+                DebugLog("[DIAG] EcEngine: Full Speed -> hardware FanBoost asserted (0x751 |= 0x40)");
 
             // Ensure SPLIT is set
             byte ufCtrl = ReadECRegister(REG_UNIVERSAL_FAN_CTRL);
@@ -1366,6 +1378,9 @@ namespace UCU.Hardware.Ec
             if (retry.Length != expected.Length || !System.Linq.Enumerable.SequenceEqual(retry, expected))
                 DebugLog($"[WRN] EcEngine: {label} fan table still differs after the retry - the EC refused it");
         }
+
+        private static bool IsFullSpeedCurve(EcFanCurveSpec curve) =>
+            string.Equals(curve.Name, "Full Speed", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// Reads the current fan curve table from the EC.

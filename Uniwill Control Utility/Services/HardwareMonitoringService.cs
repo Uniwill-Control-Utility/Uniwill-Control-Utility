@@ -654,7 +654,8 @@ namespace Uniwill_Control_Utility.Services
                 CpuClockMhz = CoreClockMhzFrom(cpu),
                 GpuTemperature = Round(ReadFirstValue(gpu, SensorType.Temperature, "GPU Core", "Core")),
                 GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "D3D 3D", "Core")),
-                GpuPowerWatts = Round(ReadFirstValue(gpu, SensorType.Power, "GPU Package", "GPU Power", "Core")),
+                GpuPowerWatts = PlausibleGpuPowerWatts(
+                    ReadFirstValue(gpu, SensorType.Power, "GPU Package", "GPU Power", "Core"), gpuType, gpu),
                 GpuClockMhz = Round(ReadFirstValue(gpu, SensorType.Clock, "GPU Core", "Core")),
                 GpuMemoryUsedGb = gpuMemoryUsedMb / 1024d,
                 GpuMemoryTotalGb = gpuMemoryTotalMb / 1024d,
@@ -738,6 +739,45 @@ namespace Uniwill_Control_Utility.Services
             }
 
             return metrics with { CpuTemperatureSource = CpuTemperatureSource.None };
+        }
+
+        /// <summary>
+        /// Ceiling for a plausible laptop GPU draw.
+        ///
+        /// The value comes from LibreHardwareMonitor, and its Intel iGPU "GPU
+        /// Power" sensor is a derivative of the MSR RAPL energy counter with an
+        /// unchecked 32-bit subtraction - while its PawnIO wrapper reports a
+        /// failed ioctl as a successful read of 0. One dropped read therefore
+        /// yields (2^32 - last)/dt, i.e. ~10^5 W for about a second (field,
+        /// 2026-11-02: an Intel Core Ultra 9 275HX laptop on battery alternated
+        /// 22 W with 190286 W, and only on battery because the powered-down dGPU
+        /// hands the GPU row to the iGPU). Nothing a laptop GPU can draw, so it
+        /// is dropped - 0 renders as "--" everywhere - and logged.
+        /// </summary>
+        internal const int MaxPlausibleGpuWatts = 600;
+
+        private static DateTime _lastGpuPowerWarnUtc = DateTime.MinValue;
+
+        /// <summary>The single GPU-power gate: implausible readings become 0
+        /// ("unavailable") instead of a number no laptop GPU can produce.</summary>
+        internal static int PlausibleGpuPowerWatts(double watts, ActiveGpuType gpuType, IHardware? gpu)
+        {
+            if (watts <= MaxPlausibleGpuWatts)
+                return Round(watts);
+
+            DateTime now = DateTime.UtcNow;
+            if (now - _lastGpuPowerWarnUtc >= TimeSpan.FromMinutes(1))
+            {
+                _lastGpuPowerWarnUtc = now;
+                try
+                {
+                    Serilog.Log.Warning(
+                        $"[LHM] Rejected GPU power {watts} W from {gpuType} '{gpu?.Name}' (ceiling {MaxPlausibleGpuWatts} W) - RAPL counter wrap, not a real draw");
+                }
+                catch { /* Serilog may not be ready */ }
+            }
+
+            return 0;
         }
 
         /// <summary>

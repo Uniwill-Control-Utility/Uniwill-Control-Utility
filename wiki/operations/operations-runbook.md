@@ -227,6 +227,22 @@ UCU therefore clamps the CPU PL pair to the Office envelope while on DC (`UCU.Co
 
 **Fan control on battery is intentionally unaffected** - nothing is disabled, and the fan page is independent of presets. Note the split/unified semantics behind the "one fan moved first" reports: with split curves each fan follows its own temperature (an idle GPU keeps the GPU fan low while the CPU is stressed), and Unified drives both from the shared source. `EcEngine.ApplyFanCurve` now reads both duty tables back after a write and re-writes once if the EC kept the old table (log: `[WRN] EcEngine: <CPU|GPU> fan table did not land ... re-writing once`).
 
+### "Full Speed" left the fans at about 25 % (fixed)
+
+The preset used to raise the curve duties to 100 % and stop there, but the EC picks the curve zone from the **temperature** first, and zone 0 is the zero-RPM standby step the firmware pins to 0 duty. At idle (45 C) that is the zone in force, so the fans stayed at their floor (~50/200 on the dev box) while the UI said Full Speed. The 2026-11-02 measurement is unambiguous: tables at 200 with `0x0751 = 0x00` -> duty 50/0; writing `0x0751 |= 0x40` (the EC's hardware FanBoost bit) -> 200/200 at the same temperatures, and the duty tables were not touched.
+
+`EcEngine.ApplyFanCurve` now asserts `MANUAL_FAN_CTRL` bit 6 whenever the curve name is `Full Speed`, and clears it for every other preset (that clearing is what the code already did unconditionally). Read-modify-write, so the performance-mode bits the firmware set survive. Regression pins: `UCU.Hardware.Tests/EcEngineFullSpeedBoostTests.cs`.
+
+This also explains the older "one fan moved first" confusion: it was never a dropped write - the tables land (they are read back byte-for-byte), the *zone* just decides whether they matter.
+
+### GPU power reading flapped to absurd values on the Intel laptop (fixed)
+
+Field report 2026-11-02 (PCSpecialist Recoil 3, Core Ultra 9 275HX): on battery, changing the fan curve made the GPU power readout alternate between 22 W and 190286 W, repeatedly. HWiNFO stayed sane, so it is ours.
+
+Cause: on battery the powered-down dGPU reports 0 load, so the GPU row falls back to the **Intel iGPU**. LibreHardwareMonitor's iGPU "GPU Power" is an MSR RAPL energy-counter derivative with an unchecked 32-bit subtraction, and its PawnIO wrapper reports a failed ioctl as a *successful read of 0*. One dropped read therefore yields (2^32 - last)/dt - about 10^5 W for a second or two. 190286 W is arithmetically that wrap at ~1 s cadence; the value is display-only (nothing computes with it), but it broke the fixed-width RTSS column and looked alarming.
+
+`HardwareMonitoringService.PlausibleGpuPowerWatts` now drops anything above 600 W to 0 ("--"), and warns once a minute with the hardware name and the raw value (`[LHM] Rejected GPU power ...`). Pins: `Uniwill Control Utility.Tests/Services/GpuPowerPlausibilityTests.cs`. The same RAPL-underflow shape exists for the Intel CPU package power sensor in that library; if a CPU-watt spike is ever reported, the same guard slots in beside it.
+
 ### Display brightness is missing
 
 Display → **Display brightness** (U-205) writes through the panel's WDDM brightness control (`root\WMI` → `WmiMonitorBrightnessMethods.WmiSetBrightness`), then re-reads `WmiMonitorBrightness.CurrentBrightness` as the evidence — the row is hidden entirely when the panel exposes no such class, so a missing slider means "this display has no WDDM brightness control", not a bug (external monitors are handled by their own DDC/CI controls, not by this row). The warning `[Display] brightness write to N% did not verify` means the panel accepted the call but reports a different value (driver clamp); the label then shows the readback, never the request.
