@@ -303,12 +303,36 @@ namespace Uniwill_Control_Utility.Services
                             };
                         }
                     }
-                    await ec.ApplyCpuPowerLimitsAsync(pl1, pl2).ConfigureAwait(false);
+                    // Battery envelope (field-measured 2026-11-02): on DC the
+                    // firmware caps package power at the Office level and a
+                    // higher request makes it DROP below that (160 W asked ->
+                    // 30 W actual vs 40 W at Office). Clamp the CPU request to
+                    // the Office envelope while on battery; GPU/DB/fan stay.
+                    var officeProfile = SkuResolver.GetProfile("office");
+                    UCU.Core.Power.BatteryPowerPolicy.Verdict verdict =
+                        UCU.Core.Power.BatteryPowerPolicy.ClampForBattery(
+                            pl1, pl2,
+                            onBattery: System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                                       == System.Windows.Forms.PowerLineStatus.Offline,
+                            officePl1: officeProfile?.CpuPl1 ?? UCU.Core.Power.BatteryPowerPolicy.DefaultOfficePl1,
+                            officePl2: officeProfile?.CpuPl2 ?? UCU.Core.Power.BatteryPowerPolicy.DefaultOfficePl2);
+
+                    if (verdict.Clamped)
+                    {
+                        Scripts.Misc.DiagnosticLogger.LogInfo(
+                            $"[Power] battery envelope: CPU limits clamped {verdict.RequestedPl1}/{verdict.RequestedPl2} W -> {verdict.Pl1}/{verdict.Pl2} W (Office)");
+                        Scripts.Misc.ToastNotification.ShowToastNotification(
+                            Services.LocalizationService.Get("Power limits"),
+                            Services.LocalizationService.Format(
+                                "On battery, CPU power is limited to the Office envelope ({0} W).", verdict.Pl1));
+                    }
+
+                    await ec.ApplyCpuPowerLimitsAsync(verdict.Pl1, verdict.Pl2).ConfigureAwait(false);
 
                     // The contract note (U-107): the watts pair this preset
                     // established is what the guardian re-applies if the EC
                     // reports it changed.
-                    Services.PowerContractStore.NoteCpuApplied(pl1, pl2);
+                    Services.PowerContractStore.NoteCpuApplied(verdict.Pl1, verdict.Pl2);
                 }
             }
 
