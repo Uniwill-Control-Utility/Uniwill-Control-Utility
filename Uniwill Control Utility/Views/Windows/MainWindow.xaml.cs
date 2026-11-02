@@ -476,20 +476,29 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // Every preset re-applies at startup now (the "Apply on startup"
                 // option is gone): a relaunch must never leave the EC running the
                 // previous session's values while the UI claims the saved preset.
-                // If the last selected profile was Custom, apply from CustomPresetStore.
-                if (Settings.Default.presetProfile == "Custom")
+                //
+                // Custom presets arrive in two key shapes: the legacy "Custom"
+                // (meaning "the saved slot") and the keyed "Custom 3" the slot
+                // radio buttons write. Only the legacy key used to be handled, so
+                // a saved keyed preset was never re-applied at all - the EC kept
+                // the previous session's values while the UI showed the preset.
+                (int keyedSlot, Models.PresetMode keyedMode) =
+                    PresetProfileApplier.TryParseCustomSlotExtended(Settings.Default.presetProfile);
+                if (keyedSlot >= 0 || Settings.Default.presetProfile == "Custom")
                 {
                     await Task.Run(() => GetBatteryStatus());
 
-                    // Determine active preset mode based on current Power boost mode setting
-                    Models.PresetMode mode = Settings.Default.EnablePowerBoostMode
-                        ? Models.PresetMode.Boost
-                        : Models.PresetMode.Normal;
+                    // Keyed presets name their slot and mode; the legacy key falls
+                    // back to the saved slot and the power-boost mode setting.
+                    Models.PresetMode mode = keyedSlot >= 0
+                        ? keyedMode
+                        : (Settings.Default.EnablePowerBoostMode ? Models.PresetMode.Boost : Models.PresetMode.Normal);
                     var presets = Models.CustomPresetStore.Load(mode);
-                    // Use the saved slot for the active mode, fall back to first slot with data.
-                    int slot = mode == Models.PresetMode.Boost
-                        ? Settings.Default.customPresetSlotBoost
-                        : Settings.Default.customPresetSlot;
+                    int slot = keyedSlot >= 0
+                        ? keyedSlot
+                        : (mode == Models.PresetMode.Boost
+                            ? Settings.Default.customPresetSlotBoost
+                            : Settings.Default.customPresetSlot);
                     if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
                     {
                         // Fallback: find first slot with saved data.
