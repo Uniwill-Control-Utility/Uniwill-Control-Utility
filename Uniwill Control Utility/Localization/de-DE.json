@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Ein Profil anwenden, nachdem das System aus dem Standby oder Ruhezustand aufgewacht ist",
   "Apply a preset whenever the battery begins charging": "Ein Profil anwenden, wenn der Akku zu laden beginnt",
   "Apply a preset whenever the system begins running from battery power": "Ein Profil anwenden, wenn das System in den Akkubetrieb wechselt",
-  "Apply on startup": "Beim Start anwenden",
   "Apply preset": "Profil anwenden",
   "Apply presets automatically when power or system state changes.": "Profile automatisch anwenden, wenn sich die Stromversorgung oder der Systemzustand ändert.",
   "Apply your own custom power settings using the sliders below.": "Wenden Sie Ihre eigenen benutzerdefinierten Energieeinstellungen mit den Schiebereglern unten an.",

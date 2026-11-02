@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Terapkan preset setelah sistem kembali dari mode sleep atau hibernasi",
   "Apply a preset whenever the battery begins charging": "Terapkan preset setiap kali baterai mulai mengisi daya",
   "Apply a preset whenever the system begins running from battery power": "Terapkan preset setiap kali sistem mulai berjalan dengan daya baterai",
-  "Apply on startup": "Terapkan saat startup",
   "Apply preset": "Terapkan preset",
   "Apply presets automatically when power or system state changes.": "Terapkan preset secara otomatis saat status daya atau sistem berubah.",
   "Apply your own custom power settings using the sliders below.": "Terapkan pengaturan daya kustom Anda sendiri menggunakan penggeser di bawah ini.",

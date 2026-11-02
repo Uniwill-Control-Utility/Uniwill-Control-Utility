@@ -33,6 +33,23 @@ public sealed class FanStartupOwnershipTests
         Assert.Contains("else if (!fansOwnedByPreset)", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void StartupPresetApplyIsUnconditional()
+    {
+        // The "Apply on startup" option is gone (2026-11-02): a relaunch must
+        // never leave the EC on the previous session's values while the UI says
+        // the saved preset is active. No setting may gate the apply again.
+        string source = ReadAppFile("Views", "Windows", "MainWindow.xaml.cs");
+
+        int start = source.IndexOf("internal static async Task ApplyOnStart()", StringComparison.Ordinal);
+        Assert.True(start > 0, "ApplyOnStart not found");
+        int end = source.IndexOf("internal static", start + 40);
+        string body = end > 0 ? source.Substring(start, end - start) : source.Substring(start);
+
+        Assert.DoesNotContain("Settings.Default.ApplyOnStart", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Settings.Default.ApplyOnStart", source, StringComparison.Ordinal);
+    }
+
     private static string ReadAppFile(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "Uniwill Control Utility" }.Concat(parts).ToArray()));
 

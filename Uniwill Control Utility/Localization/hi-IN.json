@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "सिस्टम के स्लीप या हाइबरनेशन से फिर से शुरू होने के बाद एक प्रीसेट लागू करें",
   "Apply a preset whenever the battery begins charging": "जब भी बैटरी चार्ज होना शुरू हो तो एक प्रीसेट लागू करें",
   "Apply a preset whenever the system begins running from battery power": "जब भी सिस्टम बैटरी पावर पर चलना शुरू करे तो एक प्रीसेट लागू करें",
-  "Apply on startup": "स्टार्टअप पर लागू करें",
   "Apply preset": "प्रिसेट लागू करें",
   "Apply presets automatically when power or system state changes.": "पावर या सिस्टम स्थिति बदलने पर स्वचालित रूप से प्रीसेट लागू करें।",
   "Apply your own custom power settings using the sliders below.": "नीचे दिए गए स्लाइडर्स का उपयोग करके अपनी कस्टम पावर सेटिंग्स लागू करें।",

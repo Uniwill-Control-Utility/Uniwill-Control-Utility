@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Maglapat ng preset pagkatapos mag-resume ng system mula sa sleep o hibernation",
   "Apply a preset whenever the battery begins charging": "Maglapat ng preset sa tuwing magsisimulang mag-charge ang baterya",
   "Apply a preset whenever the system begins running from battery power": "Maglapat ng preset sa tuwing tatakbo ang system gamit ang lakas ng baterya",
-  "Apply on startup": "Ilapat sa pag-startup",
   "Apply preset": "I-apply ang preset",
   "Apply presets automatically when power or system state changes.": "Awtomatikong maglapat ng mga preset kapag nagbago ang estado ng kuryente o ng system.",
   "Apply your own custom power settings using the sliders below.": "Ilapat ang sarili mong custom power settings gamit ang mga slider sa ibaba.",

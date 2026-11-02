@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "ใช้พรีเซ็ตหลังจากระบบกลับมาทำงานจากโหมดสลีปหรือไฮเบอร์เนต",
   "Apply a preset whenever the battery begins charging": "ใช้พรีเซ็ตทุกครั้งที่แบตเตอรี่เริ่มชาร์จ",
   "Apply a preset whenever the system begins running from battery power": "ใช้พรีเซ็ตทุกครั้งที่ระบบเริ่มทำงานด้วยพลังงานแบตเตอรี่",
-  "Apply on startup": "นำไปใช้เมื่อเริ่มต้นระบบ",
   "Apply preset": "ใช้พรีเซ็ต",
   "Apply presets automatically when power or system state changes.": "ใช้พรีเซ็ตโดยอัตโนมัติเมื่อสถานะพลังงานหรือสถานะของระบบเปลี่ยนแปลง",
   "Apply your own custom power settings using the sliders below.": "นำการตั้งค่าพลังงานแบบกำหนดเองของคุณไปใช้โดยใช้แถบเลื่อนด้านล่าง",

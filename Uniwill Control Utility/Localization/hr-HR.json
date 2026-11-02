@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Primijeni predložak nakon što se sustav probudi iz stanja mirovanja ili hibernacije",
   "Apply a preset whenever the battery begins charging": "Primijeni predložak kad god baterija započne punjenje",
   "Apply a preset whenever the system begins running from battery power": "Primijeni predložak kad god sustav počne raditi na baterijskom napajanju",
-  "Apply on startup": "Primijeni pri pokretanju",
   "Apply preset": "Primijeni profil",
   "Apply presets automatically when power or system state changes.": "Automatski primijeni predloške pri promjeni napajanja ili stanja sustava.",
   "Apply your own custom power settings using the sliders below.": "Primijenite vlastite prilagođene postavke napajanja pomoću klizača u nastavku.",

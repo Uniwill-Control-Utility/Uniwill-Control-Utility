@@ -251,7 +251,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     buttons[i].IsChecked = i == _customPresetSlot;
 
                 updateRadioButtonStyles();
-                cbApplyOnStartup.IsChecked = Settings.Default.ApplyOnStart;
             }
 
             // Initialize slider defaults from stored profile values so the status card
@@ -889,10 +888,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Show/hide custom panel and bottom bar
             customScroll.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
             bottomBar.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
-
-            // Stock presets always apply on startup - hide the checkbox for them.
-            bool isBuiltIn = Services.PresetProfileApplier.IsBuiltInProfile(profile);
-            cbApplyOnStartup.Visibility = isBuiltIn ? Visibility.Collapsed : Visibility.Visible;
 
             // Set profile values from SKU database (falls back to hardcoded defaults)
             var limits = GetPowerLimits();
@@ -1658,12 +1653,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             string modeSuffix = ActivePresetMode == Models.PresetMode.Boost ? " (Boost)" : "";
             ShowPresetSnackbar($"Profile {_customPresetSlot + 1} Cleared",
                 $"Custom preset{modeSuffix} has been cleared from slot {_customPresetSlot + 1}!");
-        }
-
-        private void cbApplyOnStartup_Click(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.ApplyOnStart = cbApplyOnStartup.IsChecked == true;
-            Settings.Default.Save();
         }
 
         private void btnApply_Click(object sender, RoutedEventArgs e)

@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "スリープまたは休止状態からの復帰後にプリセットを適用します",
   "Apply a preset whenever the battery begins charging": "バッテリー充電開始時にプリセットを適用します",
   "Apply a preset whenever the system begins running from battery power": "バッテリー駆動への移行時にプリセットを適用します",
-  "Apply on startup": "起動時に適用",
   "Apply preset": "プリセットを適用",
   "Apply presets automatically when power or system state changes.": "電源またはシステム状態が変化した際にプリセットを自動適用します。",
   "Apply your own custom power settings using the sliders below.": "以下のスライダーを使用して、独自のカスタム電力設定を適用します。",

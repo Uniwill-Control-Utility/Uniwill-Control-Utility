@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Gweithredu rhagosodiad ar ôl i'r system ailddechrau o gwsg neu gaeafgwsg",
   "Apply a preset whenever the battery begins charging": "Gweithredu rhagosodiad pan fydd y batri yn dechrau gwefru",
   "Apply a preset whenever the system begins running from battery power": "Gweithredu rhagosodiad pan fydd y system yn dechrau rhedeg ar bŵer y batri",
-  "Apply on startup": "Gweithredu wrth gychwyn",
   "Apply preset": "Cymhwyso rhagosodiad",
   "Apply presets automatically when power or system state changes.": "Gweithredu rhagosodiadau'n awtomatig pan fydd cyflwr y pŵer neu'r system yn newid.",
   "Apply your own custom power settings using the sliders below.": "Gweithredwch eich gosodiadau pŵer personol eich hun gan ddefnyddio'r llithryddion isod.",

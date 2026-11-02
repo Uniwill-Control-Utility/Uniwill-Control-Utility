@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Appliquer un préréglage après la sortie de veille ou d'hibernation du système",
   "Apply a preset whenever the battery begins charging": "Appliquer un préréglage lorsque la batterie commence à se charger",
   "Apply a preset whenever the system begins running from battery power": "Appliquer un préréglage lorsque le système passe sur batterie",
-  "Apply on startup": "Appliquer au démarrage",
   "Apply preset": "Appliquer le préréglage",
   "Apply presets automatically when power or system state changes.": "Appliquer automatiquement les préréglages lors d'un changement d'état de l'alimentation ou du système.",
   "Apply your own custom power settings using the sliders below.": "Appliquez vos propres paramètres d'alimentation personnalisés à l'aide des curseurs ci-dessous.",
