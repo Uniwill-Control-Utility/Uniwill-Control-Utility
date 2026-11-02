@@ -469,8 +469,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_deviceApplier.IsEcFanOverridden)
                 return;
 
+            // The saved curve is only in effect while a Custom preset owns the fans.
+            // Collapse the whole curve area and name the firmware preset instead, so
+            // the page never shows a curve the hardware is not running.
+            CurveArea.Visibility = isLocked ? Visibility.Collapsed : Visibility.Visible;
+            StockPresetNotice.Visibility = isLocked ? Visibility.Visible : Visibility.Collapsed;
+
             if (isLocked)
             {
+                string preset = PresetProfileApplier.DisplayName(Settings.Default.presetProfile);
+                txtStockPresetTitle.Text = LocalizationService.Format("{0} preset is driving the fans", preset);
                 overlayAdaptiveWarning.Visibility = Visibility.Visible;
                 SetControlsEnabled(false);
                 ShowStockPresetSnackbar();
@@ -1413,6 +1421,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_fan is null) return;
 
+            // Reflection only — the page syncs the toggle to the EC's real state.
+            if (_loadingSettings) return;
+
             // Remember whether Smart Fan Mode was active so we can restore it
             // when Turbo is disabled. Do NOT overwrite the persisted setting —
             // only track in-memory so the toggle survives the Turbo session.
@@ -1472,6 +1483,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void tsTurbo_Unchecked(object sender, RoutedEventArgs e)
         {
             if (_fan is null) return;
+
+            // Reflection only — the page syncs the toggle to the EC's real state.
+            if (_loadingSettings) return;
 
             // Restart smart fan mode if it was active before turbo was enabled.
             // Use the in-memory flag instead of persisted settings because Turbo
@@ -1546,6 +1560,33 @@ namespace Uniwill_Control_Utility.Views.Pages
                     ReadFanRpm();
                 });
             });
+        }
+
+        /// <summary>
+        /// Reflects the EC's real turbo state in the toggle. The toggle starts unset on
+        /// every navigation, so a stale local default would claim a mode the fans are
+        /// not in (field report 2026-11-02: locked page with Turbo shown as ON).
+        /// </summary>
+        private async Task SyncTurboFromEcAsync()
+        {
+            if (_fan is null) return;
+
+            bool turbo;
+            try
+            {
+                turbo = (await _fan.GetStatusAsync()).TurboActive;
+            }
+            catch
+            {
+                return; // engine unreachable — leave the toggle alone
+            }
+
+            if (_isUnloaded) return;
+
+            _loadingSettings = true;
+            tsTurbo.IsChecked = turbo;
+            _loadingSettings = false;
+            SetTurboSwitchColor(turbo);
         }
 
         /// <summary>
@@ -1875,6 +1916,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             // been applied while this page was hidden, and the event only fires on change.
             _deviceApplier.SyncManualControlLock();
             ApplyStockPresetState(_deviceApplier.IsManualControlLocked);
+
+            // Reflect the EC's turbo bit instead of the toggle's local default.
+            _ = SyncTurboFromEcAsync();
 
             // NOTE: Fan curve auto-apply is handled in DashboardViewModel.OnNavigatedToAsync
             // (the app always launches on Dashboard). This page does not auto-apply on
