@@ -1251,6 +1251,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         // Win32_Battery.BatteryStatus values that indicate AC-powered state
         private const ushort BatteryStatusAc = 2;
+
+        /// <summary>Win32_Battery's "on battery" code; the value the WMI route used
+        /// to supply, kept so the AC/DC branches below keep reading one variable.</summary>
+        private const ushort BatteryStatusDischarging = 1;
+
         private const ushort BatteryStatusCritical = 6;
         private const ushort BatteryStatusCharging = 7;
         private const ushort BatteryStatusNoSystemBattery = 8;
@@ -1259,13 +1264,30 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
-                var batteryClass = new ManagementClass("Win32_Battery");
-                var batteries = batteryClass.GetInstances();
+                // The AC/DC decision comes from the OS power status, not from WMI's
+                // Win32_Battery: on the tester laptop (2026-11-02) a launch while
+                // unplugged was classified as AC until the charger was physically
+                // moved, i.e. the WMI class answered nothing usable and `statuscode`
+                // kept its default. PowerLineStatus is a kernel read with no filter
+                // driver or device query in the path - the same reason the battery
+                // envelope clamp uses it.
+                System.Windows.Forms.PowerStatus power = System.Windows.Forms.SystemInformation.PowerStatus;
 
-                foreach (var battery in batteries)
+                if ((power.BatteryChargeStatus & System.Windows.Forms.BatteryChargeStatus.NoSystemBattery) != 0)
                 {
-                    statuscode = (ushort)battery["BatteryStatus"];
+                    statuscode = BatteryStatusNoSystemBattery;
+                    return;
                 }
+
+                if (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                {
+                    statuscode = BatteryStatusDischarging;
+                    return;
+                }
+
+                statuscode = (power.BatteryChargeStatus & System.Windows.Forms.BatteryChargeStatus.Charging) != 0
+                    ? BatteryStatusCharging
+                    : BatteryStatusAc;
             }
             catch (Exception ex)
             {
