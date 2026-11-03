@@ -326,6 +326,12 @@ Two field-driven corrections (2026-11-02).
 
 **Fan page, locked state.** With a stock preset applied the page is locked because the firmware drives the fans, but it used to keep displaying the user's saved curve - "Full speed" under an applied Office - so the page claimed a curve the hardware was not running. The whole curve area is now collapsed behind a notice that names the active preset ("Office preset is driving the fans", "{0} preset is driving the fans" in the catalogs) and says the saved curve returns with a Custom preset. The Fan Turbo toggle is disabled by the same lock and now reflects the EC's real turbo state on load (`IFanCapability.GetStatusAsync().TurboActive`) instead of an unset local default; both toggle handlers early-return while the page is syncing.
 
+### Main window height now follows device presence, not only the settings
+
+The 1080 -> 907 shrink used to depend on Hydro UI and Flydigi being *disabled in Settings*. A machine with both features enabled but no cooler attached kept the tall layout with two empty nav sections. `MainWindow.PreferredHeight(hydroDisabled, flydigiDisabled, hydroConnected, flydigiConnected)` now shrinks when both sections are **unavailable** - disabled or not connected - and the window re-evaluates on `HydroUIService.ConnectionStateChanged` and the Flydigi HID/BLE connection events, so a device that connects seconds after startup grows the window back and a drop shrinks it. The Settings toggles call the same method, so a toggle cannot leave the height inconsistent. Handlers are wired at Loaded and unwired in OnClosed. Pins: `MainWindowPreferredHeightTests` (7 cases).
+
+Known trade: when the height actually changes the window is re-fitted to the work area, which recentres it - a deliberate cost of not letting a 1080-tall window spill off a 1600p/150% panel.
+
 ### The fan page locked itself under a Custom preset (fixed)
 
 Field 2026-11-02: Custom preset 1 applied, unplug, close, relaunch - the preset was still applied, but the Fan Control page showed the "Stock Preset Active" lockdown captioned **"Custom preset applied - fan control customization is only possible with a Custom preset."**

@@ -1110,18 +1110,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// Adjusts the main window height based on whether Hydro UI and Flydigi are both disabled.
-        /// When both are off, reduces height from 1080 to 907.
+        /// Adjusts the main window height with the same rule the window itself
+        /// uses at Loaded: 907 when both Hydro UI and Flydigi are unavailable
+        /// (disabled, or their device is not connected), otherwise 1080.
         /// </summary>
         private void AdjustMainWindowHeight()
         {
-            var mainWindow = Application.Current.MainWindow;
-            if (mainWindow is null)
-                return;
-
-            bool hydroDisabled = !Settings.Default.EnableHydroUiNavigation;
-            bool flydigiDisabled = !Settings.Default.EnableFlydigi;
-            mainWindow.Height = (hydroDisabled && flydigiDisabled) ? 907 : 1080;
+            if (Application.Current.MainWindow is Views.Windows.MainWindow mainWindow)
+                mainWindow.ApplyPreferredHeight();
         }
 
        #endregion
