@@ -22,7 +22,7 @@ namespace UCU.Engine
     /// install and which no privilege boundary should require it to.
     ///
     /// Arming rule: the supervisor watches only once it has seen the app
-    /// running — it is a crash/kill respawn, not the logon autostart (the
+    /// running Ã¢â‚¬â€ it is a crash/kill respawn, not the logon autostart (the
     /// "UCU Autostart" scheduled task owns that). After the policy stops
     /// (graceful exit or crash-loop budget), the supervisor disarms and waits
     /// for the app to run again before re-arming.
@@ -42,6 +42,10 @@ namespace UCU.Engine
         internal static readonly TimeSpan FastExitThreshold = TimeSpan.FromMinutes(2);
         internal static readonly TimeSpan GracefulExitWindow = TimeSpan.FromMinutes(2);
 
+        /// <summary>Retries for a launch attempt that never produced an app process
+        /// (launcher refused, session not ready), on top of the first attempt.</summary>
+        internal const int MaxLaunchRetries = 2;
+
         private readonly ILogger<AppSupervision> _logger;
         private readonly Func<DateTime?> _probeAppStartUtc;
         private readonly Func<DateTime?, bool> _gracefulExitFresh;
@@ -51,6 +55,7 @@ namespace UCU.Engine
         private bool _watching;
         private DateTime? _runningSince;
         private int _consecutiveFastFailures;
+        private int _failedLaunches;
         private DateTime? _relaunchDueUtc;
 
         /// <summary>
@@ -100,7 +105,7 @@ namespace UCU.Engine
             if (FindAppExe() is null)
             {
                 // Dev checkout: the app exe is not staged next to the engine.
-                _logger.LogInformation("[Supervision] No app exe beside the engine — supervision off (dev layout).");
+                _logger.LogInformation("[Supervision] No app exe beside the engine Ã¢â‚¬â€ supervision off (dev layout).");
                 return;
             }
 
@@ -149,7 +154,8 @@ namespace UCU.Engine
                     _watching = true;
                     _runningSince = appStart;
                     _relaunchDueUtc = null;
-                    _logger.LogInformation("[Supervision] App running — watching for crash/kill.");
+                    _failedLaunches = 0; // a launch that worked ends the retry budget
+                    _logger.LogInformation("[Supervision] App running Ã¢â‚¬â€ watching for crash/kill.");
                 }
                 return;
             }
@@ -158,13 +164,13 @@ namespace UCU.Engine
             if (_relaunchDueUtc is DateTime due && now >= due)
             {
                 _relaunchDueUtc = null;
-                _launchApp();
+                LaunchWithRetryBudget(now);
             }
 
             if (!_watching)
                 return;
 
-            // Running → stopped transition: the policy decides.
+            // Running Ã¢â€ â€™ stopped transition: the policy decides.
             _watching = false;
             TimeSpan runDuration = now - (_runningSince ?? now);
             bool graceful = _gracefulExitFresh(_runningSince);
@@ -174,7 +180,7 @@ namespace UCU.Engine
                 MaxFastCrashAttempts, BaseDelay, MaxDelay, FastExitThreshold);
 
             _logger.LogInformation(
-                "[Supervision] App stopped after {Run}, graceful={Graceful} → {Action} (delay {Delay}, failures {Failures})",
+                "[Supervision] App stopped after {Run}, graceful={Graceful} Ã¢â€ â€™ {Action} (delay {Delay}, failures {Failures})",
                 runDuration, graceful, decision.Action, decision.Delay, _consecutiveFastFailures);
 
             switch (decision.Action)
@@ -193,11 +199,48 @@ namespace UCU.Engine
 
                 case GuardianAction.Relaunch:
                     _consecutiveFastFailures = 0;
-                    _launchApp();
+                    LaunchWithRetryBudget(now);
                     break;
             }
         }
 
+        /// <summary>
+        /// Launches the app, and retries a *failed attempt* a couple of times before
+        /// giving up. A launch that returns false produced no app process at all
+        /// (session launcher refused, session not interactive yet, exe momentarily
+        /// locked), which used to leave supervision disarmed with nothing scheduled -
+        /// the app stayed dead until the user started it (gap found 2026-11-03).
+        ///
+        /// Bounded on purpose, same philosophy as the fast-crash budget: a machine
+        /// where the launcher cannot work at all must not retry forever. A launch
+        /// that succeeds but whose app dies immediately is the crash-loop budget's
+        /// job, not this one's.
+        /// </summary>
+        private void LaunchWithRetryBudget(DateTime now)
+        {
+            if (_launchApp())
+            {
+                _failedLaunches = 0;
+                return;
+            }
+
+            if (_failedLaunches >= MaxLaunchRetries)
+            {
+                _logger.LogWarning(
+                    "[Supervision] App launch failed {Attempts} times - giving up until the app runs again.",
+                    _failedLaunches + 1);
+                _runningSince = null;
+                return;
+            }
+
+            _failedLaunches++;
+            long ticks = BaseDelay.Ticks << Math.Min(_failedLaunches - 1, 20);
+            var delay = TimeSpan.FromTicks(Math.Min(ticks, MaxDelay.Ticks));
+            _relaunchDueUtc = now + delay;
+            _logger.LogWarning(
+                "[Supervision] App launch failed - retry {Attempt}/{Max} in {Delay}",
+                _failedLaunches, MaxLaunchRetries, delay);
+        }
         /// <summary>The app exe staged beside the engine's Service\ folder, or null (dev layout).</summary>
         internal static string? FindAppExe()
         {
@@ -217,7 +260,7 @@ namespace UCU.Engine
         /// <summary>
         /// The app's start time (UTC) while it runs, null when it does not.
         /// LocalSystem sees every session's processes; a protected/access-denied
-        /// probe reads StartTime throws on — StartTime is read inside the guard.
+        /// probe reads StartTime throws on Ã¢â‚¬â€ StartTime is read inside the guard.
         /// </summary>
         private static DateTime? ProbeAppProcess()
         {
