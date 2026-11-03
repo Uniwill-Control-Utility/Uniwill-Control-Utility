@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Packages Uniwill Control Utility for release: publish, stage native payload,
@@ -12,7 +12,7 @@
       Releases\releases.win.json                      Velopack GitHub feed index
       Releases\Uniwill-Control-Utility-<ver>-win-x64.zip  portable (no auto-update)
 
-    The version is read from the csproj (single source of truth) — bump it there,
+    The version is read from the csproj (single source of truth) - bump it there,
     tag the GitHub release with the same version, upload the printed manifest.
 
     The Releases\ directory is persistent: deltas are built from the newest full
@@ -111,7 +111,7 @@ if ($leaked.Count -gt 0) {
 # --- 2d. Compile the Uninstall.exe shim into the layout ---
 # The MSI template ships every file in the publish dir, so a shim compiled
 # here lands next to the app in MSI installs and portable zips. Built with
-# the always-present .NET Framework csc — no toolchain dependency.
+# the always-present .NET Framework csc - no toolchain dependency.
 $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
 # /target:winexe (not exe): the shim is a GUI app ([STAThread] + MessageBox);
@@ -141,7 +141,7 @@ if ($LASTEXITCODE -ne 0) { throw "UCU.Updater.exe shim compile failed" }
 # --- 3. Stage loose native payload (this list IS the packaging manifest) ---
 # These files live in the project root and are not all produced by the publish
 # (see wiki/architecture/dependency-inventory.md). Fail loudly if any is
-# missing — the script is the reproducibility gate the wiki asks for.
+# missing - the script is the reproducibility gate the wiki asks for.
 $payload = @(
     "ADLX_3DSettings.dll", "ADLX_AutoTuning.dll", "ADLX_DisplaySettings.dll", "ADLX_PerformanceMetrics.dll",
     "BlackSharp.Core.dll", "DiskInfoToolkit.dll", "HidSharp.dll", "LibreHardwareMonitorLib.dll",
@@ -161,7 +161,7 @@ foreach ($file in $payload) {
 dotnet tool restore | Out-Null
 dotnet vpk download github --repoUrl https://github.com/jgudec/Uniwill-Control-Utility -o $releasesDir
 if ($LASTEXITCODE -ne 0) {
-    Write-Warning "vpk download github failed (first run? no Velopack assets on GitHub yet) — building a full-only release."
+    Write-Warning "vpk download github failed (first run? no Velopack assets on GitHub yet) - building a full-only release."
 }
 
 # --- 5. Velopack pack: per-machine MSI + full/delta nupkgs + releases.win.json ---
@@ -178,12 +178,12 @@ if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 # The Control Panel / Settings uninstall must run the complete-sweep shim,
 # not a thin `msiexec /x`. The packed vpk template already publishes ONE ARP
 # entry itself (ARPSYSTEMCOMPONENT=1 suppresses the Windows Installer engine's
-# GUID-keyed entry — the one carrying WindowsInstaller=1, i.e. the entry the
+# GUID-keyed entry - the one carrying WindowsInstaller=1, i.e. the entry the
 # Control Panel routes by product code straight into msiexec), under
 #   HKLM\...\Uninstall\MSI:Uniwill-Control-Utility
 # with UninstallString "msiexec.exe /x [ProductCode]": the entry is
 # component-clean (installed and deleted with `ArpRegistration`), but the
-# command is thin — the engine service is registered by the app, not the MSI,
+# command is thin - the engine service is registered by the app, not the MSI,
 # so the removal leaves service, layout, tasks and entry behind.
 #
 # This step authors the rebind INTO the package: UninstallString and
@@ -191,7 +191,7 @@ if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 # requireAdministrator shim: app kill, service stop+delete, tasks, MSI /x,
 # ARP entries, install root). The key is non-GUID and carries no
 # WindowsInstaller value, so appwiz.cpl/Settings shell-execute the string
-# verbatim — the one Control Panel entry the product has IS the complete
+# verbatim - the one Control Panel entry the product has IS the complete
 # route. Values ship inside the signed-source MSI: no runtime registry
 # writer, so no AV anti-hijack enforcer class applies (the runtime
 # re-assertion in EngineInstaller.RepairControlPanelUninstall stays as the
@@ -203,9 +203,9 @@ if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 # Exe-CustomActions that launch the SHIM at uninstall stay a field-proven
 # dead end in this package (verbose-log forensics in the git history: every
 # encoding tried at the time failed 1721/2715/2723/2727 or a CreateProcess
-# failure under the msiserver session) — the ARP rebinding needs no CA at
-# all. (Step 5c later found the working exe-CA encoding — type 18 File
-# source + deferred + NoImpersonate — for the engine verbs; the shim route
+# failure under the msiserver session) - the ARP rebinding needs no CA at
+# all. (Step 5c later found the working exe-CA encoding - type 18 File
+# source + deferred + NoImpersonate - for the engine verbs; the shim route
 # remains unproven and is NOT what 5c authors.)
 #
 # msi-edit is compiled on demand: the IDatabase interface is vtable-only
@@ -254,8 +254,8 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 # --- 5a. U-111 (MSI registers the engine service) is a proven dead end ----
 # The goal was real: a fresh install paid one UAC because the app's
 # unelevated chain registered UCUEngine. The mechanism Windows Installer
-# prescribes — ServiceInstall/ServiceControl/MsiLockPermissionsEx rows +
-# InstallServices/StartServices/StopServices/DeleteServices — cannot be
+# prescribes - ServiceInstall/ServiceControl/MsiLockPermissionsEx rows +
+# InstallServices/StartServices/StopServices/DeleteServices - cannot be
 # authored into THIS package on current Windows, field-probed 2026-10-31
 # (every probe against a copy of the packed MSI):
 #   - CREATE TABLE parses nowhere: COM OpenView, the C API
@@ -263,10 +263,10 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 #     ERROR_BAD_QUERY on every syntax, including the SDK's documented
 #     examples. msi.dll's SQL on this OS has no DDL.
 #   - MsiDatabaseImport of an .idt: 1627 (imports rows into existing
-#     tables only). MsiDatabaseMerge: hr=0 no-op — the source database
+#     tables only). MsiDatabaseMerge: hr=0 no-op - the source database
 #     cannot create the tables either.
 #   - The compound-file route (writing table streams as light.exe does):
-#     the OS's own APIs refuse it — StgCreateStorageEx INVALIDFUNCTION,
+#     the OS's own APIs refuse it - StgCreateStorageEx INVALIDFUNCTION,
 #     StgOpenStorageEx ABNORMALAPIWRITE on every format, transacted
 #     CreateStream/OpenStream INVALIDFUNCTION, on a freshly packed MSI,
 #     and the control docfile created moments earlier by the same API.
@@ -274,7 +274,7 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 #     not on the table.
 # The engine is registered at INSTALL time by U-111b (step 5c below): a
 # deferred exe CustomAction running the engine's own --install-engine verb
-# as SYSTEM — pure DML on the existing CustomAction/InstallExecuteSequence
+# as SYSTEM - pure DML on the existing CustomAction/InstallExecuteSequence
 # tables, no service tables, no DDL. The documented, elevated app-side
 # `--install-engine` pass REMAINS as the self-heal route (dev layouts,
 # hand-installed packages, Velopack update moves the exe). msi-edit's
@@ -295,7 +295,7 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 & $msiEdit addca $packedMsi.FullName
 if ($LASTEXITCODE -ne 0) { throw "msi-edit addca failed: engine service CustomActions not authored" }
 $caEcho = & $msiEdit inspect $packedMsi.FullName 2>&1 | Out-String
-foreach ($want in @('UcuEngineInstallDeferred\s*\|\s*3090', 'UcuEngineInstallRollback\s*\|\s*3346', 'UcuEngineRemoveDeferred\s*\|\s*3090')) {
+foreach ($want in @('UcuEngineInstallDeferred\s*\|\s*3090', 'UcuEngineInstallRollback\s*\|\s*3346', 'UcuEngineRemoveDeferred\s*\|\s*3090', 'UcuCloseApp\s*\|\s*114', 'UcuStopEngine\s*\|\s*114', 'UcuKillEngine\s*\|\s*114')) {
     if ($caEcho -notmatch $want) { throw "post-edit verification: CustomAction row missing in the packed MSI ($want)" }
 }
 if ($caEcho -notmatch "--uninstall-engine") {
@@ -319,7 +319,7 @@ if ($setupExe) {
         Sort-Object { [version]$_.Directory.Name } | Select-Object -Last 1
     if (-not $mt) { $mt = $mtCandidates | Select-Object -First 1 }
     if (-not $mt) {
-        Write-Warning "mt.exe not found in the Windows SDK — Setup.exe stays asInvoker; run it elevated."
+        Write-Warning "mt.exe not found in the Windows SDK - Setup.exe stays asInvoker; run it elevated."
     } else {
         # The fresh Setup.exe is transiently locked by real-time AV scanning
         # (field-proven: mt c101008d "cannot open the device or file" right
