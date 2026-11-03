@@ -326,6 +326,14 @@ Two field-driven corrections (2026-11-02).
 
 **Fan page, locked state.** With a stock preset applied the page is locked because the firmware drives the fans, but it used to keep displaying the user's saved curve - "Full speed" under an applied Office - so the page claimed a curve the hardware was not running. The whole curve area is now collapsed behind a notice that names the active preset ("Office preset is driving the fans", "{0} preset is driving the fans" in the catalogs) and says the saved curve returns with a Custom preset. The Fan Turbo toggle is disabled by the same lock and now reflects the EC's real turbo state on load (`IFanCapability.GetStatusAsync().TurboActive`) instead of an unset local default; both toggle handlers early-return while the page is syncing.
 
+### App supervision: a failed launch is retried twice, then it gives up
+
+`AppSupervision` revived a crashed app reliably, but a launch attempt that produced **no process at all** (session launcher refused, session not interactive yet, exe momentarily locked) used to leave supervision disarmed with nothing scheduled: the app stayed dead until the user started it. `LaunchWithRetryBudget` now retries such an attempt twice, 10 s then 20 s, resets its budget when the app is next seen running, and logs `[Supervision] App launch failed - retry N/2 in ...` before giving up (`... giving up until the app runs again`).
+
+It is bounded on purpose, same philosophy as the fast-crash budget: a machine whose launcher cannot work at all must not retry forever. A launch that *succeeds* but whose app dies immediately is still the crash-loop budget's job, not this one's. Pins: `AppSupervisionLaunchRetryTests` (4 cases: single attempt when it works, two retries then silence, fail-then-success, budget reset after a real run).
+
+Still by design, not changed: supervision arms only after it has seen the app running (the `UCU Autostart` task owns logon), and a hung app looks healthy to a process probe.
+
 ### Main window height now follows device presence, not only the settings
 
 The 1080 -> 907 shrink used to depend on Hydro UI and Flydigi being *disabled in Settings*. A machine with both features enabled but no cooler attached kept the tall layout with two empty nav sections. `MainWindow.PreferredHeight(hydroDisabled, flydigiDisabled, hydroConnected, flydigiConnected)` now shrinks when both sections are **unavailable** - disabled or not connected - and the window re-evaluates on `HydroUIService.ConnectionStateChanged` and the Flydigi HID/BLE connection events, so a device that connects seconds after startup grows the window back and a drop shrinks it. The Settings toggles call the same method, so a toggle cannot leave the height inconsistent. Handlers are wired at Loaded and unwired in OnClosed. Pins: `MainWindowPreferredHeightTests` (7 cases).
