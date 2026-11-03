@@ -1964,6 +1964,8 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             SystemEvents.PowerModeChanged -= HandlePowerModeChange;
 
+            UnwireDeviceConnectionWatcher();
+
             base.OnClosed(e);
             Application.Current.Shutdown();
         }
@@ -2246,16 +2248,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                 this.WindowState = WindowState.Minimized;
             }
 
-            // Adjust window height based on feature toggles.
-            // When both Hydro UI and Flydigi are disabled, use a smaller height.
+            // Adjust window height based on feature toggles and live device presence.
             // Runs here (Loaded) instead of the constructor so the window is already
             // shown and the layout is finalized, avoiding a visible flash at 1080.
-            bool hydroDisabled = !Settings.Default.EnableHydroUiNavigation;
-            bool flydigiDisabled = !Settings.Default.EnableFlydigi;
-            if (hydroDisabled && flydigiDisabled)
-            {
-                this.Height = 907;
-            }
+            ApplyPreferredHeight();
+            WireDeviceConnectionWatcher();
 
             // Keep the window inside the monitor's work area so the title bar
             // never spills above the top screen edge. On the 2560x1600 internal
@@ -2298,6 +2295,95 @@ namespace Uniwill_Control_Utility.Views.Windows
             // and auto-apply the UCU-declared refresh rate + color profile after a settle
             // delay when the live panel differs.
             StartPanelWatcher();
+        }
+
+        /// <summary>
+        /// Height for the current feature/connection state: 907 when both optional
+        /// nav sections are unavailable (disabled in Settings, or their device is
+        /// not connected), otherwise the 1080 base from XAML.
+        /// </summary>
+        public static double PreferredHeight(bool hydroDisabled, bool flydigiDisabled, bool hydroConnected, bool flydigiConnected)
+        {
+            bool hydroAbsent = hydroDisabled || !hydroConnected;
+            bool flydigiAbsent = flydigiDisabled || !flydigiConnected;
+            return (hydroAbsent && flydigiAbsent) ? 907 : 1080;
+        }
+
+        /// <summary>
+        /// Applies the height rule from the current Settings and connection state.
+        /// Does not touch position: the work-area clamp stays a separate step.
+        /// </summary>
+        public void ApplyPreferredHeight()
+        {
+            Height = PreferredHeight(
+                !Settings.Default.EnableHydroUiNavigation,
+                !Settings.Default.EnableFlydigi,
+                App.GetService<HydroUIService>()?.IsConnected ?? false,
+                (App.GetService<FlydigiCoolerHidService>()?.IsConnected ?? false)
+                    || (App.GetService<FlydigiCoolerBleService>()?.IsConnected ?? false));
+        }
+
+        private EventHandler<HydroUIService.WatercoolerConnectionState>? _hydroConnectionHandler;
+        private EventHandler<bool>? _flydigiConnectionHandler;
+
+        /// <summary>
+        /// A device connecting a few seconds after startup grows the window back to
+        /// 1080; a drop shrinks it again. The services raise this from background
+        /// threads, so hop to the dispatcher before touching layout.
+        /// </summary>
+        private void OnDeviceConnectionChanged()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.InvokeAsync(OnDeviceConnectionChanged);
+                return;
+            }
+
+            double before = Height;
+            ApplyPreferredHeight();
+
+            // Growing back to 1080 on a short panel would spill the title bar
+            // above the top edge, so re-fit; a parked window is left alone (see Loaded).
+            if (Height != before && !_startupGateParked)
+                App.FitWindowToWorkArea(this);
+        }
+
+        private void WireDeviceConnectionWatcher()
+        {
+            var hydro = App.GetService<HydroUIService>();
+            if (hydro != null)
+            {
+                _hydroConnectionHandler = (_, _) => OnDeviceConnectionChanged();
+                hydro.ConnectionStateChanged += _hydroConnectionHandler;
+            }
+
+            _flydigiConnectionHandler = (_, _) => OnDeviceConnectionChanged();
+
+            var hid = App.GetService<FlydigiCoolerHidService>();
+            if (hid != null)
+                hid.ConnectionStateChanged += _flydigiConnectionHandler;
+
+            var ble = App.GetService<FlydigiCoolerBleService>();
+            if (ble != null)
+                ble.ConnectionStateChanged += _flydigiConnectionHandler;
+        }
+
+        private void UnwireDeviceConnectionWatcher()
+        {
+            var hydro = App.GetService<HydroUIService>();
+            if (hydro != null && _hydroConnectionHandler != null)
+                hydro.ConnectionStateChanged -= _hydroConnectionHandler;
+
+            var hid = App.GetService<FlydigiCoolerHidService>();
+            if (hid != null && _flydigiConnectionHandler != null)
+                hid.ConnectionStateChanged -= _flydigiConnectionHandler;
+
+            var ble = App.GetService<FlydigiCoolerBleService>();
+            if (ble != null && _flydigiConnectionHandler != null)
+                ble.ConnectionStateChanged -= _flydigiConnectionHandler;
+
+            _hydroConnectionHandler = null;
+            _flydigiConnectionHandler = null;
         }
 
         // Auto-reconcile the internal panel's display settings on the detachedâ†’attached
