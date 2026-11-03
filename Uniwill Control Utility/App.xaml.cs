@@ -2104,27 +2104,15 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Log.Logger.Fatal(e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()), "Unhandled exception on non-UI thread");
-
-            if (e.IsTerminating)
-            {
-                // Try to show a message box, but this may not work if the UI thread is dead
-                try
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show(
-                            $"A critical error occurred:\n\n{e.ExceptionObject}\n\nThe application will now close.",
-                            "Critical Error",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
-                    });
-                }
-                catch
-                {
-                    // UI thread is dead, can't show dialog
-                }
-            }
+            // Log only - never block here. The message box this handler used to
+            // show ran through Dispatcher.Invoke, and while it was up the runtime
+            // could not terminate the process: field, 2026-11-04, a background
+            // NRE at 08:41 left a frozen app behind a dialog until the user
+            // dismissed it at 08:57, so the engine's supervisor saw a live
+            // process the whole time and could not revive anything. A logged
+            // death the supervisor can react to beats a hang nobody can see.
+            Log.Logger.Fatal(e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()),
+                "Unhandled exception on non-UI thread (terminating={Terminating})", e.IsTerminating);
         }
 
         private static void SafeFireAndForget(Task task)

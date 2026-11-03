@@ -133,26 +133,20 @@
        targets, which MSBuild imports after the project body, so an earlier
        evaluation sees them empty and the engine's output lands next to the
        project directory instead of in Service\. -->
-  <Target Name="StageEngineInServiceFolder" AfterTargets="Build"
-          Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+  <Target Name="StageEngineInServiceFolder" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
     <PropertyGroup>
       <_EngineStagingOutDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(OutDir)', 'Service\'))</_EngineStagingOutDir>
       <_EngineStagingIntermediateDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'engine\'))</_EngineStagingIntermediateDir>
     </PropertyGroup>
-    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
-             Targets="Build"
-             Properties="Configuration=$(Configuration);Platform=AnyCPU;OutDir=$(_EngineStagingOutDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=AnyCPU;OutDir=$(_EngineStagingOutDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
   </Target>
 
-  <Target Name="StageEngineInServiceFolderOnPublish" AfterTargets="Publish"
-          Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+  <Target Name="StageEngineInServiceFolderOnPublish" AfterTargets="Publish" Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
     <PropertyGroup>
       <_EngineStagingPublishDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(PublishDir)', 'Service\'))</_EngineStagingPublishDir>
       <_EngineStagingIntermediateDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'engine\'))</_EngineStagingIntermediateDir>
     </PropertyGroup>
-    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
-             Targets="Publish"
-             Properties="Configuration=$(Configuration);Platform=AnyCPU;PublishDir=$(_EngineStagingPublishDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj" Targets="Publish" Properties="Configuration=$(Configuration);Platform=AnyCPU;PublishDir=$(_EngineStagingPublishDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
   </Target>
 
   <ItemGroup>

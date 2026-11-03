@@ -176,6 +176,55 @@ public sealed class AppSupervisionTests
     }
 
     [Fact]
+    public void GracefulExitWithinTheVerificationWindowOfOurOwnLaunch_RetriesInsteadOfDisarming()
+    {
+        var h = new Harness();
+
+        // A real run dies hard: the supervisor relaunches.
+        h.AppRunning();
+        h.Tick(); // arms
+        h.Advance(TimeSpan.FromMinutes(30));
+        h.AppGone();
+        h.Tick(); // Relaunch
+        Assert.Equal(1, h.Launches);
+
+        // The relaunch comes up and quits by itself 7 s later, reporting the
+        // graceful exit every startup path can emit (field, 2026-11-04).
+        h.AppRunning();
+        h.Tick();
+        h.Advance(TimeSpan.FromSeconds(7));
+        h.Graceful = true;
+        h.AppGone();
+        h.Tick(); // must not disarm
+
+        h.Advance(TimeSpan.FromMinutes(10)); // retry comes due
+        h.Tick();
+
+        Assert.Equal(2, h.Launches);
+    }
+
+    [Fact]
+    public void FastGracefulExitOfAUserStartedRun_StillDisarms()
+    {
+        var h = new Harness();
+        h.AppRunning();
+        h.Tick(); // arms; this instance was not launched by the supervisor
+
+        h.Advance(TimeSpan.FromSeconds(30));
+        h.Graceful = true;
+        h.AppGone();
+        h.Tick(); // Stop
+
+        for (int i = 0; i < 10; i++)
+        {
+            h.Advance(TimeSpan.FromMinutes(10));
+            h.Tick();
+        }
+
+        Assert.Equal(0, h.Launches);
+    }
+
+    [Fact]
     public void GracefulSignal_MustBelongToTheRunThatEnded()
     {
         DateTime now = new(2026, 10, 26, 12, 0, 0, DateTimeKind.Utc);

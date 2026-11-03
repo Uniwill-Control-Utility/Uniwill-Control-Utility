@@ -83,6 +83,20 @@ public sealed class MainWindowStartupPresentationTests
         Assert.Contains("WindowStartupLocation=\"CenterScreen\"", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void App_ShutdownIsExplicit_SoATransientWindowCannotEndTheStartup()
+    {
+        // Field, 2026-11-04: with the startup overlay suppressed (a supervisor
+        // relaunch, or ShowStartupProgressOverlay off) the preset toast is the only
+        // window open until the host creates MainWindow. WPF's default
+        // OnLastWindowClose ended the app when ToastOverlay closed that window 4.5 s
+        // later - every guardian relaunch died on its own, reported a graceful exit
+        // and the supervisor disarmed, so the app never came back.
+        string xaml = ReadSource("App.xaml");
+
+        Assert.Contains("ShutdownMode=\"OnExplicitShutdown\"", xaml, StringComparison.Ordinal);
+    }
+
     private static string ReadSource(string fileName, params string[] subfolders)
     {
         var parts = new List<string> { FindRepositoryRoot(), "Uniwill Control Utility" };

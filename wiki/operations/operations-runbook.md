@@ -68,6 +68,10 @@ If the saved language is `zh-CN`, the current source catalogue contains invalid 
 
 The first instance should receive `UniwillControlUtility.Show`. Check whether an existing process is hidden in the notification area. If the process is present but cannot surface, collect its log before terminating it.
 
+### Visual Studio Debug build fails with CS0234 in UCU.Engine
+
+`UCU.Engine` (and anything referencing the libraries) reports `UCU.Hardware.Cpu`, `UCU.Core.Rtss`-style namespaces as missing, while `dotnet build` of the same configuration succeeds. Cause: the library projects once targeted `net10.0-windows10.0.22621.0` and now target `net10.0-windows`; the old `bin`/`obj` trees under the previous TFM stay on disk - neither `dotnet clean` nor VS' Clean Solution removes them - and VS' fast up-to-date check then compiles the engine against the pre-retarget `UCU.Hardware.dll`/`UCU.Core.dll` left in its `obj`. Remedy: delete every `bin`/`obj` under the repository root (`artifacts/` and `Releases/` stay), rebuild; if VS still fails, close it, delete `.vs`, and rebuild. Verify with `dotnet build "Uniwill Control Utility.sln" -c Debug -p:Platform=x64`.
+
 ### Startup stalls in the "Initializing" phase (60–71 %)
 
 The phase progress reflects deferred tasks, and the game-library scan walks every local volume. A **disconnected mapped network drive** blocks the directory probe in the redirector until it times out (21–63 s measured against a dead host), which is the classic long stall. The scan now skips `DriveType.Network` and the splash releases at a 10 s budget, so the list appears shortly after the window.
@@ -326,6 +330,16 @@ Two field-driven corrections (2026-11-02).
 
 **Fan page, locked state.** With a stock preset applied the page is locked because the firmware drives the fans, but it used to keep displaying the user's saved curve - "Full speed" under an applied Office - so the page claimed a curve the hardware was not running. The whole curve area is now collapsed behind a notice that names the active preset ("Office preset is driving the fans", "{0} preset is driving the fans" in the catalogs) and says the saved curve returns with a Custom preset. The Fan Turbo toggle is disabled by the same lock and now reflects the EC's real turbo state on load (`IFanCapability.GetStatusAsync().TurboActive`) instead of an unset local default; both toggle handlers early-return while the page is syncing.
 
+### Tray widget: Mica backdrop, no IUWM
+
+The Quick Control widget runs the **same Mica backdrop as the main window** (`WindowBackdropType="Mica"`, re-applied by `SystemThemeWatcher.Watch(..., Mica, ...)` on every theme change). It ran `WindowBackdropType="Acrylic"` for one round and came back out (2026-11-06): on this stack WPF-UI acrylic intermittently drops the backdrop and leaves an opaque light panel. The three `iNKORE.UI.WPF.Modern` `AcrylicPanel` tint bands that came with it are gone as well - they read as a hard contrast difference against the main window instead of the same surface.
+
+**A window that is not `Application.MainWindow` needs its own pass.** `FluentWindow` only sets the DWM backdrop attribute from `WindowBackdropType`; the window keeps the style's opaque `ApplicationBackgroundBrush` (`#202020`) over it. `WindowBackgroundManager.UpdateBackground` is what clears both the window background and the composition background first (RemoveBackdrop -> RemoveBackground -> ApplyBackdrop), and `ApplicationThemeManager.Apply` runs that pass **only for `Application.MainWindow`** (`WindowBackgroundManager.UpdateBackground(mainWindow, ...)`), on startup and on every theme change. The tray widget is never the main window, so it sat on a flat `#202020` surface - and a Windows light->dark switch did not repair it either (the background it restored is opaque). It now calls the pass itself on `Loaded`, on every show (`ToggleAsync`) and on `ApplicationThemeManager.Changed`. Any future on-demand window with a backdrop needs the same three hooks.
+
+**IUWM is not used (evaluated and dropped, 2026-11-06).** There is no `iNKORE.UI.WPF.Modern` package reference and `TrayWidgetWindow` merges no foreign dictionary. The migration was abandoned because IUWM has no `CardControl`, `CardExpander`, `Snackbar`, `ColorPicker` or `FluentWindow`, so a 1:1 replacement of WPF-UI is not possible - the analysis stays in the plan notes, not in the build. Nothing in the tree may re-introduce `iNKORE`/`ikw:` without the same decision being taken again.
+
+Footer: the row is `*` with `MinHeight="44"` and its content is `VerticalAlignment="Center"`, so the button sits centred between the divider and the window's bottom edge - the window is pinned at its 540 DIP `MaxHeight` while the content is a little shorter, and that slack belongs to the footer rather than to a strip below it.
+
 ### App supervision: a failed launch is retried twice, then it gives up
 
 `AppSupervision` revived a crashed app reliably, but a launch attempt that produced **no process at all** (session launcher refused, session not interactive yet, exe momentarily locked) used to leave supervision disarmed with nothing scheduled: the app stayed dead until the user started it. `LaunchWithRetryBudget` now retries such an attempt twice, 10 s then 20 s, resets its budget when the app is next seen running, and logs `[Supervision] App launch failed - retry N/2 in ...` before giving up (`... giving up until the app runs again`).
@@ -333,6 +347,16 @@ Two field-driven corrections (2026-11-02).
 It is bounded on purpose, same philosophy as the fast-crash budget: a machine whose launcher cannot work at all must not retry forever. A launch that *succeeds* but whose app dies immediately is still the crash-loop budget's job, not this one's. Pins: `AppSupervisionLaunchRetryTests` (4 cases: single attempt when it works, two retries then silence, fail-then-success, budget reset after a real run).
 
 Still by design, not changed: supervision arms only after it has seen the app running (the `UCU Autostart` task owns logon), and a hung app looks healthy to a process probe.
+
+### A guardian relaunch quit by itself 4.7 s in, and supervision disarmed (fixed)
+
+Field 2026-11-04: after an overnight hibernation the app died on a background-thread `NullReferenceException`. The engine relaunched it with `--from-guardian`; that instance exited **by itself** ~7 s later, reported a graceful exit, and supervision logged `graceful=true -> Stop` and disarmed - the app never came back. Reproduced on the dev box: any launch with the startup overlay suppressed (the guardian relaunch, or `ShowStartupProgressOverlay` switched off) exits ~6.5 s in, code 0, without ever reaching `Hosting starting`.
+
+- **The self-exit.** `ToastOverlay.Show` creates a real `Window` and closes it after `VisibleMs = 4000` (+350 ms fade). With the splash suppressed, `MainWindow` is not created until `_host.StartAsync`, so for those seconds the preset toast was the **only** window - and WPF's default `ShutdownMode.OnLastWindowClose` ended the application when the toast closed. `App.xaml` now sets `ShutdownMode="OnExplicitShutdown"`; every real exit path already calls `Shutdown()` explicitly (`MainWindow.OnClosed`, the tray Close item), so nothing else changes. Pin: `MainWindowStartupPresentationTests.App_ShutdownIsExplicit_SoATransientWindowCannotEndTheStartup`.
+- **The disarm.** A launch the supervisor started itself must stay up `SelfLaunchVerificationWindow` (60 s) before its graceful exit counts as intentional; inside that window it feeds the fast-crash budget instead (bounded: 3 retries, then Stop). Pins: `AppSupervisionTests.GracefulExitWithinTheVerificationWindowOfOurOwnLaunch_RetriesInsteadOfDisarming`, `FastGracefulExitOfAUserStartedRun_StillDisarms`.
+- **The frozen crash dialog.** `OnAppDomainUnhandledException` no longer shows a modal. It ran `Dispatcher.Invoke(MessageBox.Show)`, which blocks the runtime's termination until somebody dismisses it: the 08:41 exception's process stayed alive until 08:57, so the supervisor saw a live app and had nothing to revive. It logs the exception and returns; the process dies and supervision reacts.
+
+Still open: the NRE's own site. Its log line carries no stack (`System.NullReferenceException: Object reference not set to an instance of an object.` alone on a line), so the throwing thread is unknown; the only activity near it was the RTSS/FPS sampling path, 19 min after resume. A WER LocalDumps entry for the exe is the cheap way to catch the next one.
 
 ### Main window height now follows device presence, not only the settings
 
