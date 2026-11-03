@@ -279,6 +279,23 @@ The Presets page carried an "Apply on startup" checkbox that only affected Custo
 
 Consequence worth knowing: a Custom preset's power limits, fan curve and GPU settings are written on every launch, so a machine whose EC firmware clamps something (see the battery section) will look exactly the same after a relaunch as it did before it - which is the point.
 
+### The installer closes the app itself (2026-11-03)
+
+`build\msi-edit\MsiEdit.cs` now authors four more CustomActions into every packed MSI, sequenced **before `InstallValidate`** (1350-1353) so the file-in-use detection never sees a locked image:
+
+| CA | Type | What it runs |
+|---|---|---|
+| `UcuSetTaskkillPath` | 51 | `UcuTaskkillExe` = `[SystemFolder]taskkill.exe` |
+| `UcuSetScPath` | 51 | `UcuScExe` = `[SystemFolder]sc.exe` |
+| `UcuStopEngine` | 114 | `sc stop UCUEngine` |
+| `UcuKillEngine` | 114 | `taskkill /f /im "…Engine.exe"` |
+| `UcuCloseApp` | 114 | `taskkill /f /im "Uniwill Control Utility.exe" /t` |
+
+Type 50 runs an exe whose path comes from a property, so no helper binary and no Binary table travel with the package. The `+64` continue flag is load-bearing: a fresh install has no service (`sc` exits 1060) and nothing to kill (`taskkill` exits 128), and without it the first install died with **error 1722 at UcuStopEngine** - field-proven on 2026-11-03, caught on the first test. The engine is stopped **and killed** before the app, because `AppSupervision` relaunches a killed app: killing the app first just brings it back.
+
+Both paths verified on the dev box with the packed MSI: fresh install with neither service nor app (exit 0, service created), and a forced reinstall (`REINSTALL=ALL REINSTALLMODE=vomus`) while app + engine were running (exit 0, app gone, engine restarted by `UcuEngineInstallDeferred`). `build\pack.ps1` asserts the `114` rows exist after packing.
+
+Registration note: every pack carries a new product code with the same version, so installing a new pack **over** an old one leaves two ARP entries. The documented flow - uninstall the old pack first - is still the rule; the installer only guarantees that the files themselves are never installed under a running exe.
 ### Never install over a running app (mixed build = the app half-works)
 
 Field 2026-11-02 (tester laptop): the MSI was installed while UCU was running. Windows cannot replace a running image, so the **old exe stayed** while the new `UCU.Core.dll` landed beside it, and every preset apply died with:

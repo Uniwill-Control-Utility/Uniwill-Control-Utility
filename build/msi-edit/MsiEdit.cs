@@ -1,10 +1,10 @@
 // msi-edit: read/patch the packed UCU MSI so its Control Panel story is ONE
 // entry that runs the complete-sweep shim:
-//   1. ARPSYSTEMCOMPONENT=1  — the MSI never creates its own GUID-keyed
+//   1. ARPSYSTEMCOMPONENT=1  ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the MSI never creates its own GUID-keyed
 //      Add/Remove Programs entry (so no thin `msiexec /x` route exists in
 //      Control Panel at all),
 //   2. Registry rows publishing our own ARP entry (non-GUID key
-//      `Uniwill-Control-Utility`, UninstallString = Uninstall.exe) — the
+//      `Uniwill-Control-Utility`, UninstallString = Uninstall.exe) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the
 //      Control Panel shell-executes the shim; a non-GUID key carrying no
 //      WindowsInstaller value is never routed by product code.
 //
@@ -66,6 +66,7 @@ static class MsiEdit
             else if (mode == "addca")
             {
                 AddServiceCustomActions(db);
+                AddCloseRunningAppCustomActions(db);
                 db.Commit();
                 Console.WriteLine("COMMITTED");
             }
@@ -181,7 +182,7 @@ static class MsiEdit
     //
     // The packed Velopack MSI already publishes its ONE Control Panel entry
     // itself (ARPSYSTEMCOMPONENT=1 suppresses the Windows Installer engine's
-    // GUID-keyed entry — the one carrying WindowsInstaller=1, the entry that
+    // GUID-keyed entry ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the one carrying WindowsInstaller=1, the entry that
     // routes by product code to the thin `msiexec /x`), and the entry it
     // publishes is a Registry-table component under
     //   HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MSI:Uniwill-Control-Utility
@@ -189,7 +190,7 @@ static class MsiEdit
     // engine service is registered by the app, not the MSI, so the thin route
     // leaves the service, the layout and the entry behind.
     //
-    // This patch rebinds those rows at pack time — the values are authored
+    // This patch rebinds those rows at pack time ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the values are authored
     // into the package, so no runtime writer touches the registry and no AV
     // anti-hijack enforcer class applies:
     //   UninstallString / QuietUninstallString -> "[INSTALLFOLDER]Uninstall.exe"
@@ -268,8 +269,8 @@ static class MsiEdit
 
         // The product code INSIDE the ARP entry. Guarded machines (field-
         // proven: Emsisoft box) hide the Windows Installer registration tree
-        // from in-process readers — MsiEnumProductsW enumerates every other
-        // product on the machine and never ours, elevated included — while
+        // from in-process readers ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â MsiEnumProductsW enumerates every other
+        // product on the machine and never ours, elevated included ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â while
         // the component-published ARP entry stays visible (Control Panel
         // reads it). The shim and the sentinel therefore take the code from
         // this row: [ProductCode] expands at install time, the row is
@@ -426,6 +427,86 @@ static class MsiEdit
         Console.WriteLine("engine service CustomActions authored (File key " + fk +
                           "): 3090 --install-engine @6000, 3346 --remove-service rollback @5999, " +
                           "3090 --remove-service @3498 (InstallFinalize=" + installFinalize + ", RemoveFiles=" + removeFiles + ")");
+    }
+
+    /// <summary>
+    /// Force-close the running app (and stop the engine service) BEFORE
+    /// InstallValidate, so the installer never finds its own payload locked.
+    ///
+    /// Field 2026-11-02 (tester laptop): the MSI was run while UCU was up.
+    /// Windows cannot replace a running image, so the install "succeeded" with
+    /// the OLD exe still on disk and the new DLLs beside it - a mixed build that
+    /// then failed every preset apply with MissingMethodException. The app now
+    /// detects that state and refuses to start, but the install has to be
+    /// correct in the first place.
+    ///
+    /// Type 50 runs an executable whose path comes from a property (Source =
+    /// property name, Target = command line), so no helper binary and no Binary
+    /// table travel with the package: taskkill.exe and sc.exe are resolved from
+    /// [SystemFolder] by a type-51 SetProperty pair. Both run in the execute
+    /// sequence as an elevated per-machine install, which is what lets taskkill
+    /// end the user's app and sc stop the LocalSystem engine.
+    /// </summary>
+    static void AddCloseRunningAppCustomActions(Database db)
+    {
+        int installValidate = SeqOf(db, "InstallValidate", 1400);
+
+        // Sequence the pair below InstallValidate but above CostFinalize (1000):
+        // the in-use detection that decides to schedule a reboot happens at
+        // InstallValidate, so the app must be gone before it runs.
+        int setKill = Math.Min(installValidate - 4, 1350);
+        int setSc = setKill + 1;
+        // Engine FIRST: its AppSupervision relaunches a killed app, so killing the
+        // app before the service is down just brings it back (and the install can
+        // meet a freshly locked exe). Stopping the service ends the supervision.
+        int stopEngine = setKill + 2;
+        int killEngine = setKill + 3;
+        int closeApp = setKill + 4;
+        if (setKill <= 1000)
+            throw new Exception("InstallValidate is sequenced at " + installValidate +
+                                ": no room to close the app before it");
+
+        foreach (var act in new[] { "UcuSetTaskkillPath", "UcuSetScPath", "UcuCloseApp", "UcuStopEngine", "UcuKillEngine" })
+        {
+            Execute(db, "DELETE FROM `CustomAction` WHERE `Action` = '" + act + "'");
+            Execute(db, "DELETE FROM `InstallExecuteSequence` WHERE `Action` = '" + act + "'");
+        }
+
+        // Type 51: a property set to a formatted value ([SystemFolder] resolves
+        // at run time, so no path is baked into the package).
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuSetTaskkillPath', 51, 'UcuTaskkillExe', '[SystemFolder]taskkill.exe')");
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuSetScPath', 51, 'UcuScExe', '[SystemFolder]sc.exe')");
+
+        // Type 50 + 64 (continue): exe from the property named in Source, arguments
+        // in Target, and a non-zero exit does NOT abort the install - the fresh-
+        // install case for both commands (no UCUEngine service yet -> sc 1060;
+        // nothing to kill -> taskkill 128). Field-proven: without the flag a first
+        // install died with error 1722 at UcuStopEngine.
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuCloseApp', 114, 'UcuTaskkillExe', '/f /im \"Uniwill Control Utility.exe\" /t')");
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuStopEngine', 114, 'UcuScExe', 'stop UCUEngine')");
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuKillEngine', 114, 'UcuTaskkillExe', '/f /im \"Uniwill Control Utility Engine.exe\"')");
+
+        // Install and upgrade only: an uninstall runs the shim, which stops both
+        // itself.
+        const string condition = "NOT (REMOVE=\"ALL\")";
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuSetTaskkillPath', '" + condition + "', " + setKill + ")");
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuSetScPath', '" + condition + "', " + setSc + ")");
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuKillEngine', '" + condition + "', " + killEngine + ")");
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuCloseApp', '" + condition + "', " + closeApp + ")");
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuStopEngine', '" + condition + "', " + stopEngine + ")");
+
+        Console.WriteLine("close-before-install CustomActions authored: taskkill + sc stop at " +
+                          setKill + "-" + stopEngine + " (InstallValidate=" + installValidate + ")");
     }
 
     static int SeqOf(Database db, string action, int standardDefault)
