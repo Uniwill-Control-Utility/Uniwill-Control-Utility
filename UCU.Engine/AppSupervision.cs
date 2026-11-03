@@ -46,6 +46,15 @@ namespace UCU.Engine
         /// (launcher refused, session not ready), on top of the first attempt.</summary>
         internal const int MaxLaunchRetries = 2;
 
+        /// <summary>
+        /// A launch the supervisor started itself must stay up this long before its
+        /// exit counts as intentional. Field, 2026-11-04: a supervisor relaunch died
+        /// by itself 7 s in and reported a graceful exit, so the supervisor disarmed
+        /// and the app never came back. A self-launch that dies fast is a failed
+        /// launch, not the user closing the app.
+        /// </summary>
+        internal static readonly TimeSpan SelfLaunchVerificationWindow = TimeSpan.FromSeconds(60);
+
         private readonly ILogger<AppSupervision> _logger;
         private readonly Func<DateTime?> _probeAppStartUtc;
         private readonly Func<DateTime?, bool> _gracefulExitFresh;
@@ -57,6 +66,9 @@ namespace UCU.Engine
         private int _consecutiveFastFailures;
         private int _failedLaunches;
         private DateTime? _relaunchDueUtc;
+
+        /// <summary>True while the app instance in flight is one this supervisor launched.</summary>
+        private bool _launchedBySupervisor;
 
         /// <summary>
         /// Production composition: real process probe, the verb-carried graceful
@@ -175,6 +187,14 @@ namespace UCU.Engine
             TimeSpan runDuration = now - (_runningSince ?? now);
             bool graceful = _gracefulExitFresh(_runningSince);
 
+            // A launch we made ourselves that died inside the verification window
+            // is a launch that failed, not the user closing the app. Feed it to
+            // the fast-crash budget (bounded retries, then Stop) instead of
+            // disarming on a "graceful" signal every startup path can emit.
+            if (_launchedBySupervisor && runDuration < SelfLaunchVerificationWindow)
+                graceful = false;
+            _launchedBySupervisor = false;
+
             GuardianDecision decision = GuardianPolicy.Evaluate(
                 graceful, runDuration, _consecutiveFastFailures,
                 MaxFastCrashAttempts, BaseDelay, MaxDelay, FastExitThreshold);
@@ -221,6 +241,7 @@ namespace UCU.Engine
             if (_launchApp())
             {
                 _failedLaunches = 0;
+                _launchedBySupervisor = true;
                 return;
             }
 

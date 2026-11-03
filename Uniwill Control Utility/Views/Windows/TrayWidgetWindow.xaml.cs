@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Windows.Tray;
@@ -57,7 +58,27 @@ namespace Uniwill_Control_Utility.Views.Windows
             _quickControl = quickControl;
             Instance = this;
             InitializeComponent();
+            // WPF-UI's WindowBackdropType.Acrylic is unusable here: on this stack it
+            // intermittently drops the backdrop and leaves an opaque light panel, which
+            // is why the widget stays on Mica - the same backdrop the main window uses,
+            // re-applied by the watcher on every theme change.
             SystemThemeWatcher.Watch(this, Wpf.Ui.Controls.WindowBackdropType.Mica, true);
+
+            // ...and apply it again whenever the backdrop can have been reset:
+            // FluentWindow only sets the DWM attribute from WindowBackdropType, and the
+            // opaque ApplicationBackgroundBrush the style leaves on the window covers
+            // the backdrop until WindowBackgroundManager runs its full pass
+            // (RemoveBackdrop -> RemoveBackground -> ApplyBackdrop). ApplicationThemeManager.Apply
+            // runs that pass only for Application.MainWindow, so this window never gets
+            // it from the app - it takes the pass itself, on first load, on every
+            // re-display, and whenever the app theme changes (field, 2026-11-06: a
+            // Windows light->dark switch dropped the backdrop and it did not come back,
+            // Loaded having already fired).
+            Loaded += (_, _) => ApplyTrayBackdrop();
+            // shortcut: the tray window lives for the whole process, so this static
+            // subscription is never released.
+            ApplicationThemeManager.Changed += (_, _) =>
+                Dispatcher.BeginInvoke(new Action(ApplyTrayBackdrop));
 
             _refreshTimer = new DispatcherTimer
             {
@@ -65,6 +86,17 @@ namespace Uniwill_Control_Utility.Views.Windows
             };
             _refreshTimer.Tick += (s, e) => UpdateMetrics();
         }
+
+        /// <summary>
+        /// The full backdrop pass for this window: WPF-UI's <c>FluentWindow</c> only sets
+        /// the DWM attribute, while this is what also clears the window background and
+        /// the composition background so the Mica can show through. Idempotent.
+        /// </summary>
+        private void ApplyTrayBackdrop() =>
+            WindowBackgroundManager.UpdateBackground(
+                this,
+                ApplicationThemeManager.GetAppTheme(),
+                Wpf.Ui.Controls.WindowBackdropType.Mica);
 
         public async Task ToggleAsync()
         {
@@ -81,6 +113,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             Show();
             UpdateLayout();
+            ApplyTrayBackdrop();
             PositionNearTray();
             Activate();
             _refreshTimer.Start();
