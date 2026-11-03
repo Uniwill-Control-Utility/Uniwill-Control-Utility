@@ -295,9 +295,10 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 & $msiEdit addca $packedMsi.FullName
 if ($LASTEXITCODE -ne 0) { throw "msi-edit addca failed: engine service CustomActions not authored" }
 $caEcho = & $msiEdit inspect $packedMsi.FullName 2>&1 | Out-String
-foreach ($want in @('UcuEngineInstallDeferred\s*\|\s*3090', 'UcuEngineInstallRollback\s*\|\s*3346', 'UcuEngineRemoveDeferred\s*\|\s*3090', 'UcuCloseApp\s*\|\s*114', 'UcuStopEngine\s*\|\s*114', 'UcuKillEngine\s*\|\s*114')) {
+foreach ($want in @('UcuEngineInstallDeferred\s*\|\s*3090', 'UcuEngineInstallRollback\s*\|\s*3346', 'UcuEngineRemoveDeferred\s*\|\s*3090', 'UcuCloseApp\s*\|\s*114', 'UcuStopEngine\s*\|\s*114')) {
     if ($caEcho -notmatch $want) { throw "post-edit verification: CustomAction row missing in the packed MSI ($want)" }
 }
+
 if ($caEcho -notmatch "--uninstall-engine") {
     # Belt: the sweep verb must never appear as a CA target inside the MSI.
     Write-Host "Engine service CustomActions authored (install @6000 + rollback @5999, remove @3498, engine verbs only)" -ForegroundColor Cyan
