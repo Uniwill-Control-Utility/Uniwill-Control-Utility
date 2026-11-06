@@ -881,9 +881,14 @@
                     <!-- OEM Control Center takeover (story U-203): pause the OEM
                          stack (engine machine scope + user scope), restore it from
                          the journal. Status + actions only; the hardening gate's
-                         refusals surface as the suspect list, never as actions. -->
+                         refusals surface as the suspect list, never as actions.
+                         Collapsed by default: the card exists only where the OEM
+                         stack does, and SettingsPage_Loaded reveals it unless the
+                         engine reports no catalog services and no OEM processes
+                         (field, 2026-11-06: it stayed after XMG CC was uninstalled). -->
                     <ui:CardExpander x:Name="OemTakeoverCard"
                                      Margin="0,0,0,8"
+                                     Visibility="Collapsed"
                                      IsExpanded="False"
                                      Expanded="OemTakeoverCard_Expanded">
                         <ui:CardExpander.Icon>

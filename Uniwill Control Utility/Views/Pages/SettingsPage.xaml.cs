@@ -1124,8 +1124,47 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void UiPage_Loaded(object sender, RoutedEventArgs e)
         {
+            _ = RefreshOemCardVisibilityAsync();
             await LoadSystemInfoAsync();
             await SyncHardwareManagementStates();
+        }
+
+        /// <summary>
+        /// Shows the OEM takeover card only where the OEM stack exists. The engine
+        /// reports how many catalog services are registered and how many
+        /// publisher-verified OEM processes are alive; zero of both means there is
+        /// nothing to pause or restore - a machine that never had the vendor stack,
+        /// or had it uninstalled (field, 2026-11-06: the card stayed after XMG CC was
+        /// removed and %ProgramFiles%\OEM was empty). Deliberately not the policy
+        /// State: an orphaned journal from a pause performed before the uninstall
+        /// keeps that at Stale, which would keep a dead card on screen.
+        ///
+        /// An unknown answer keeps the card: the engine being offline or a failed
+        /// read must not hide a working affordance on every transient outage.
+        /// </summary>
+        private async System.Threading.Tasks.Task RefreshOemCardVisibilityAsync()
+        {
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            if (_oemTakeover is null)
+            {
+                await Dispatcher.InvokeAsync(() => OemTakeoverCard.Visibility = Visibility.Visible);
+                return;
+            }
+
+            try
+            {
+                Services.OemOverview overview = await _oemTakeover.GetOverviewAsync();
+                bool absent = overview.EngineReachable
+                    && overview.ServicesInstalled == 0
+                    && overview.OemProcessesRunning == 0;
+                await Dispatcher.InvokeAsync(() =>
+                    OemTakeoverCard.Visibility = absent ? Visibility.Collapsed : Visibility.Visible);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[Settings] OEM takeover presence read failed");
+                await Dispatcher.InvokeAsync(() => OemTakeoverCard.Visibility = Visibility.Visible);
+            }
         }
 
         private async System.Threading.Tasks.Task LoadSystemInfoAsync()
