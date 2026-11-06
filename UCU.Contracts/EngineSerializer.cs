@@ -24,6 +24,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(List<EcRegisterBlockDto>))]
     [JsonSerializable(typeof(IntValueDto))]
     [JsonSerializable(typeof(BoolValueDto))]
+    [JsonSerializable(typeof(AutostartRequestDto))]
     [JsonSerializable(typeof(WordAddressDto))]
     [JsonSerializable(typeof(RegisterRangeDto))]
     [JsonSerializable(typeof(RegisterWriteDto))]

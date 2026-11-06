@@ -411,6 +411,12 @@ namespace UCU.Client
 
         public Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Engine.NotifyAppExit, cancellationToken);
+
+        public Task<bool> SetAutostartAsync(bool enabled, int delaySeconds, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(
+                EngineVerbs.Engine.SetAutostart,
+                EngineSerializer.ToParams(new AutostartRequestDto { Enabled = enabled, DelaySeconds = delaySeconds }),
+                cancellationToken);
     }
 
     /// <summary>

@@ -85,7 +85,9 @@ Bounded tasks report at `Warning` when they outlive their budget, so the log dis
 
 ## Autostart and scheduled tasks
 
-- The logon task is **"UCU Autostart"**, registered with **limited** privileges (`TaskRunLevel.LUA`): the app is unelevated, and a standard user can register/run a limited task without UAC. The action's working directory is the exe folder.
+- The logon task is **"UCU Autostart"**, registered with **limited** privileges (`TaskRunLevel.LUA`) for the interactive user. The action's working directory is the exe folder.
+- **The engine registers it, not the app** (`engine.set_autostart` -> `UCU.Engine\AutostartTask`): the Task Scheduler refuses task creation to a medium-integrity token, so the unelevated app cannot register its own entry (field, 2026-11-06: opening Settings threw `E_ACCESSDENIED` from `RegisterTaskDefinition`; 0.9.6 only managed it because the whole app ran elevated). The request carries the toggle and the delay; the service resolves the action path from its own `Service\` layout and the account from the app's session (console session as fallback) - never from the caller, or the verb would be a "schedule any program as this user" primitive.
+- The app calls the engine first from `ScheduledTaskService` and keeps the local registration as the fallback for a dev run with no service.
 - `MigrateLegacyAutostartTask` moves the pre-engine **"UCU"** task (highest privileges, for the old `requireAdministrator` manifest) to the new task once, preserving the delay setting.
 - `RetireGuardianTask` removes the retired **"UCU Guardian"** watchdog task (the supervisor in the engine replaced it) and clears the vestigial `GuardianEnabled` setting.
 - `SelfHealScheduledTask` re-points the task at the running exe when a moved install (zip → MSI migration) baked an old path.

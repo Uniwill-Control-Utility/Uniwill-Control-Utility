@@ -41,6 +41,12 @@ namespace UCU.Engine
                 appExit.SignalGracefulExit(DateTime.UtcNow);
                 return Task.FromResult<object?>(true);
             });
+
+            add(EngineVerbs.Engine.SetAutostart, (p, ct) =>
+            {
+                AutostartRequestDto request = EngineSerializer.BindParams<AutostartRequestDto>(p);
+                return Task.FromResult<object?>(AutostartTask.Apply(request.Enabled, request.DelaySeconds));
+            });
         }
     }
 }

@@ -3,6 +3,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -20,6 +22,9 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     internal static class ScheduledTaskService
     {
+        /// <summary>The logon autostart entry's name; the engine owns it (see App).</summary>
+        internal const string AutostartTaskName = "UCU Autostart";
+
         public static string CurrentExePath
         {
             get
@@ -36,6 +41,14 @@ namespace Uniwill_Control_Utility.Services
         /// </param>
         public static void Register(string name, string description, string arguments, TimeSpan delay, string? exePath = null)
         {
+            // The service owns the logon entry: the Task Scheduler denies task
+            // creation to the unelevated app (field 2026-11-06, E_ACCESSDENIED), so
+            // the local registration below only works when this process happens to
+            // be elevated. Ask the engine first and keep the local path as the
+            // fallback for a dev run with no service.
+            if (TryEngineAutostart(name, enabled: true, delay))
+                return;
+
             using var ts = new TaskService();
 
             // Delete existing task so we can recreate with updated settings.
@@ -70,9 +83,51 @@ namespace Uniwill_Control_Utility.Services
 
         public static void Unregister(string name)
         {
+            if (TryEngineAutostart(name, enabled: false, TimeSpan.Zero))
+                return;
+
             using var ts = new TaskService();
             if (ts.RootFolder.AllTasks.Any(t => t.Name == name))
                 ts.RootFolder.DeleteTask(name);
+        }
+
+        /// <summary>
+        /// The autostart entry is the one task the engine can own; every other
+        /// task this class creates is a one-shot the caller has rights for. The
+        /// call is bounded because it runs on the Settings UI thread: a wedged
+        /// engine costs a moment, not the page (the same budget App.OnExit uses
+        /// for its graceful-exit signal).
+        /// </summary>
+        private static bool TryEngineAutostart(string name, bool enabled, TimeSpan delay)
+        {
+            if (!string.Equals(name, AutostartTaskName, StringComparison.Ordinal))
+                return false;
+
+            try
+            {
+                IEngineCapability? engine = App.GetService<IEngineCapability>();
+                if (engine is null)
+                    return false;
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                bool applied = engine
+                    .SetAutostartAsync(enabled, (int)delay.TotalSeconds, cts.Token)
+                    .GetAwaiter().GetResult();
+
+                if (!applied)
+                {
+                    Serilog.Log.Warning(
+                        "[ScheduledTask] the engine refused to {Action} '{Name}' (no app exe beside it, or no interactive user)",
+                        enabled ? "register" : "remove", name);
+                }
+
+                return applied;
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "[ScheduledTask] engine autostart call failed; falling back to local registration");
+                return false;
+            }
         }
 
         /// <summary>
