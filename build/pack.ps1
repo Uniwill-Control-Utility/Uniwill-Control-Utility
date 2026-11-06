@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     Packages Uniwill Control Utility for release: publish, stage native payload,
-    Velopack pack (per-machine MSI + full/delta nupkgs), portable zip.
+    Velopack pack (per-machine MSI + full/delta nupkgs).
 
 .DESCRIPTION
     Produces the GitHub release assets for jgudec/Uniwill-Control-Utility:
@@ -10,7 +10,10 @@
       Releases\Uniwill-Control-Utility-<ver>-full.nupkg   Velopack full package
       Releases\Uniwill-Control-Utility-<ver>-delta.nupkg  Velopack delta from the previous release
       Releases\releases.win.json                      Velopack GitHub feed index
-      Releases\Uniwill-Control-Utility-<ver>-win-x64.zip  portable (no auto-update)
+
+    No portable zip is produced: the engine runs as a machine-wide service
+    created on first launch, so an unpacked copy has no update or removal
+    story of its own (deleting the folder leaves the service registered).
 
     The version is read from the csproj (single source of truth) - bump it there,
     tag the GitHub release with the same version, upload the printed manifest.
@@ -173,6 +176,15 @@ dotnet vpk pack -u Uniwill-Control-Utility -v $version -p $publishDir -o $releas
     -f net10-x64-desktop `
     --msi --instLocation PerMachine
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
+
+# vpk always emits its own portable zip (there is no --noPortable in 1.2.161).
+# We do not ship one: the engine runs as a machine-wide service created on first
+# launch, so an unpacked copy has no update or removal story of its own.
+$vpkPortable = Join-Path $releasesDir "Uniwill-Control-Utility-win-Portable.zip"
+if (Test-Path $vpkPortable) {
+    Remove-Item $vpkPortable -Force
+    Write-Host "Removed vpk's portable zip (not a shipped asset)" -ForegroundColor DarkGray
+}
 
 # --- 5a. Rebind the MSI's Add/Remove Programs entry to Uninstall.exe ------
 # The Control Panel / Settings uninstall must run the complete-sweep shim,
@@ -338,13 +350,8 @@ if ($setupExe) {
     }
 }
 
-# --- 6. Portable zip side artifact (today's distribution format) ---
-$zip = Join-Path $releasesDir "Uniwill-Control-Utility-$version-win-x64.zip"
-if (Test-Path $zip) { Remove-Item $zip }
-Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $zip
-
-# --- 7. Upload manifest ---
+# --- 6. Upload manifest ---
 Write-Host "`nUpload these assets to the GitHub release tagged v$version :" -ForegroundColor Green
 Get-ChildItem $releasesDir |
-    Where-Object { $_.Name -match "releases\.win\.json$|full\.nupkg$|delta\.nupkg$|\.msi$|\.zip$" } |
+    Where-Object { $_.Name -match "releases\.win\.json$|Uniwill-Control-Utility-$([regex]::Escape($version))-(full|delta)\.nupkg$|\.msi$|win-Setup\.exe$" } |
     ForEach-Object { Write-Host "  $($_.Name)" }
