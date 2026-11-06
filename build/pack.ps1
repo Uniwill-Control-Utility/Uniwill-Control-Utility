@@ -5,7 +5,7 @@
     Velopack pack (per-machine MSI + full/delta nupkgs).
 
 .DESCRIPTION
-    Produces the GitHub release assets for jgudec/Uniwill-Control-Utility:
+    Produces the GitHub release assets for Uniwill-Control-Utility/Uniwill-Control-Utility:
       Releases\Uniwill-Control-Utility.msi            per-machine installer (Program Files)
       Releases\Uniwill-Control-Utility-<ver>-full.nupkg   Velopack full package
       Releases\Uniwill-Control-Utility-<ver>-delta.nupkg  Velopack delta from the previous release
@@ -162,7 +162,7 @@ foreach ($file in $payload) {
 
 # --- 4. Seed the persistent Releases dir so deltas can be built ---
 dotnet tool restore | Out-Null
-dotnet vpk download github --repoUrl https://github.com/jgudec/Uniwill-Control-Utility -o $releasesDir
+dotnet vpk download github --repoUrl https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility -o $releasesDir
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "vpk download github failed (first run? no Velopack assets on GitHub yet) - building a full-only release."
 }

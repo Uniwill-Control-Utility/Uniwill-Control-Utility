@@ -57,7 +57,7 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     public sealed class VelopackUpdateService
     {
-        public const string GitHubFeedUrl = "https://github.com/jgudec/Uniwill-Control-Utility";
+        public const string GitHubFeedUrl = "https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility";
 
         /// <summary>
         /// Local folder feed override for end-to-end testing (points the

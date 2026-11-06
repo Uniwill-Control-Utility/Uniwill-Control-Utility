@@ -4,7 +4,7 @@
 
 The repository contains bug and feature request templates, but no `CONTRIBUTING.md`, pull-request template, code owners, continuous-integration workflow, release workflow, or automated test project.
 
-Both issue templates still assign `JamesCJ60`, and README issue/release links point to `jgudec/Uniwill-Control-Utility` while the current origin is the `Uniwill-Control-Utility` organization. These references should be reconciled when repository ownership is finalized.
+Both issue templates still assign `JamesCJ60`; point them at a maintainer in the `Uniwill-Control-Utility` organization. Repository links now all reference `Uniwill-Control-Utility/Uniwill-Control-Utility` - the updater feed, the Add/Remove Programs project links and the README.
 
 ## Recommended branch flow
 
