@@ -16,8 +16,8 @@ using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
+using UCU.Core.Supervision;
 using Wpf.Ui.Abstractions.Controls;
-
 namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class Presets : INavigationAware
@@ -216,7 +216,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Filters out Adaptive game-detection spam, fan polling, etc.
             if (line.Contains("[RyzenAdj_To_UCU.") ||
                 line.Contains("[NvTuning.") ||
-                line.Contains("[UniwillECService.") ||
+                line.Contains("[EcEngine.") ||
                 line.Contains("[Presets.") ||
                 line.Contains("[Translate") ||
                 line.Contains("[WinPower]") ||
@@ -251,7 +251,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     buttons[i].IsChecked = i == _customPresetSlot;
 
                 updateRadioButtonStyles();
-                cbApplyOnStartup.IsChecked = Settings.Default.ApplyOnStart;
             }
 
             // Initialize slider defaults from stored profile values so the status card
@@ -890,10 +889,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             customScroll.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
             bottomBar.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
 
-            // Stock presets always apply on startup - hide the checkbox for them.
-            bool isBuiltIn = Services.PresetProfileApplier.IsBuiltInProfile(profile);
-            cbApplyOnStartup.Visibility = isBuiltIn ? Visibility.Collapsed : Visibility.Visible;
-
             // Set profile values from SKU database (falls back to hardcoded defaults)
             var limits = GetPowerLimits();
             int cpuMax = limits?.CpuPl1Sustained ?? 135;
@@ -1077,6 +1072,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
 
                 _ = applyProfileAsync();
+
+                // The page's slot-aware apply runs outside the arbiter's pipeline
+                // (sliders, fan-slot bookkeeping, V-F state are page-local); record it
+                // so the arbiter's debounce and priority bookkeeping stays honest and
+                // automation edges racing a user click see the click as the last truth.
+                App.GetService<PresetArbiter>()?.RecordApply(PresetIntentSource.UserInterface, profile);
             }
             else
             {
@@ -1180,7 +1181,51 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
+
+            ShowEffectiveBatteryLimits();
         }
+
+        /// <summary>
+        /// On battery the firmware grants only its own ceiling and the app clamps
+        /// its requests to the measured envelope (BatteryPowerPolicy), so the card
+        /// must show what will actually be applied - "160 W -> 40 W" - instead of
+        /// the preset's AC numbers. Field, 2026-11-02: Turbo showed 160 W SPL/FPL
+        /// and 150 W TGP while the hardware sat at ~35/40 W.
+        /// </summary>
+        private void ShowEffectiveBatteryLimits()
+        {
+            if (System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                != System.Windows.Forms.PowerLineStatus.Offline)
+            {
+                return;
+            }
+
+            bool intel = Family.TYPE == Family.ProcessorType.Intel;
+            UCU.Core.Power.BatteryPowerPolicy.Envelope envelope =
+                UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(intel);
+
+            int requestedPl1 = (int)(intel ? _profileIntelPl1 : _profileSustained);
+            int requestedPl2 = (int)(intel ? _profileIntelPl2 : _profileBoost);
+            UCU.Core.Power.BatteryPowerPolicy.Verdict cpu =
+                UCU.Core.Power.BatteryPowerPolicy.ClampCpu(requestedPl1, requestedPl2, onBattery: true, envelope.CpuWatts);
+            UCU.Core.Power.BatteryPowerPolicy.GpuVerdict gpu =
+                UCU.Core.Power.BatteryPowerPolicy.ClampGpu(
+                    (int)_profileGpuTgp,
+                    _profileGpuDb ? (int)_profileGpuDbOffset : 0,
+                    onBattery: true,
+                    envelope.GpuWatts);
+
+            tbPl1.Text = EffectiveWatt(requestedPl1, cpu.Pl1);
+            tbPl2.Text = EffectiveWatt(requestedPl2, cpu.Pl2);
+            tbGpuTgp.Text = EffectiveWatt((int)_profileGpuTgp, gpu.TgpWatts);
+            tbGpuDb.Text = _profileGpuDb
+                ? (gpu.DbWatts > 0 ? $"+{gpu.DbWatts} W" : $"+{_profileGpuDbOffset:F0} W \u2192 Off")
+                : "Off";
+        }
+
+        /// <summary>"40 W" when the request stands, "160 W → 40 W" when clamped.</summary>
+        private static string EffectiveWatt(int requested, int applied) =>
+            requested == applied ? $"{applied} W" : $"{requested} W \u2192 {applied} W";
 
         #endregion
 
@@ -1220,7 +1265,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var ecGate = RyzenAdj_To_UCU.EcService;
                     if (ecGate != null)
                     {
-                        ecGate.ApplyOemStockMode(PresetProfileApplier.OemModeIndexFor(_currentProfile));
+                        ecGate.ApplyOemStockModeAsync(PresetProfileApplier.OemModeIndexFor(_currentProfile)).GetAwaiter().GetResult();
+
+                        // The contract yields with the values (U-107): the
+                        // guardian must not heal custom bytes over a stock
+                        // preset that yields power to the firmware.
+                        Services.PowerContractStore.ClearAll();
                     }
                 }
 
@@ -1282,7 +1332,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                         int pl1 = (int)sdSustained.Value;
                         int pl2 = (int)sdBoost.Value;
                         DebugLog($"  Applying EC CPU power limits: PL1={pl1}W PL2={pl2}W");
-                        ec.ApplyCpuPowerLimits(pl1, pl2);
+                        ec.ApplyCpuPowerLimitsAsync(pl1, pl2).GetAwaiter().GetResult();
+                        Services.PowerContractStore.NoteCpuApplied(pl1, pl2);
                         DebugLog($"  EC CPU power limits applied");
 
                         // TjMax is now handled via SMU path (--tctl-temp) in buildCommandString().
@@ -1646,12 +1697,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             string modeSuffix = ActivePresetMode == Models.PresetMode.Boost ? " (Boost)" : "";
             ShowPresetSnackbar($"Profile {_customPresetSlot + 1} Cleared",
                 $"Custom preset{modeSuffix} has been cleared from slot {_customPresetSlot + 1}!");
-        }
-
-        private void cbApplyOnStartup_Click(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.ApplyOnStart = cbApplyOnStartup.IsChecked == true;
-            Settings.Default.Save();
         }
 
         private void btnApply_Click(object sender, RoutedEventArgs e)

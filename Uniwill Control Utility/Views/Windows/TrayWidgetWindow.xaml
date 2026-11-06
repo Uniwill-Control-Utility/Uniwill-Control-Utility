@@ -28,25 +28,26 @@
     UseLayoutRounding="True">
 
     <ui:FluentWindow.Resources>
+        <ResourceDictionary>
+            <!-- Metrics styles -->
+            <Style x:Key="LabelStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="9" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Style>
 
-        <!-- Metrics styles -->
-        <Style x:Key="LabelStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="9" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-        </Style>
+            <Style x:Key="HeroStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
+                <Setter Property="FontSize" Value="18" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
 
-        <Style x:Key="HeroStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
-            <Setter Property="FontSize" Value="18" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-
-        <Style x:Key="ValueStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
-            <Setter Property="FontSize" Value="10" />
-            <Setter Property="FontWeight" Value="Medium" />
-            <Setter Property="HorizontalAlignment" Value="Right" />
-        </Style>
+            <Style x:Key="ValueStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
+                <Setter Property="FontSize" Value="10" />
+                <Setter Property="FontWeight" Value="Medium" />
+                <Setter Property="HorizontalAlignment" Value="Right" />
+            </Style>
+        </ResourceDictionary>
     </ui:FluentWindow.Resources>
 
     <Grid>
@@ -55,7 +56,11 @@
             <RowDefinition Height="1" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="1" />
-            <RowDefinition Height="Auto" />
+            <!-- The footer absorbs the pixels the window keeps below its content (it is
+                 pinned at MaxHeight while the content is a little shorter), and its
+                 content is centred inside that height so the button never sits on the
+                 window's bottom edge. -->
+            <RowDefinition Height="*" MinHeight="44" />
         </Grid.RowDefinitions>
 
         <!-- ===== METRICS SECTION (no card background) ===== -->
@@ -257,12 +262,13 @@
              shrinks the card (and the window, which sizes to its content) by the
              exact space freed rows would occupy — see ResizeQuickSettingsCard. -->
         <Border x:Name="QuickSettingsCard" Grid.Row="2" Margin="-10,0,0,0"
-                Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                Background="Transparent"
                 BorderThickness="0"
                 Padding="0,0,0,22"
                 Height="330">
         <ui:NavigationView x:Name="TrayNavigation"
                            Margin="0,0,0,-20"
+                           Background="Transparent"
                            FontSize="10"
                            IsPaneVisible="False"
                            IsPaneOpen="False"
@@ -294,7 +300,7 @@
         <Border Grid.Row="3" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" BorderThickness="0" />
 
         <!-- ===== FOOTER ===== -->
-        <Grid Grid.Row="4" Margin="12,3,12,0" >
+        <Grid Grid.Row="4" Margin="12,0,12,0" VerticalAlignment="Center">
             <!-- Conditional "More <page> settings" hop: shown only when the tray is
                  on a non-default page (e.g. the Display page), styled like the expand
                  button (no background, no border). The tray window re-arms its label

@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Uniwill Control Utility\Uniwill Control Utility.csproj" />
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+    <ProjectReference Include="..\UCU.Hardware\UCU.Hardware.csproj" />
   </ItemGroup>
 
 </Project>

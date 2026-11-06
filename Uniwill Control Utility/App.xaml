@@ -6,7 +6,8 @@
     xmlns:system="clr-namespace:System;assembly=System.Runtime"
       DispatcherUnhandledException="OnDispatcherUnhandledException"
     Exit="OnExit"
-    Startup="OnStartup">
+    Startup="OnStartup"
+    ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>

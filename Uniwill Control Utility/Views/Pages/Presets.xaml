@@ -823,12 +823,6 @@
 
             <!-- Right: Clear, Save + Apply buttons -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                <CheckBox x:Name="cbApplyOnStartup"
-                          Content="Apply on startup"
-                          Margin="0,0,12,0"
-                          VerticalAlignment="Center"
-                          FontSize="13"
-                          Click="cbApplyOnStartup_Click" />
                 <ui:Button x:Name="btnClear"
                            Appearance="Secondary"
                            Click="btnClear_Click"

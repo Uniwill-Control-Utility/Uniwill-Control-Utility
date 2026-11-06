@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Privileged hardware access: the EC engine and the driver transport that talks
+       to UWACPIDriver.sys. Only the engine service loads this assembly — the UI
+       process is never allowed a reference to it, which is what keeps the app
+       unelevated. Encoding rules live in UCU.Core; this assembly is I/O only. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10.0</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>UCU.Hardware</AssemblyName>
+    <RootNamespace>UCU.Hardware</RootNamespace>
+    <!-- Version: Directory.Build.props, the single source of truth. -->
+    <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <!-- The MiniLED local-dimming WMI handshake (Devices/). Executing the OEM
+         root\WMI method is a privileged act the unelevated app cannot do, so
+         the WMI dependency rides the LocalSystem side of the boundary. -->
+    <PackageReference Include="System.Management" Version="10.0.13" />
+    <!-- The OEM takeover task scope (U-203): pausing the OEM stack disables
+         machine scheduled tasks, an enable-state write only LocalSystem
+         owns, so the Task Scheduler dependency rides the LocalSystem side
+         of the boundary (the same wrapper the app already ships for its
+         own task rows). Raw dynamic COM binding is a field-proven dead
+         end: the Schedule.Service collection answers E_NOINTERFACE to the
+         IEnumerable cast (pack #22 dev-box fault). -->
+    <PackageReference Include="TaskScheduler" Version="2.12.2" />
+    <!-- The engine-side sensor probe (Metrics/). The app keeps its own LHM copy for
+         the GPU (NVAPI decision) and never loads this assembly, so the
+         sensor-driver dependency stays on the LocalSystem side of the boundary. -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre744" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fake-transport write-sequence tests. -->
+    <InternalsVisibleTo Include="UCU.Hardware.Tests" />
+  </ItemGroup>
+
+</Project>

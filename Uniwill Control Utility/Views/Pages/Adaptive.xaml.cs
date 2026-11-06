@@ -27,6 +27,7 @@ using GameLib.Plugin.Steam.Model;
 using Windows.Gaming.Preview.GamesEnumeration;
 using System.ComponentModel;
 using static Uniwill_Control_Utility.Scripts.Game_Manager;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -119,10 +120,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ = Task.Run(() =>
             {
                 bool uniwillAvailable = false;
-                var uniwillEc = App.GetService<UniwillECService>();
-                if (uniwillEc is not null)
+                var engine = App.GetService<IEngineCapability>();
+                if (engine is not null)
                 {
-                    try { uniwillAvailable = uniwillEc.Initialize(); }
+                    try { uniwillAvailable = engine.IsHardwareAvailableAsync().GetAwaiter().GetResult(); }
                     catch (Exception) { /* EC not available */ }
                 }
 
@@ -1887,7 +1888,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Also write EC CPU power limits
                     var ec = RyzenAdj_To_UCU.EcService;
                     if (ec != null)
-                        ec.ApplyCpuPowerLimits(sustained, boost);
+                        ec.ApplyCpuPowerLimitsAsync(sustained, boost).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {

@@ -157,9 +157,23 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 };
 
                 var overclock = new PerformanceStates20InfoV1(performanceStates, 2, 0);
+
+                // The honest signal: the native SetPerformanceStates20 is a
+                // fire-and-forget call whose only witness is the capability's
+                // read-only flag - the driver's declaration that it refuses
+                // performance-state modification. GeForce drivers set it (the
+                // clock writes never land), and a success-shaped return after a
+                // refused write is how a preset page keeps showing offsets that
+                // are not in the GPU. The flag is the stable, public signal; 0 is
+                // reserved for the out-of-range early return, so the caller can
+                // tell "refused" from "invalid input".
+                bool readOnly = internalGpu.PerformanceStatesInfo.IsReadOnly;
+                if (readOnly)
+                    DiagnosticLogger.LogInfo("SetClocks: driver reports performance states read-only - clock offsets are not applied by this GPU");
+
                 GPUApi.SetPerformanceStates20(internalGpu.Handle, overclock);
 
-                return 1;
+                return readOnly ? -1 : 1;
             }
             catch (Exception ex)
             {
@@ -177,6 +191,27 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 {
                     DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): out of range {MinPowerLimitWatts}-{MaxPowerLimitWatts}W, skipped");
                     return 0;
+                }
+
+                // Battery envelope (measured 2026-11-02, CPU + GPU loaded:
+                // Intel 35 W GPU, AMD 40 W GPU). On DC the firmware owns the GPU
+                // ceiling and ignores the request - a 115 W Custom TGP sat at
+                // ~30 W while the UI claimed 115 - so clamp the request and drop
+                // Dynamic Boost, which cannot be borrowed on battery either.
+                var envelope = UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(
+                    Family.TYPE == Family.ProcessorType.Intel);
+                UCU.Core.Power.BatteryPowerPolicy.GpuVerdict gpu =
+                    UCU.Core.Power.BatteryPowerPolicy.ClampGpu(
+                        totalWatts, dbOffset,
+                        onBattery: System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                                   == System.Windows.Forms.PowerLineStatus.Offline,
+                        gpuCeiling: envelope.GpuWatts);
+                if (gpu.Clamped)
+                {
+                    DiagnosticLogger.LogInfo(
+                        $"[Power] battery envelope: GPU TGP clamped {gpu.RequestedTgp}W/{gpu.RequestedDb}W DB -> {gpu.TgpWatts}W/{gpu.DbWatts}W DB");
+                    totalWatts = gpu.TgpWatts;
+                    dbOffset = gpu.DbWatts;
                 }
 
                 // Laptop GPUs don't support nvmlDeviceSetPowerManagementLimit (returns NOT_SUPPORTED).
@@ -213,7 +248,13 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 //   0x0744 = cTGP offset (targetWatts - defaultWatts)
                 //   0x0745 = TPP offset
                 //   0x0746 = Dynamic Boost offset
-                ec.ActivateGpuPowerControl(ctgpOffset, dbOffset);
+                ec.ActivateGpuPowerControlAsync(ctgpOffset, dbOffset).GetAwaiter().GetResult();
+
+                // The contract note (U-107): every GPU power-limit apply
+                // funnels through here, so the guardian's contract records the
+                // exact bytes the activation wrote â€” the drift comparison is
+                // byte-for-byte against the EC's answer, no re-derivation.
+                Services.PowerContractStore.NoteGpuApplied(ctgpOffset, dbOffset);
 
                 return 1;
             }
@@ -888,7 +929,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 // Offset 0x44: entries start, stride = 0x24 (36 bytes) per point
                 //   Each entry: 5 uint32 + FrequencyDeltaInkHz(4) + 3 uint32 = 36 bytes
                 //   FrequencyDeltaInkHz at offset 0x14 within each entry
-                // Total buffer: 0x2420 (9248 bytes) — supports up to 255 point indices
+                // Total buffer: 0x2420 (9248 bytes) ï¿½ supports up to 255 point indices
 
                 const int bufferSize = 0x2420;
                 const int entryStride = 0x24; // 36 bytes per entry
@@ -907,7 +948,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     int pointIndex = kvp.Key;
                     if (pointIndex < 0 || pointIndex >= UsableVfPointCount) continue;
 
-                    // Set mask bit — bitmap at offset 0x04, one bit per point index
+                    // Set mask bit ï¿½ bitmap at offset 0x04, one bit per point index
                     int maskByteOffset = 0x04 + (pointIndex / 8);
                     int maskBit = pointIndex % 8;
                     buffer[maskByteOffset] |= (byte)(1 << maskBit);
@@ -966,7 +1007,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 // Offset 0x0C: _ClockBoostLocks[32] (24 bytes each)
                 // Total: 0x0C + 32*24 = 0x30C (780 bytes)
 
-                const int bufferSize = 0x30C; // 780 bytes — Marshal.SizeOf<PrivateClockBoostLockV2>()
+                const int bufferSize = 0x30C; // 780 bytes ï¿½ Marshal.SizeOf<PrivateClockBoostLockV2>()
                 const int lockStride = 24;
                 const int maxLocks = 32;
 
@@ -1013,7 +1054,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Applies per-point frequency offsets using NvAPI_GPU_SetClocks (0x6F151055).
-        /// Unexposed function — buffer layout is unknown. Using a minimal structure
+        /// Unexposed function ï¿½ buffer layout is unknown. Using a minimal structure
         /// based on PerformanceStates20Info patterns.
         /// </summary>
         public static int ApplyVfCurveOffsets_SetClocks(Dictionary<int, int> offsetsMHz)
@@ -1035,7 +1076,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 var setControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(setPtr);
 
                 // Unknown buffer layout. Try a minimal structure similar to PerformanceStates20InfoV1.
-                // This is speculative — we're guessing based on the pattern of other NvAPI GPU set functions.
+                // This is speculative ï¿½ we're guessing based on the pattern of other NvAPI GPU set functions.
                 const int bufferSize = 0x200;
                 byte[] buffer = new byte[bufferSize];
 
@@ -1065,7 +1106,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Reads the current VF control table via NvAPI getControl (0x23F1B133).
-        /// Required before setControl — the driver expects a valid base state.
+        /// Required before setControl ï¿½ the driver expects a valid base state.
         /// </summary>
         private static bool ReadControlTable(IntPtr gpu, out byte[] buffer)
         {
@@ -1264,7 +1305,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Queries the VFCurve-specific NvAPI interfaces to check availability.
-        /// Read-only — does not call the interfaces, only queries them.
+        /// Read-only ï¿½ does not call the interfaces, only queries them.
         /// </summary>
         public static VfCurveInterfaceResult QueryInterfaces()
         {
@@ -1298,7 +1339,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Attempts to read VFCurve data using the VFCurve-specific getInfo interface (0x2A70).
-        /// Read-only probe — does not modify GPU state.
+        /// Read-only probe ï¿½ does not modify GPU state.
         /// </summary>
         public static bool TryReadVfCurveGetInfo(
             IntPtr gpu,
@@ -1360,7 +1401,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Runs a full diagnostic probe of the VFCurve-specific interfaces.
-        /// Read-only — does not modify GPU state.
+        /// Read-only ï¿½ does not modify GPU state.
         /// </summary>
         public static string RunDiagnostic()
         {

@@ -970,8 +970,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
-            imgDevice.Source = new BitmapImage(
-                new Uri($"pack://application:,,,/Assets/HydroUI/{imageFile}", UriKind.Absolute));
+            // Decoded off the UI thread - see SafeImageSource (a synchronous
+            // BitmapImage decode can be held by an AV file guard).
+            string imageUri = $"pack://application:,,,/Assets/HydroUI/{imageFile}";
+            _ = Task.Run(async () =>
+            {
+                var image = await Services.SafeImageSource.DecodeAsync(imageUri);
+                if (image is null)
+                    return;
+                await Dispatcher.InvokeAsync(() => imgDevice.Source = image);
+            });
         }
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)

@@ -1,3 +1,4 @@
+using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Tests.Services;

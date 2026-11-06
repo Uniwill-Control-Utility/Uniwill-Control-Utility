@@ -18,6 +18,10 @@
 | PawnIO | Kernel-backed module system used by UCU for AMD SMU and Intel register access. |
 | PL1 / PL2 | Intel sustained and short-duration processor power limits. |
 | Preset | A named collection of CPU, GPU, and related settings; built-in profiles are Office, Gaming, and Turbo. |
+| Squat suspect | A target whose name matches the OEM catalog but which failed the takeover's path+signature+publisher gate. Audited and never touched (U-203). |
+| Shortcut map | User-editable chord -> action bindings in `shortcuts.json`, matched on the overlay's global hook and limited to the watcher hub's vetted action set (U-204). |
+| Takeover journal | The reversible record of OEM-stack mutations (`oem-takeover-journal.json`, one file per scope). "Mutations not yet undone": restore consumes the entries it reversed, so the file drains as the state returns to Active (U-203). |
+| Diagnostics bundle | One-click zip from About: report (versions, OS, CPU, engine answer, takeover state) plus the app log, engine log and both takeover journals (U-208). |
 | RTSS | RivaTuner Statistics Server. UCU can read its shared memory as the preferred FPS source. |
 | SKU | A resolved laptop CPU/GPU/device combination with model-specific profile values from `SkuData/skus.json`. |
 | SMU | AMD System Management Unit, addressed through mailbox commands for power and Curve Optimizer operations. |

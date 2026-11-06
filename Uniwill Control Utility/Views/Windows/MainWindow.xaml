@@ -109,6 +109,91 @@ VerticalAlignment="Center"/>
                                        Click="UpdateRestartButton_Click"/>
                         </StackPanel>
                     </ui:Card>
+
+                    <!-- OEM takeover warning (U-203 visibility): shown while the
+                         OEM Control Center stack is live (Active/PartiallyPaused).
+                         The full view stays in Settings; this chip is the
+                         discoverable path to it. Click opens the review popup. -->
+                    <ui:Card x:Name="OemWarningCard"
+                             Margin="4,4,0,4"
+                             Padding="8,4"
+                             Visibility="Collapsed"
+                             Cursor="Hand"
+                             Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                             BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                             BorderThickness="1"
+                             ToolTip="Review the OEM Control Center takeover"
+                             MouseLeftButtonUp="OemWarningCard_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                         Glyph="&#xE7BA;"
+                                         FontSize="14"
+                                         Margin="0,0,6,0"
+                                         VerticalAlignment="Center"
+                                         Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="OemWarningText"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                       Text="OEM Control Center running" />
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- Review popup, anchored under the warning chip. -->
+                    <Popup x:Name="OemWarnPopup"
+                           PlacementTarget="{Binding ElementName=OemWarningCard}"
+                           Placement="Bottom"
+                           StaysOpen="False"
+                           AllowsTransparency="True"
+                           PopupAnimation="Fade"
+                           VerticalOffset="6">
+                        <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="14">
+                            <StackPanel Width="380">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                 Glyph="&#xE7BA;"
+                                                 FontSize="16"
+                                                 Margin="0,0,8,0"
+                                                 VerticalAlignment="Center" />
+                                    <TextBlock Text="OEM Control Center running"
+                                               FontWeight="SemiBold"
+                                               FontSize="13"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Margin="0,8,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Opacity="0.85"
+                                           Text="The OEM Control Center is running and may override this app's fan and power control." />
+                                <TextBlock x:Name="OemWarnDetail"
+                                           Margin="0,6,0,0"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Opacity="0.7" />
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            Margin="0,14,0,0">
+                                    <ui:Button x:Name="OemWarnNotNowButton"
+                                               Content="Not now"
+                                               Margin="0,0,8,0"
+                                               Click="OemWarnNotNow_Click" />
+                                    <ui:Button x:Name="OemWarnSettingsButton"
+                                               Content="Open Settings"
+                                               Margin="0,0,8,0"
+                                               Click="OemWarnSettings_Click" />
+                                    <ui:Button x:Name="OemWarnPauseButton"
+                                               Content="Pause stack"
+                                               Appearance="Primary"
+                                               Click="OemWarnPause_Click" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
                 </StackPanel>
             </ui:TitleBar.Header>
 

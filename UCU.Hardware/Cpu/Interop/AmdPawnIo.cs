@@ -1,0 +1,398 @@
+using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
+using System;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
+using Serilog;
+
+namespace UCU.Hardware.Cpu.Interop
+{
+    /// <summary>
+    /// Adapted from ZenStates's PawnIo.cs
+    /// https://github.com/irusanov/ZenStates-Core/tree/master/PawnIo
+    /// 
+    /// </summary>
+    public sealed partial class AMDpawnIO
+    {
+        private const int FunctionNameBytes = 32;
+
+        private static string OldDevicePath = @"\\.\PawnIO";
+        private static string DevicePath = @"\\?\GLOBALROOT\Device\PawnIO";
+        private const uint ShareReadWrite = 0x00000003;
+
+        // Device-specific control codes
+        private const uint DeviceType = 41394u << 16;
+        private const uint IoctlExecuteFn = 0x841 << 2;
+        private const uint IoctlLoadBinary = 0x821 << 2;
+
+        // HRESULT for invalid handle
+        private const int E_HANDLE = unchecked((int)0x80070006);
+
+        private readonly SafeFileHandle? _device;
+
+        private static readonly Version? _installedVersion = ReadInstalledVersion();
+
+        private AMDpawnIO(SafeFileHandle? deviceHandle)
+        {
+            _device = deviceHandle;
+        }
+
+        /// <summary>True when the uninstall registry entry exists and a version can be read.</summary>
+        public static bool IsInstalled => Version != null;
+
+        /// <summary>PawnIO version if available, otherwise null.</summary>
+        public static Version? Version => _installedVersion;
+
+        /// <summary>True when the device handle exists and is usable.</summary>
+        public bool IsLoaded => _device != null && !_device.IsInvalid && !_device.IsClosed;
+
+        /// <summary>
+        /// The Win32 code of the most recent PawnIO device-open failure and
+        /// the path that produced it (U-110 engine payload). A driver that
+        /// Core Isolation (Memory Integrity) blocks never starts, so the
+        /// device is absent and the open fails — and on flows that attempt
+        /// the start, 1275 (ERROR_DRIVER_BLOCKED_BY_CORE_ISOLATION) surfaces
+        /// here; OpenRevo's driver manager names the same code from
+        /// StartService (driver\bld_driver_mgr.rs). Cleared when a load
+        /// attempt begins and when an open succeeds, so the record is never
+        /// stale for the current attempt. SMU init is serialized behind the
+        /// Smu initialization lock, so this is not a racing surface.
+        /// </summary>
+        public static (int Code, string Path)? LastDeviceOpenFailure { get; private set; }
+
+        /// <summary>
+        /// " (Win32 1275 opening \\?\GLOBALROOT\Device\PawnIO)" when a
+        /// device-open failure was recorded, empty when the failure has no
+        /// observed code — the suffix the init-failure messages embed so
+        /// the engine's HardwareFault payload carries the blocking code to
+        /// the app (the dispatcher propagates the InvalidOperationException
+        /// message verbatim).
+        /// </summary>
+        public static string DescribeLastOpenFailure() =>
+            LastDeviceOpenFailure is (int code, string path)
+                ? $" (Win32 {code} opening {path})"
+                : string.Empty;
+
+        // --------------------------------------------------------------------
+        // Module loading
+        // --------------------------------------------------------------------
+        public static AMDpawnIO LoadModuleFromFile(string filePath)
+        {
+            LastDeviceOpenFailure = null; // every attempt starts with a clean record
+
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("File path must not be empty.", nameof(filePath));
+
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException("PawnIO module not found.", filePath);
+
+            byte[] moduleBytes = File.ReadAllBytes(filePath);
+            return LoadModule(moduleBytes);
+        }
+
+        public static AMDpawnIO LoadModuleFromResource(Assembly assembly, string resourceName)
+        {
+            LastDeviceOpenFailure = null;
+
+            ArgumentNullException.ThrowIfNull(assembly);
+            if (string.IsNullOrWhiteSpace(resourceName))
+                throw new ArgumentException("Resource name must not be empty.", nameof(resourceName));
+
+            using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null)
+                return new AMDpawnIO(null);
+
+            byte[] moduleBytes = ReadAllBytes(stream);
+            return LoadModule(moduleBytes);
+        }
+
+        private static AMDpawnIO LoadModule(byte[] moduleBytes)
+        {
+            LastDeviceOpenFailure = null;
+
+            IntPtr raw = CreateFile(
+                DevicePath,
+                FileAccess.GENERIC_READ | FileAccess.GENERIC_WRITE,
+                ShareReadWrite,
+                IntPtr.Zero,
+                CreationDisposition.OPEN_EXISTING,
+                0,
+                IntPtr.Zero);
+
+            // Ensure backwards compatibility with pre-2.1.0 versions of PawnIO
+            if (raw == IntPtr.Zero || raw.ToInt64() == -1)
+            {
+                // Record the code for the U-110 payload (see LastDeviceOpenFailure).
+                LastDeviceOpenFailure = (Marshal.GetLastWin32Error(), DevicePath);
+
+                raw = CreateFile(
+                OldDevicePath,
+                FileAccess.GENERIC_READ | FileAccess.GENERIC_WRITE,
+                ShareReadWrite,
+                IntPtr.Zero,
+                CreationDisposition.OPEN_EXISTING,
+                0,
+                IntPtr.Zero);
+
+                if (raw == IntPtr.Zero || raw.ToInt64() == -1)
+                {
+                    LastDeviceOpenFailure = (Marshal.GetLastWin32Error(), OldDevicePath);
+                    return new AMDpawnIO(null);
+                }
+                    
+                DevicePath = OldDevicePath;
+            }
+
+            // An open succeeded: the failure record describes this attempt, and
+            // this attempt is not an open failure (a LoadBinary refusal below
+            // is a different shape; the SMU init messages carry no open code).
+            LastDeviceOpenFailure = null;
+
+            try
+            {
+                bool ok = DeviceIoControl(
+                    raw,
+                    ControlCode.LoadBinary,
+                    moduleBytes,
+                    (uint)moduleBytes.Length,
+                    null,
+                    0,
+                    out _,
+                    IntPtr.Zero);
+
+                if (!ok)
+                {
+                    CloseHandle(raw);
+                    return new AMDpawnIO(null);
+                }
+
+                return new AMDpawnIO(new SafeFileHandle(raw, ownsHandle: true));
+            }
+            catch (Exception ex)
+            {
+                // DeviceIoControl may throw on driver load failure (e.g., access denied, driver not loaded,
+                // or SEHException from the kernel driver). Log and return an unloaded instance.
+                Log.Information($"AMDpawnIO LoadModule: DeviceIoControl LoadBinary failed: {ex.GetType().Name}: {ex.Message}");
+                try { CloseHandle(raw); } catch { /* Handle close failed; handle is already invalid */ }
+                return new AMDpawnIO(null);
+            }
+        }
+
+        public void Close()
+        {
+            if (IsLoaded)
+                _device!.Close();
+        }
+
+        // --------------------------------------------------------------------
+        // Execution
+        // --------------------------------------------------------------------
+
+        /// <summary>
+        /// Executes a function and returns its outputs.
+        /// </summary>
+        public long[] Execute(string name, long[] input, int outLength)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(outLength);
+
+            input ??= Array.Empty<long>();
+
+            long[] outputs = new long[outLength];
+            int hr = ExecuteHr(name, input, (uint)input.Length, outputs, (uint)outLength, out uint returned);
+
+            // If it failed, return the default-sized array (matches typical "best-effort" behaviour).
+            if (hr != 0 || returned == 0)
+                return outputs;
+
+            // Trim to returned length (in longs) if smaller than requested.
+            if (returned < (uint)outLength)
+            {
+                long[] trimmed = new long[returned];
+                Array.Copy(outputs, trimmed, (int)returned);
+                return trimmed;
+            }
+
+            return outputs;
+        }
+
+        /// <summary>
+        /// Executes a function and returns an HRESULT (0 = S_OK).
+        /// </summary>
+        public int ExecuteHr(string name, long[] inBuffer, uint inSize, long[] outBuffer, uint outSize, out uint returnSize)
+        {
+            ArgumentNullException.ThrowIfNull(name);
+
+            inBuffer ??= Array.Empty<long>();
+            outBuffer ??= Array.Empty<long>();
+
+            if (inBuffer.Length < inSize)
+                throw new ArgumentOutOfRangeException(nameof(inSize));
+
+            if (outBuffer.Length < outSize)
+                throw new ArgumentOutOfRangeException(nameof(outSize));
+
+            if (!IsLoaded)
+            {
+                returnSize = 0;
+                return E_HANDLE;
+            }
+
+            byte[] request = BuildRequest(name, inBuffer, inSize);
+            byte[] response = new byte[outSize * 8];
+
+            bool ok = DeviceIoControl(
+                _device!,
+                ControlCode.Execute,
+                request,
+                (uint)request.Length,
+                response,
+                (uint)response.Length,
+                out uint bytesReturned,
+                IntPtr.Zero);
+
+            if (!ok)
+            {
+                returnSize = 0;
+                return Marshal.GetHRForLastWin32Error();
+            }
+
+            int copyBytes = Math.Min((int)bytesReturned, outBuffer.Length * 8);
+            Buffer.BlockCopy(response, 0, outBuffer, 0, copyBytes);
+
+            returnSize = bytesReturned / 8;
+            return 0;
+        }
+
+        private static byte[] BuildRequest(string functionName, long[] args, uint argCount)
+        {
+            // Protocol layout: 32 bytes name + N * 8 bytes args.
+            byte[] buffer = new byte[FunctionNameBytes + (argCount * 8)];
+
+            // Function name section (ASCII, NUL-terminated if shorter)
+            byte[] nameBytes = Encoding.ASCII.GetBytes(functionName);
+            int nameCopy = Math.Min(FunctionNameBytes - 1, nameBytes.Length);
+            Buffer.BlockCopy(nameBytes, 0, buffer, 0, nameCopy);
+
+            // Arguments section
+            if (argCount > 0)
+                Buffer.BlockCopy(args, 0, buffer, FunctionNameBytes, (int)argCount * 8);
+
+            return buffer;
+        }
+
+        // --------------------------------------------------------------------
+        // Version detection
+        // --------------------------------------------------------------------
+
+        private static Version? ReadInstalledVersion()
+        {
+            try
+            {
+                using RegistryKey? key =
+                    Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO");
+
+                object? raw = key?.GetValue("DisplayVersion");
+                return TryParseVersion(raw, out Version? parsed) ? parsed : null;
+            }
+            catch (Exception ex)
+            {
+                // Registry read may fail due to permissions, missing key, or WOW64 redirection.
+                Log.Information($"AMDpawnIO ReadInstalledVersion: failed: {ex.GetType().Name}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static bool TryParseVersion(object? val, out Version? version)
+        {
+            version = null;
+
+            if (val is not string s || string.IsNullOrWhiteSpace(s))
+                return false;
+
+            try
+            {
+                version = new Version(s);
+                return true;
+            }
+            catch (OverflowException)
+            {
+                // Version constructor throws OverflowException for out-of-range components.
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                // Version constructor throws ArgumentException for malformed strings.
+                return false;
+            }
+        }
+
+        private static byte[] ReadAllBytes(Stream src)
+        {
+            using var ms = new MemoryStream();
+            src.CopyTo(ms);
+            return ms.ToArray();
+        }
+
+        // --------------------------------------------------------------------
+        // Native interop
+        // --------------------------------------------------------------------
+
+        private enum ControlCode : uint
+        {
+            LoadBinary = DeviceType | IoctlLoadBinary,
+            Execute = DeviceType | IoctlExecuteFn
+        }
+
+        [Flags]
+        private enum FileAccess : uint
+        {
+            GENERIC_READ = 0x80000000,
+            GENERIC_WRITE = 0x40000000
+        }
+
+        private enum CreationDisposition : uint
+        {
+            OPEN_EXISTING = 3
+        }
+
+        [LibraryImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool DeviceIoControl(
+            SafeFileHandle device,
+            ControlCode ioControlCode,
+            [In] byte[]? inBuffer,
+            uint inBufferSize,
+            [In, Out] byte[]? outBuffer,
+            uint nOutBufferSize,
+            out uint bytesReturned,
+            IntPtr overlapped);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool DeviceIoControl(
+            IntPtr hDevice,
+            ControlCode dwIoControlCode,
+            [In, Out] byte[]? lpInBuffer,
+            uint nInBufferSize,
+            [In, Out] byte[]? lpOutBuffer,
+            uint nOutBufferSize,
+            out uint lpBytesReturned,
+            IntPtr lpOverlapped);
+
+        [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true)]
+        private static partial IntPtr CreateFile(
+            [MarshalAs(UnmanagedType.LPWStr)] string lpFileName,
+            FileAccess dwDesiredAccess,
+            uint dwShareMode,
+            IntPtr lpSecurityAttributes,
+            CreationDisposition dwCreationDisposition,
+            uint dwFlagsAndAttributes,
+            IntPtr hTemplateFile);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool CloseHandle(IntPtr hObject);
+    }
+}

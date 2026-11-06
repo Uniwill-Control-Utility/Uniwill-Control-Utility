@@ -16,12 +16,12 @@ public sealed class EcSmartFanWritePlanTests
             blocks,
             cpu =>
             {
-                Assert.Equal((ushort)0x0F20, cpu.StartAddress);
+                Assert.Equal((ushort)0x0F20, cpu.Address);
                 Assert.Equal(cpuDuty, cpu.Data);
             },
             gpu =>
             {
-                Assert.Equal((ushort)0x0F50, gpu.StartAddress);
+                Assert.Equal((ushort)0x0F50, gpu.Address);
                 Assert.Equal(gpuDuty, gpu.Data);
             });
         Assert.Equal(32, blocks.Sum(block => block.Data.Length));

@@ -23,7 +23,7 @@
          the title-bar chip, the About page, and build\pack.ps1 (Velopack packVersion).
          Must be 3-part (a.b.c) — Velopack rejects 4-part versions. Bump the third
          part for every release. -->
-    <Version>0.9.6</Version>
+    <!-- Version: Directory.Build.props, the single source of truth. -->
     <!-- Custom Main in App.xaml.cs runs the Velopack bootstrap before WPF starts,
          so App.xaml is compiled as a Page (not ApplicationDefinition). -->
     <StartupObject>Uniwill_Control_Utility.App</StartupObject>
@@ -85,39 +85,68 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Crash guardian: the reference flows its output (exe/dll/deps/
-         runtimeconfig) into this project's bin and publish directories, so
-         VS Publish and build\pack.ps1 ship it automatically. -->
-    <ProjectReference Include="..\UCU.Guardian\UCU.Guardian.csproj" />
+    <!-- Pure domain logic (EC encodings, validation, supervision policy). No I/O
+         and no Windows APIs in this reference, so the app stays testable. -->
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+
+    <!-- The engine RPC client and its wire contract: the UI process drives the EC
+         only through the capability interfaces these provide (proxies to the
+         engine service). This is the app's only path to the EC. -->
+    <ProjectReference Include="..\UCU.Client\UCU.Client.csproj" />
+    <ProjectReference Include="..\UCU.Contracts\UCU.Contracts.csproj" />
+
+    <!-- Engine service: kept out of the app's compile graph on purpose (the UI
+         process must never reach the hardware assembly), the reference exists
+         only to order the build; the staging targets below drive the engine's
+         own Build/Publish with their output redirected into Service\. -->
+    <ProjectReference Include="..\UCU.Engine\UCU.Engine.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <!-- Stage the guardian into a Service\ subfolder so the install directory
-       shows a single "Uniwill Control Utility.exe" — the service exe has a
-       similar name and the same icon, and side by side it confuses users.
-       Its private deps (Serilog) are copied, not moved: the app root needs
-       them too. Runs for Build (VS F5) and Publish (pack.ps1 / VS Publish). -->
-  <Target Name="StageGuardianInServiceFolder" AfterTargets="Build"
-          Condition="Exists('$(OutDir)Uniwill Control Utility Service.exe')">
-    <ItemGroup>
-      <_GuardianRoot Include="$(OutDir)Uniwill Control Utility Service.*" />
-      <_GuardianShared Include="$(OutDir)Serilog.dll" />
-      <_GuardianShared Include="$(OutDir)Serilog.Sinks.File.dll" />
-    </ItemGroup>
-    <MakeDir Directories="$(OutDir)Service" />
-    <Move SourceFiles="@(_GuardianRoot)" DestinationFolder="$(OutDir)Service" />
-    <Copy SourceFiles="@(_GuardianShared)" DestinationFolder="$(OutDir)Service" SkipUnchangedFiles="true" />
+  <!-- Engine service: staged into Service\ by running the engine project's own
+       Build/Publish with its output redirected there. Redirecting (instead of
+       flowing the files into the app root) keeps the service's full
+       dependency closure - hosting, Serilog, UCU.Core/Contracts/Hardware -
+       inside Service\ and leaves the app root's assemblies alone, which is
+       what keeps the app process free of the hardware layer. The redirect must
+       be an absolute path: a relative OutDir would resolve against the engine
+       project's directory, and the value is composed with Path.Combine
+       semantics rather than string concatenation: under `dotnet publish -o
+       <dir>` PublishDir is already absolute, and appending it to the project
+       directory yields "projectDir\C:\path", which MSBuild reports as
+       MSB3191 (unable to create directory). The MSI route failed exactly
+       there; the F5 layout, where OutDir is relative, hid it. Runs for Build
+       (VS F5) and Publish (pack.ps1 / VS
+       Publish).
+
+       IntermediateOutputPath is redirected too, and that is not cosmetic. The
+       engine's own Build (into bin\) and this staging Build share one obj\ by
+       default, and the copy-local/copy-to-output markers MSBuild uses for
+       incrementality live in obj\ - so the second OutDir is judged against the
+       first one's markers and its copy is skipped. Measured in the field: a
+       rebuilt engine left Service\ on the previous binary, so the elevated
+       install pass registered a stale exe. A staging-specific obj makes the markers
+       describe the output they actually govern, so Service\ is refreshed
+       whenever the engine changes.
+
+       The paths are computed inside each target, never in a project-level
+       PropertyGroup: OutDir and IntermediateOutputPath are assigned by the SDK
+       targets, which MSBuild imports after the project body, so an earlier
+       evaluation sees them empty and the engine's output lands next to the
+       project directory instead of in Service\. -->
+  <Target Name="StageEngineInServiceFolder" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+    <PropertyGroup>
+      <_EngineStagingOutDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(OutDir)', 'Service\'))</_EngineStagingOutDir>
+      <_EngineStagingIntermediateDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'engine\'))</_EngineStagingIntermediateDir>
+    </PropertyGroup>
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=AnyCPU;OutDir=$(_EngineStagingOutDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
   </Target>
 
-  <Target Name="StageGuardianInServiceFolderOnPublish" AfterTargets="Publish"
-          Condition="Exists('$(PublishDir)Uniwill Control Utility Service.exe')">
-    <ItemGroup>
-      <_GuardianRootPub Include="$(PublishDir)Uniwill Control Utility Service.*" />
-      <_GuardianSharedPub Include="$(PublishDir)Serilog.dll" />
-      <_GuardianSharedPub Include="$(PublishDir)Serilog.Sinks.File.dll" />
-    </ItemGroup>
-    <MakeDir Directories="$(PublishDir)Service" />
-    <Move SourceFiles="@(_GuardianRootPub)" DestinationFolder="$(PublishDir)Service" />
-    <Copy SourceFiles="@(_GuardianSharedPub)" DestinationFolder="$(PublishDir)Service" SkipUnchangedFiles="true" />
+  <Target Name="StageEngineInServiceFolderOnPublish" AfterTargets="Publish" Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+    <PropertyGroup>
+      <_EngineStagingPublishDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(PublishDir)', 'Service\'))</_EngineStagingPublishDir>
+      <_EngineStagingIntermediateDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'engine\'))</_EngineStagingIntermediateDir>
+    </PropertyGroup>
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj" Targets="Publish" Properties="Configuration=$(Configuration);Platform=AnyCPU;PublishDir=$(_EngineStagingPublishDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
   </Target>
 
   <ItemGroup>

@@ -617,6 +617,33 @@
                                            VerticalAlignment="Center"
                                            Click="OpenLogFolder_Click" />
                             </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <!-- Diagnostics bundle (U-208): versions, hardware,
+                                 engine and OEM takeover state plus the logs and
+                                 both journals, zipped for support. -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Diagnostics" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="One bundle for support: versions, hardware, engine and takeover state, logs and journals"
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:Button x:Name="btnExportDiagnostics"
+                                           Grid.Column="1"
+                                           Content="Export diagnostics"
+                                           VerticalAlignment="Center"
+                                           Click="ExportDiagnostics_Click" />
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
                 </StackPanel>

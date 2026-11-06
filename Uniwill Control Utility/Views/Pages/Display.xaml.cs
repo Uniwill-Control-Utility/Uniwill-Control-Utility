@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Management;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
@@ -13,8 +13,11 @@ using Serilog;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
+using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
+using UCU.Contracts.Capabilities;
+using UCU.Core.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -26,11 +29,24 @@ namespace Uniwill_Control_Utility.Views.Pages
         // milliseconds to avoid reading back the stale value before the EC commits.
         private const int ApplyGraceMs = 10000; // 10 seconds
 
-        // NVRAM GUID for OemMagicVariable
-        private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
+        // NVRAM GUID for OemMagicVariable (the variable NvramAccess routes; the
+        // page keeps only its own offset).
         private const int OffsetOemDisplayMode = 98; // OpenRevo probe confirmed offset 98 (not 99)
 
-        private readonly UniwillECService? _ecService;
+        private readonly IGpuMuxCapability? _mux;
+        private readonly IEcTelemetryCapability? _telemetry;
+        private readonly IEngineCapability? _engine;
+        private EcPlatform? _ecPlatform;
+
+        /// <summary>
+        /// The platform the engine resolved, fetched once. The NVRAM mirror of the
+        /// mux mode stores a raw byte whose encoding is platform-specific, and only
+        /// the engine knows the platform (it reads the boot CPU vendor), so the page
+        /// asks the engine's identity verb one time and caches the answer: the
+        /// processor cannot change during a session.
+        /// </summary>
+        private EcPlatform EcPlatformForNvram =>
+            _ecPlatform ??= _engine!.GetInfoAsync().GetAwaiter().GetResult().Platform;
         private bool _isEcAvailable;
         private bool _isLoaded;
         private bool _isAdministrator;
@@ -39,19 +55,19 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _refreshRateBusy;
         private bool _colorCalBusy;
 
+        /// <summary>The last non-imported profile the user selected: the
+        /// fallback when the active imported profile is deleted (U-205).</summary>
+        private string _lastShippedColorProfile =
+            Uniwill_Control_Utility.Scripts.Misc.Display.DefaultColorProfileFile;
+
         // Delayed refresh timer created after each user change.
 
         // --- MiniLED Local Dimming ---
-        private const string WmiClassName = "AcpiTest_MULong";
-        private const string DefaultInstanceName = @"ACPI\PNP0C14\1_1";
-        private const ulong CmdEnableStep1 = 0x50000000002;
-        private const ulong CmdEnableStep2 = 0x5000000000E;
-        private const ulong CmdDisableStep1 = 0x50000000001;
-        private const ulong CmdDisableStep2 = 0x5000000000D;
-        private const byte ExpectedEnableStep1 = 0xBB;
-        private const byte ExpectedEnableStep2 = 0x0E;
-        private const byte ExpectedDisableStep1 = 0xAA;
-        private const byte ExpectedDisableStep2 = 0x0D;
+        // The WMI handshake (class, instance, command words, expected reply
+        // bytes) lives in MiniLedAccess now: the engine's device verb runs it
+        // as LocalSystem, the app's WMI code as that route's fallback. The
+        // page keeps only the EC readback pair (0x72B bit 0x02), which rides
+        // the telemetry verb.
         private const ushort EcLocalDimmingRegister = 0x072B;
         private const byte EcLocalDimmingBit = 0x02;
         private DispatcherTimer? _delayTimer;
@@ -68,50 +84,23 @@ namespace Uniwill_Control_Utility.Views.Pages
         // The power saving mode the buttons currently show (gates the live notify overlay).
         private int _displayedPowerSavingMode = 2; // Auto
 
-        // NVRAM P/Invoke
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern uint GetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [Out] byte[] lpBuffer, uint nSize);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [In] byte[] lpValue, uint nSize);
-
-        // Token privilege P/Invoke (required for NVRAM access)
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool OpenProcessToken(IntPtr h, uint d, out IntPtr t);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool LookupPrivilegeValue(string? s, string n, ref LUID l);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool AdjustTokenPrivileges(IntPtr t, bool d, ref TP n, uint b, IntPtr p, IntPtr r);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr h);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct LUID { public uint Low; public int High; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct TP { public int Count; public LUID Luid; public uint Attr; }
-
-        private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
-        private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+        // The NVRAM P/Invokes this page used to carry (firmware-variable read/
+        // write and the token-privilege adjust) live in NvramAccess now, as
+        // that route's local fallback; the page calls the route.
 
         public Display()
         {
             InitializeComponent();
             Instance = this;
 
-            _ecService = App.GetService<UniwillECService>();
-            if (_ecService is not null)
+            _mux = App.GetService<IGpuMuxCapability>();
+            _telemetry = App.GetService<IEcTelemetryCapability>();
+            _engine = App.GetService<IEngineCapability>();
+            if (_mux is not null && _engine is not null)
             {
                 try
                 {
-                    _isEcAvailable = _ecService.Initialize();
+                    _isEcAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -132,13 +121,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _isAdministrator = false;
             }
 
-            // Enable SeSystemEnvironmentPrivilege and probe NVRAM access
-            if (_isAdministrator)
-            {
-                EnablePrivilege("SeSystemEnvironmentPrivilege");
-                _isNvramAvailable = ReadNvram("OemMagicVariable") is not null;
-                Debug.WriteLine($"[Display] NVRAM available: {_isNvramAvailable}");
-            }
+            // NVRAM availability is probed through NvramAccess, not gated on
+            // this process being administrator: the engine route answers from
+            // its LocalSystem token, so an unelevated app has NVRAM whenever
+            // the engine does. (The token-adjust the elevated probe used to do
+            // survives inside NvramAccess's local fallback.)
+            _isNvramAvailable = NvramAccess.ReadOemMagic() is not null;
+            Debug.WriteLine($"[Display] NVRAM available: {_isNvramAvailable}");
 
             // Show MiniLED card only on MiniLED panels
             CardLocalDimming.Visibility = App.HasMiniLEDPanel ? Visibility.Visible : Visibility.Collapsed;
@@ -221,7 +210,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // the mode. We show the NVRAM value and let the user decide.
                         try
                         {
-                            int ecMode = (int)_ecService!.GetCurrentGpuMuxMode();
+                            int ecMode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
                             if (ecMode != mode)
                             {
                                 Debug.WriteLine($"[Display] EC mode ({ecMode}) differs from NVRAM ({mode}) — showing NVRAM value");
@@ -248,7 +237,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Fallback: read from EC if NVRAM is unavailable
                 try
                 {
-                    mode = (int)_ecService.GetCurrentGpuMuxMode();
+                    mode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -279,9 +268,74 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Sync the color-calibration combo from the live ICM association
             UpdateColorCalibrationCombo(GetColorProfileSafe());
 
+            InitBrightnessRow();
+
             RefreshAll();
             _isLoaded = true;
         }
+
+        // ---- Brightness + screen off (U-205) --------------------------------
+
+        private bool _brightnessLoading;
+        private DispatcherTimer? _brightnessTimer;
+
+        /// <summary>Shows the brightness row only where the panel exposes the
+        /// WDDM brightness control, and seeds it from the live value.</summary>
+        private void InitBrightnessRow()
+        {
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.TryGetBrightness(out int percent))
+            {
+                CardBrightness.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            CardBrightness.Visibility = Visibility.Visible;
+
+            _brightnessLoading = true;
+            try
+            {
+                slBrightness.Value = percent;
+                tbBrightness.Text = percent + "%";
+            }
+            finally
+            {
+                _brightnessLoading = false;
+            }
+        }
+
+        /// <summary>Debounced apply: a slider drag must not issue one WMI write
+        /// per pixel of travel.</summary>
+        private void slBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            tbBrightness.Text = (int)Math.Round(e.NewValue) + "%";
+
+            if (_brightnessLoading || !_isLoaded)
+                return;
+
+            _brightnessTimer ??= new DispatcherTimer(
+                TimeSpan.FromMilliseconds(400),
+                DispatcherPriority.Normal,
+                (_, _) =>
+                {
+                    _brightnessTimer!.Stop();
+                    ApplyBrightness();
+                },
+                Dispatcher);
+
+            _brightnessTimer.Stop();
+            _brightnessTimer.Start();
+        }
+
+        private void ApplyBrightness()
+        {
+            int wanted = (int)Math.Round(slBrightness.Value);
+
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.TrySetBrightness(wanted, out int applied))
+                Log.Warning("[Display] brightness write to {Wanted}% did not verify (readback {Applied})", wanted, applied);
+            else
+                tbBrightness.Text = applied + "%";
+        }
+
 
         /// <summary>
         /// Updates the visual state of the three GPU mode buttons to reflect the current mode.
@@ -330,9 +384,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 // Write EC register
-                _ecService!.SetGpuMuxMode((UniwillECService.GpuMuxMode)mode);
+                _mux!.SetModeAsync((GpuMuxMode)mode).GetAwaiter().GetResult();
                 _lastUserApplyTime = DateTime.UtcNow;
-                Debug.WriteLine($"[Display] Applied GPU mode: {(UniwillECService.GpuMuxMode)mode}");
+                Debug.WriteLine($"[Display] Applied GPU mode: {(GpuMuxMode)mode}");
 
                 // Update button visual state immediately
                 UpdateGpuModeButtons(mode);
@@ -564,8 +618,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                return _ecService is not null
-                    && _ecService.GetCurrentGpuMuxMode() == UniwillECService.GpuMuxMode.DgpuOnly;
+                return _mux is not null
+                    && _mux.GetModeAsync().GetAwaiter().GetResult() == GpuMuxMode.DgpuOnly;
             }
             catch
             {
@@ -780,10 +834,176 @@ namespace Uniwill_Control_Utility.Views.Pages
                     cbColorCalibration.SelectionChanged += cbColorCalibration_SelectionChanged;
                 }
             }
+
+            UpdateColorDeleteVisibility();
+        }
+
+        /// <summary>Delete is offered for imported profiles only: Windows'
+        /// shipped profiles are not the user's to remove.</summary>
+        private void UpdateColorDeleteVisibility()
+        {
+            bool imported = cbColorCalibration.SelectedItem is ComboBoxItem item
+                            && item.Tag is string file
+                            && Uniwill_Control_Utility.Scripts.Misc.Display.IsImportedColorProfile(file);
+
+            btnDeleteColorProfile.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>Deletes the selected imported profile (U-205). If it is the
+        /// associated one, the association is dropped first - leaving the
+        /// registry pointing at a missing file would have Windows fail every
+        /// colour lookup for the display. The selection then falls back to the
+        /// last shipped profile the user had chosen (Default if none), so the
+        /// combo never ends up blank.</summary>
+        private async void btnDeleteColorProfile_Click(object sender, RoutedEventArgs e)
+        {
+            if (cbColorCalibration.SelectedItem is not ComboBoxItem item || item.Tag is not string file)
+                return;
+
+            _colorCalBusy = true;
+            try
+            {
+                bool wasAssociated = string.Equals(file, GetColorProfileSafe(), StringComparison.OrdinalIgnoreCase);
+
+                if (wasAssociated)
+                {
+                    await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(
+                        Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName(), string.Empty));
+                }
+
+                if (!Uniwill_Control_Utility.Scripts.Misc.Display.DeleteImportedColorProfile(file, out string? error))
+                {
+                    ToastNotification.ShowToastNotification(
+                        LocalizationService.Get("Color Calibration"),
+                        LocalizationService.Format("The ICC profile could not be deleted: {0}", error ?? string.Empty));
+                    return;
+                }
+
+                // Re-associate the shipped profile the display had before the
+                // imported one (Default when there is none), so deleting the
+                // active profile leaves a calibrated, selected display instead
+                // of an empty combo and a blank association.
+                List<string> offered = OfferedColorProfileFiles();
+                string? fallback = offered.Contains(_lastShippedColorProfile)
+                    ? _lastShippedColorProfile
+                    : offered.FirstOrDefault();
+
+                if (wasAssociated && !string.IsNullOrEmpty(fallback))
+                {
+                    await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(
+                        Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName(), fallback!));
+                }
+
+                UpdateColorCalibrationCombo(GetColorProfileSafe() ?? fallback);
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Color Calibration"),
+                    LocalizationService.Get("The ICC profile was deleted."));
+            }
+            finally
+            {
+                _colorCalBusy = false;
+            }
+        }
+
+        /// <summary>Imports a user ICC profile (U-205): the Core validator
+        /// decides, Core refuses garbage before anything is associated. A
+        /// successful import is switched to immediately - choosing a file in
+        /// the import dialog is the user's intent to use it.</summary>
+        private async void btnImportColorProfile_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".icc",
+                Filter = LocalizationService.Get("ICC profile (*.icc;*.icm)|*.icc;*.icm"),
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.ImportColorProfile(
+                    dialog.FileName, out string? file, out string? error) ||
+                file is null)
+            {
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Color Calibration"),
+                    LocalizationService.Format("The ICC profile could not be imported: {0}", error ?? string.Empty));
+                return;
+            }
+
+            _colorCalBusy = true;
+            try
+            {
+                string? panel = Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName();
+                if (string.IsNullOrEmpty(panel))
+                {
+                    // Panel detached (external-only): defer, exactly like a
+                    // combo selection made in that state.
+                    Settings.Default.DisplayColorProfileDeferred = file;
+                    Settings.Default.DisplayColorProfileLastKnown = file;
+                    Settings.Default.Save();
+                }
+                else
+                {
+                    await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(panel, file));
+                }
+
+                UpdateColorCalibrationCombo(GetColorProfileSafe() ?? file);
+            }
+            finally
+            {
+                _colorCalBusy = false;
+            }
+
+            ToastNotification.ShowToastNotification(
+                LocalizationService.Get("Color Calibration"),
+                LocalizationService.Get("The ICC profile was imported."));
+        }
+
+        /// <summary>Copies the display's associated profile out (U-205).</summary>
+        private void btnExportColorProfile_Click(object sender, RoutedEventArgs e)
+        {
+            string? current = GetColorProfileSafe();
+
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".icc",
+                FileName = string.IsNullOrEmpty(current) ? "UCU-color-profile.icc" : current!,
+                Filter = LocalizationService.Get("ICC profile (*.icc;*.icm)|*.icc;*.icm"),
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.ExportColorProfile(
+                    Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName(),
+                    dialog.FileName, out string? error))
+            {
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Color Calibration"),
+                    LocalizationService.Format("The ICC profile could not be exported: {0}", error ?? string.Empty));
+                return;
+            }
+
+            ToastNotification.ShowToastNotification(
+                LocalizationService.Get("Color Calibration"),
+                LocalizationService.Get("The ICC profile was exported."));
         }
 
         private void cbColorCalibration_SelectionChanged(object sender, RoutedEventArgs e)
         {
+            UpdateColorDeleteVisibility();
+
+            // Remember the shipped choice before an imported one can take over:
+            // deleting the imported profile returns the display to it.
+            if (cbColorCalibration.SelectedItem is ComboBoxItem chosen
+                && chosen.Tag is string chosenFile
+                && !Uniwill_Control_Utility.Scripts.Misc.Display.IsImportedColorProfile(chosenFile))
+            {
+                _lastShippedColorProfile = chosenFile;
+            }
+
             if (!_isLoaded || _colorCalBusy)
                 return;
 
@@ -864,8 +1084,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     FileName = "shutdown",
                     Arguments = "/r /t 0",
-                    UseShellExecute = true,
-                    Verb = "runas" // Request elevation
+                    // No "runas" verb: the console user already holds
+                    // SeShutdownPrivilege, so the verb bought nothing except
+                    // the UAC prompt on the user's own restart click.
+                    UseShellExecute = true
                 });
             }
             catch (Exception ex)
@@ -876,7 +1098,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void RefreshAll()
         {
-            if (_ecService is null) return;
+            if (_mux is null) return;
 
             // Skip syncing the buttons if the user recently changed the setting
             bool withinGrace = (DateTime.UtcNow - _lastUserApplyTime).TotalMilliseconds < ApplyGraceMs;
@@ -894,7 +1116,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                     else
                     {
-                        mode = (int)_ecService.GetCurrentGpuMuxMode();
+                        mode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
                     }
                     UpdateGpuModeButtons(mode);
                 }
@@ -972,59 +1194,30 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-        #region NVRAM Access
+        #region NVRAM Access (GPU-mode firmware mirror via NvramAccess)
 
-        /// <summary>
-        /// Enables a privilege on the current process token (e.g., SeSystemEnvironmentPrivilege for NVRAM access).
-        /// </summary>
-        private static void EnablePrivilege(string privilegeName)
-        {
-            IntPtr token;
-            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ADJUST_PRIVILEGES, out token))
-            {
-                Debug.WriteLine($"[Display] OpenProcessToken failed: {Marshal.GetLastWin32Error()}");
-                return;
-            }
-
-            try
-            {
-                var tp = new TP { Count = 1, Attr = SE_PRIVILEGE_ENABLED };
-                if (!LookupPrivilegeValue(null, privilegeName, ref tp.Luid))
-                {
-                    Debug.WriteLine($"[Display] LookupPrivilegeValue failed: {Marshal.GetLastWin32Error()}");
-                    return;
-                }
-
-                if (!AdjustTokenPrivileges(token, false, ref tp, (uint)Marshal.SizeOf(tp), IntPtr.Zero, IntPtr.Zero))
-                {
-                    Debug.WriteLine($"[Display] AdjustTokenPrivileges failed: {Marshal.GetLastWin32Error()}");
-                }
-                else
-                {
-                    Debug.WriteLine($"[Display] Enabled privilege: {privilegeName}");
-                }
-            }
-            finally
-            {
-                CloseHandle(token);
-            }
-        }
+        // The NVRAM reads and writes route through NvramAccess: the engine's
+        // device.nvram verbs answer from its LocalSystem token (writing
+        // firmware variables demands SeSystemEnvironmentPrivilege, which an
+        // unelevated process can never enable — the page's own P/Invokes were
+        // silently dead in the field), and the page's original direct calls
+        // survive in NvramAccess as the fallback. The offset-98 encoding stays
+        // page-side: the mux codec and the platform the engine reports decode
+        // the raw byte, exactly as the factory write encoded it.
 
         /// <summary>
         /// Reads the OemDisplayMode byte from the OemMagicVariable NVRAM entry (offset 98).
         /// </summary>
         private byte? ReadNvramMode()
         {
-            if (!_isNvramAvailable) return null;
-
-            byte[]? nvram = ReadNvram("OemMagicVariable");
+            byte[]? nvram = NvramAccess.ReadOemMagic();
             if (nvram == null || nvram.Length <= OffsetOemDisplayMode)
                 return null;
 
             // The NVRAM byte uses the same platform-specific encoding as the EC
-            // register; return the semantic mode so callers can compare it directly
-            // against the button tags / GpuMuxMode values.
-            return (byte)UniwillECService.RawToMode(nvram[OffsetOemDisplayMode]);
+            // register; decode through the shared codec with the platform the engine
+            // resolved, so the value written at factory time decodes as written.
+            return (byte)EcMuxCodec.RawToMode(nvram[OffsetOemDisplayMode], EcPlatformForNvram);
         }
 
         /// <summary>
@@ -1033,47 +1226,25 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void WriteNvramMode(byte mode)
         {
-            if (!_isNvramAvailable)
-            {
-                throw new InvalidOperationException("NVRAM access is not available");
-            }
-
-            byte[]? nvram = ReadNvram("OemMagicVariable");
+            byte[]? nvram = NvramAccess.ReadOemMagic();
             if (nvram == null)
             {
                 throw new InvalidOperationException("Cannot read OemMagicVariable for NVRAM write");
             }
 
             // The caller passes the semantic mode; the firmware expects the
-            // platform-specific raw byte (swapped on Intel platforms).
-            byte raw = UniwillECService.ModeToRaw((UniwillECService.GpuMuxMode)mode);
+            // platform-specific raw byte (swapped on Intel platforms), so encode with
+            // the same platform the engine reports.
+            byte raw = EcMuxCodec.ModeToRaw((GpuMuxMode)mode, EcPlatformForNvram);
             byte[] modified = (byte[])nvram.Clone();
             modified[OffsetOemDisplayMode] = raw;
 
-            bool ok = SetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, modified, (uint)modified.Length);
-            if (!ok)
+            if (!NvramAccess.WriteOemMagic(modified))
             {
-                int error = Marshal.GetLastWin32Error();
-                throw new InvalidOperationException($"NVRAM OemMagicVariable write failed with error {error}");
+                throw new InvalidOperationException("NVRAM OemMagicVariable write failed (see [Nvram] log)");
             }
 
             Debug.WriteLine($"[Display] NVRAM OemDisplayMode set to {raw} (mode {mode}) at offset {OffsetOemDisplayMode}");
-        }
-
-        /// <summary>
-        /// Reads an NVRAM variable by name using the string-GUID API.
-        /// </summary>
-        private byte[]? ReadNvram(string name)
-        {
-            byte[] buf = new byte[256];
-            uint len = GetFirmwareEnvironmentVariable(name, NvramGuidStr, buf, (uint)buf.Length);
-            if (len > 0 && len <= buf.Length)
-            {
-                byte[] result = new byte[len];
-                Array.Copy(buf, result, len);
-                return result;
-            }
-            return null;
         }
 
         #endregion
@@ -1081,17 +1252,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         #region MiniLED Local Dimming
 
         /// <summary>
-        /// Calls GetSetULong via WMI using the correct GetMethodParameters pattern.
+        /// The row's toggle: the handshake actuates through MiniLedAccess
+        /// (engine verb first, the page's original WMI as that route's
+        /// fallback), then the EC 0x72B readback verifies; the toggle flips
+        /// back on the firmware's answer, never on the call's.
         /// </summary>
-        private static byte WmiCall(ManagementObject mo, ulong data)
-        {
-            using var input = mo.GetMethodParameters("GetSetULong");
-            input["Data"] = data;
-
-            using var output = (ManagementBaseObject)mo.InvokeMethod("GetSetULong", input, null);
-            return (byte)(uint)output["Return"];
-        }
-
         private void TsLocalDimming_Toggled(object sender, RoutedEventArgs e)
         {
             if (_localDimmingToggling)
@@ -1102,7 +1267,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             _localDimmingToggling = true;
             tsLocalDimming.IsEnabled = false;
 
-            // WMI ManagementObject has apartment threading affinity — must be called on a dedicated thread.
+            // WMI calls carry COM apartment affinity - they must run on a
+            // dedicated thread (the route's local fallback does too).
             _ = Task.Run(() =>
             {
                 try
@@ -1142,68 +1308,33 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private bool SetLocalDimming(bool enable)
         {
-            try
-            {
-                var instancePath = $@"{WmiClassName}.InstanceName='{DefaultInstanceName}'";
-                using var mo = new ManagementObject(@"root\WMI", instancePath, null);
-
-                if (enable)
-                {
-                    byte result1 = WmiCall(mo, CmdEnableStep1);
-                    if (result1 != ExpectedEnableStep1)
-                    {
-                        Debug.WriteLine($"[Display] Enable step 1 returned 0x{result1:X2} (expected 0x{ExpectedEnableStep1:X2})");
-                        return false;
-                    }
-
-                    byte result2 = WmiCall(mo, CmdEnableStep2);
-                    if (result2 != ExpectedEnableStep2)
-                    {
-                        Debug.WriteLine($"[Display] Enable step 2 returned 0x{result2:X2} (expected 0x{ExpectedEnableStep2:X2})");
-                        return false;
-                    }
-                }
-                else
-                {
-                    byte result1 = WmiCall(mo, CmdDisableStep1);
-                    if (result1 != ExpectedDisableStep1)
-                    {
-                        Debug.WriteLine($"[Display] Disable step 1 returned 0x{result1:X2} (expected 0x{ExpectedDisableStep1:X2})");
-                        return false;
-                    }
-
-                    byte result2 = WmiCall(mo, CmdDisableStep2);
-                    if (result2 != ExpectedDisableStep2)
-                    {
-                        Debug.WriteLine($"[Display] Disable step 2 returned 0x{result2:X2} (expected 0x{ExpectedDisableStep2:X2})");
-                        return false;
-                    }
-                }
-
-                Thread.Sleep(100);
-
-                // Verify via EC readback.
-                if (_ecService != null && _isEcAvailable)
-                {
-                    byte ecValue = _ecService.ReadECRegister(EcLocalDimmingRegister);
-                    bool actualState = (ecValue & EcLocalDimmingBit) != 0;
-
-                    if (actualState != enable)
-                    {
-                        Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} shows {(actualState ? "ON" : "OFF")}, expected {(enable ? "ON" : "OFF")} — mismatch");
-                        return false;
-                    }
-
-                    Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} confirms Local Dimming {(enable ? "ON" : "OFF")}");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Display] WMI/ACPI call failed: {ex.Message}");
+            // The WMI handshake routes through MiniLedAccess: the engine's
+            // device verb performs the OEM ACPI two-step pair as LocalSystem
+            // (executing a custom root\WMI method needs write access an
+            // unelevated process does not have — the row was silently dead
+            // in that state), and the page's original WMI code survives in
+            // MiniLedAccess as the fallback.
+            if (!MiniLedAccess.SetLocalDimming(enable))
                 return false;
+
+            Thread.Sleep(100);
+
+            // Verify via EC readback (the telemetry verb, already engine-routed).
+            if (_telemetry != null && _isEcAvailable)
+            {
+                byte ecValue = _telemetry.ReadRegisterAsync(EcLocalDimmingRegister).GetAwaiter().GetResult();
+                bool actualState = (ecValue & EcLocalDimmingBit) != 0;
+
+                if (actualState != enable)
+                {
+                    Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} shows {(actualState ? "ON" : "OFF")}, expected {(enable ? "ON" : "OFF")} — mismatch");
+                    return false;
+                }
+
+                Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} confirms Local Dimming {(enable ? "ON" : "OFF")}");
             }
+
+            return true;
         }
 
         #endregion

@@ -601,7 +601,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 return GetCurrentColorProfile(deviceName) is null;
             }
 
-            string fullPath = IcmProfilesFolder + @"\" + profileFileName;
+            string fullPath = ResolveProfilePath(profileFileName);
             if (!System.IO.File.Exists(fullPath))
                 return false;
 
@@ -637,6 +637,26 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 if (file == DefaultColorProfileFile || System.IO.File.Exists(IcmProfilesFolder + @"\" + file))
                     offered.Add(file);
             }
+
+            // Imported profiles (U-205) join the Windows set: they are the
+            // user's own calibration files, validated on import.
+            try
+            {
+                if (System.IO.Directory.Exists(IccUserFolder))
+                {
+                    foreach (string path in System.IO.Directory.GetFiles(IccUserFolder))
+                    {
+                        string name = System.IO.Path.GetFileName(path);
+                        if (!offered.Contains(name, StringComparer.OrdinalIgnoreCase))
+                            offered.Add(name);
+                    }
+                }
+            }
+            catch
+            {
+                // An unreadable user folder simply offers the Windows set.
+            }
+
             return offered;
         }
 
@@ -755,6 +775,202 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         internal const string IcmProfileValueName = "ICMProfile";
         internal const string IcmAssociationRoot = @"HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ICM\ProfileAssociations\Display\{4d36e96e-e325-11ce-bfc1-08002be10318}";
         internal const string IcmProfilesFolder = @"C:\Windows\System32\spool\drivers\color";
+
+        /// <summary>Imported ICC profiles (U-205): the user's own .icc/.icm
+        /// files, validated before they land here. Per-user because the app is
+        /// unelevated and the spool folder needs administrator rights.</summary>
+        internal static string IccUserFolder => System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UCU", "icc");
+
+        /// <summary>Full path of a profile filename: an imported profile lives
+        /// in the per-user folder, everything else in Windows' spool.</summary>
+        internal static string ResolveProfilePath(string fileName)
+        {
+            if (System.IO.Path.IsPathRooted(fileName))
+                return fileName;
+
+            string imported = System.IO.Path.Combine(IccUserFolder, fileName);
+            return System.IO.File.Exists(imported)
+                ? imported
+                : System.IO.Path.Combine(IcmProfilesFolder, fileName);
+        }
+
+        /// <summary>Validates an ICC file and stores it for association
+        /// (U-205). The validator is the Core gate: a file that is not a
+        /// profile never becomes selectable, because Windows would accept the
+        /// association and render the panel through a broken transform.</summary>
+        public static bool ImportColorProfile(string sourcePath, out string? fileName, out string? error)
+        {
+            fileName = null;
+            error = null;
+
+            byte[] bytes;
+            try
+            {
+                bytes = System.IO.File.ReadAllBytes(sourcePath);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+
+            UCU.Core.Display.IccProfileValidator.Result verdict =
+                UCU.Core.Display.IccProfileValidator.Validate(bytes);
+            if (!verdict.Valid)
+            {
+                error = verdict.Reason;
+                return false;
+            }
+
+            string name = System.IO.Path.GetFileName(sourcePath);
+            try
+            {
+                System.IO.Directory.CreateDirectory(IccUserFolder);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(IccUserFolder, name), bytes);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+
+            fileName = name;
+            return true;
+        }
+
+        /// <summary>True for a profile the user imported - the only kind the
+        /// app may delete. Windows' shipped set lives in its spool folder and
+        /// is not ours to remove, so the delete control stays hidden for it.</summary>
+        public static bool IsImportedColorProfile(string? fileName) =>
+            !string.IsNullOrEmpty(fileName)
+            && !ColorProfileFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Deletes an imported profile from the per-user store
+        /// (U-205). Refuses the shipped set.</summary>
+        public static bool DeleteImportedColorProfile(string fileName, out string? error)
+        {
+            error = null;
+
+            if (!IsImportedColorProfile(fileName))
+            {
+                error = "the shipped Windows profiles cannot be deleted";
+                return false;
+            }
+
+            try
+            {
+                string path = System.IO.Path.Combine(IccUserFolder, fileName);
+                if (System.IO.File.Exists(path))
+                    System.IO.File.Delete(path);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        // ---- Brightness + screen off (U-205) --------------------------------
+
+        /// <summary>Current panel brightness (0..100) via WMI, or false when the
+        /// display does not expose WmiMonitorBrightness (external monitors,
+        /// some panels).</summary>
+        public static bool TryGetBrightness(out int percent)
+        {
+            percent = 0;
+
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    @"root\WMI", "SELECT CurrentBrightness FROM WmiMonitorBrightness");
+
+                foreach (System.Management.ManagementObject item in searcher.Get())
+                {
+                    using (item)
+                    {
+                        percent = Convert.ToInt32(item["CurrentBrightness"]);
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // The WMI class is absent on displays without WDDM brightness
+                // control: unsupported, not a fault.
+            }
+
+            return false;
+        }
+
+        /// <summary>Sets panel brightness and answers the readback (U-205).
+        /// WmiSetBrightness takes (timeoutSeconds, percent); the readback is
+        /// the evidence, exactly like every other panel write.</summary>
+        public static bool TrySetBrightness(int percent, out int applied)
+        {
+            applied = 0;
+            percent = Math.Clamp(percent, 0, 100);
+
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    @"root\WMI", "SELECT * FROM WmiMonitorBrightnessMethods");
+
+                foreach (System.Management.ManagementObject item in searcher.Get())
+                {
+                    using (item)
+                    {
+                        item.InvokeMethod("WmiSetBrightness", new object[] { 0u, (byte)percent });
+
+                        if (TryGetBrightness(out applied))
+                            return Math.Abs(applied - percent) <= 1;
+
+                        return false;
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+
+        /// <summary>Copies the display's associated profile to
+        /// <paramref name="targetPath"/> (U-205).</summary>
+        public static bool ExportColorProfile(string? deviceName, string targetPath, out string? error)
+        {
+            error = null;
+
+            string? current = GetCurrentColorProfile(deviceName);
+            if (string.IsNullOrEmpty(current))
+            {
+                error = "no profile is associated with this display";
+                return false;
+            }
+
+            string source = ResolveProfilePath(current);
+            if (!System.IO.File.Exists(source))
+            {
+                error = $"profile file '{current}' not found";
+                return false;
+            }
+
+            try
+            {
+                System.IO.File.Copy(source, targetPath, overwrite: true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
 
         const int DispChangeSuccessful = 0;
         const int DgpuOnlyRefreshRate = 300;

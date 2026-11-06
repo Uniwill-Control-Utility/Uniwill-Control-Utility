@@ -71,6 +71,12 @@ flowchart TB
     HydroPage[Hydro UI] --> WC[WaterCoolerService]
     Overlay --> Monitoring
     Overlay --> FPS[FpsMonitoringService]
+    Overlay --> SHORT[ShortcutService]
+    Automations --> SHORT
+    Settings --> OEM[OemTakeoverService]
+    About --> DIAG[DiagnosticsExportService]
+    OEM --> ENGINE[Engine oem.* verbs]
+    Display --> ICC[ICC profiles + brightness]
 ```
 
 ## Implementation gaps visible in code

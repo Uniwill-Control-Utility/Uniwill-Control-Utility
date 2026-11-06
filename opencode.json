@@ -1,0 +1,12 @@
+{
+  "": "https://opencode.ai/config.json",
+  "permissions": {
+    "allow": [
+      "Bash(where *)",
+      "Bash(dotnet *)",
+      "Bash(findstr *)",
+      "Bash(taskkill *)",
+      "Bash(dir *)"
+    ]
+  }
+}

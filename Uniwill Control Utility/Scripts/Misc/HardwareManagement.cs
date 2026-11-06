@@ -20,6 +20,17 @@ namespace Uniwill_Control_Utility.Scripts.Misc
     /// </summary>
     internal static class HardwareManagement
     {
+        /// <summary>
+        /// The engine's device capability (webcam PnP). Set from DI at startup
+        /// (App phase 1) and by SettingsPage, the same static-singleton idiom as
+        /// RyzenAdj_To_UCU.EcService. The engine performs the PnP mutation as
+        /// LocalSystem with no consent prompt and verifies it by re-reading the
+        /// node; the elevated PowerShell path stays as the fallback for a machine
+        /// whose engine is not running. Wi-Fi/Bluetooth stay here as radio-API
+        /// calls: they need no privilege, so they need no engine.
+        /// </summary>
+        internal static UCU.Contracts.Capabilities.IDeviceCapability? Devices { get; set; }
+
         #region Windows Radios (Wi-Fi / Bluetooth)
 
         private static Windows.Devices.Radios.Radio? _wifiRadio;
@@ -140,6 +151,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         private const string SearchWebcamStatus =
             "Get-PnpDevice -FriendlyName *Webcam*,*Camera* -Class Camera | Where-Object { $_.Present -eq $true } | ForEach-Object { $_.Status }";
 
+        /// <summary>
+        /// Runs a PowerShell status query unelevated and captures its output.
+        /// Get-PnpDevice queries need no elevation; the mutations (SetWebcamAsync)
+        /// go through ElevatedProcess instead.
+        /// </summary>
         private static async Task<(int exitCode, string output, string error)> RunPowershellAsync(string command)
         {
             var psi = new ProcessStartInfo
@@ -150,7 +166,6 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
-                // UCU runs elevated by default, no need for runas
             };
 
             using var proc = Process.Start(psi);
@@ -165,15 +180,36 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         /// <summary>
         /// Enables/disables the webcam via PnP device hotswap on the Camera device class.
-        /// One query covers both *Webcam* and *Camera* friendly names; the action only runs
-        /// on present devices whose state differs, so already-in-state is a silent no-op.
+        /// The mutation is the engine's device verb: LocalSystem answers it with no
+        /// consent prompt (the per-operation UAC this row used to raise is gone), the
+        /// CM API targets the present *Webcam*/*Camera* node, and the engine's own
+        /// verification re-read answers the verb. The elevated PowerShell route
+        /// remains as the fallback for a machine whose engine is not running.
         /// </summary>
         public static async Task<bool> SetWebcamAsync(bool enable)
         {
-            var (code, output, error) = await RunPowershellAsync(enable ? EnableWebcamCommand : DisableWebcamCommand);
+            if (Devices != null)
+            {
+                try
+                {
+                    bool verified = await Devices.SetWebcamEnabledAsync(enable).ConfigureAwait(false);
 
-            Log.Information("[HardwareManagement] Webcam PnP {Action} results: exit={Code} out=[{Output}] err=[{Error}]",
-                enable ? "enable" : "disable", code, output, error);
+                    Log.Information("[HardwareManagement] Webcam PnP {Action} via engine: verified={Verified}",
+                        enable ? "enable" : "disable", verified);
+
+                    return verified;
+                }
+                catch (Exception ex)
+                {
+                    Log.Information("[HardwareManagement] Engine webcam toggle unavailable ({Message}) - using the elevated fallback", ex.Message);
+                }
+            }
+
+            int code = await ElevatedProcess.RunPowershellAsync(
+                enable ? EnableWebcamCommand : DisableWebcamCommand, "Webcam PnP toggle").ConfigureAwait(false);
+
+            Log.Information("[HardwareManagement] Webcam PnP {Action} elevated exit={Code}",
+                enable ? "enable" : "disable", code);
 
             return code == 0;
         }
@@ -204,35 +240,45 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         /// <summary>
         /// Enables/disables the touchpad via the Windows Settings admin flow
-        /// (SystemSettingsAdminFlows.exe EnableTouchpad 0/1) — the mechanism open-revo uses
-        /// on this platform. The flow owns the same toggle the Settings app shows.
+        /// (SystemSettingsAdminFlows.exe EnableTouchpad 0/1) — the mechanism open-revo
+        /// uses on this platform. The flow owns the same toggle the Settings app shows.
+        /// The flow needs a full administrator token AND the interactive session, so
+        /// it cannot run in the LocalSystem engine (session 0). It runs as a one-shot
+        /// "highest privileges" scheduled task for the logged-on user - the same
+        /// route the Windows Settings app itself uses for this flow - which the
+        /// unelevated app can create, run and delete with NO consent prompt. The
+        /// direct elevated spawn remains as the fallback for a machine where the
+        /// task cannot be created.
         /// </summary>
         public static async Task<bool> SetTouchpadAsync(bool enable)
         {
             try
             {
-                var psi = new ProcessStartInfo
+                int? taskResult = Services.ScheduledTaskService.RunOneShotHighestPrivileges(
+                    "UCU Touchpad Flow",
+                    "One-shot run of the Windows touchpad admin flow (UCU).",
+                    "SystemSettingsAdminFlows.exe",
+                    enable ? "EnableTouchpad 1" : "EnableTouchpad 0");
+
+                if (taskResult != null)
                 {
-                    FileName = "SystemSettingsAdminFlows.exe",
-                    Arguments = enable ? "EnableTouchpad 1" : "EnableTouchpad 0",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                    // UCU runs elevated by default, no need for runas
-                };
+                    Log.Information("[HardwareManagement] Touchpad admin flow via one-shot task (enable={Enable}) exit code: {ExitCode}",
+                        enable, taskResult.Value);
+                    return taskResult.Value == 0;
+                }
 
-                using var proc = Process.Start(psi);
-                if (proc == null)
-                    return false;
+                Log.Information("[HardwareManagement] Touchpad task bridge unavailable - using the elevated fallback");
 
-                string output = await proc.StandardOutput.ReadToEndAsync();
-                string error = await proc.StandardError.ReadToEndAsync();
-                proc.WaitForExit();
+                // Fallback route: elevated per-operation consent, since the app
+                // process is unelevated.
+                int exitCode = await ElevatedProcess.RunAsync(
+                    "SystemSettingsAdminFlows.exe",
+                    enable ? "EnableTouchpad 1" : "EnableTouchpad 0",
+                    "Touchpad admin flow").ConfigureAwait(false);
 
-                Log.Information("[HardwareManagement] Touchpad admin flow (enable={Enable}) exit code: {ExitCode}, out=[{Output}], err=[{Error}]",
-                    enable, proc.ExitCode, output.Trim(), error.Trim());
-                return proc.ExitCode == 0;
+                Log.Information("[HardwareManagement] Touchpad admin flow (enable={Enable}) exit code: {ExitCode}",
+                    enable, exitCode);
+                return exitCode == 0;
             }
             catch (Exception ex)
             {

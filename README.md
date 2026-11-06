@@ -206,6 +206,7 @@ Set-and-forget rules that apply presets automatically when system state changes.
 - **GPU Preference when Plugged In** — Set the GPU preference (No change / iGPU / dGPU / Auto) when connected to power (Hybrid mode only; "No change" is the default)
 - **Refresh Rate on Battery** — Set the internal panel's refresh rate when running on battery (internal panel only; "No change" is the default)
 - **Refresh Rate when Plugged In** — Set the internal panel's refresh rate when connected to power (internal panel only; "No change" is the default)
+- **Power Tuning Guardian** — Opt-in (off by default), per feature: re-applies the preset's GPU power ceiling (TGP / Dynamic Boost) and/or CPU power limits (PL1 / PL2) when the firmware reports a third-party program reset them — verified by an EC register re-read before the toast
 
 ![Auto](screenshots/automations.png)
 
@@ -321,6 +322,7 @@ Application preferences, diagnostics, updates, and embedded system information.
 - **Preset backup** — Export and import custom and adaptive mode presets as JSON
 - **Feature Control** - enable/disable various pages (e.g. the Flydigi cooler page if you do not need it)
 - **Advanced features** — Power boost mode, Q-Key button preset switching, and the CPU Advanced Performance Menu unlock (Intel ONLY - BIOS setup exposes the Advanced Performance Menu on next boot)
+- **Hardware management** — Wi-Fi, Bluetooth, webcam, and touchpad toggles, plus firmware-resident device switches: Windows key lock, Fn key lock, and AC power recovery (turn the laptop on when AC is restored) — the lock rows reflect the firmware's own state and survive UCU closing
 - **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug)
 - **System Information** — Device, processor, memory, and battery specs with detailed RAM timings and SPD data
 
@@ -363,17 +365,42 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 
 ### Recommended: installer (auto-updating)
 
-1. Head over to the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
+1. Head over to the [Releases](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases) page
 2. Download and run **Uniwill-Control-Utility-win.msi** (installs to Program Files; requires the .NET 10 Desktop Runtime, which the installer sets up). Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"` — auto-update follows the app wherever it lives.
 3. UCU checks for updates on startup, downloads them silently, and installs them when you close the app — an accent card appears in the title bar when an update is ready. You can also use **Check for Updates** in Settings.
 
-### Portable (no auto-updates)
+### No portable build
 
-1. Download the latest **zip** from the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
-2. Extract the zip
-3. Launch **Uniwill Control Utility.exe**
+There is no zip download. The engine runs as a machine-wide Windows service (`UCUEngine`) so the app itself stays unelevated, and an unpacked copy has no update or removal story of its own - deleting the folder leaves the service registered and pointing at a path that no longer exists. If you still run an old extracted copy, install the MSI: it re-points the service at the Program Files layout, and the old folder can then be deleted.
 
-The portable layout has no installer, so automatic updates are unavailable there (Settings will tell you). If you previously ran UCU from an extracted zip, install the MSI and delete the old folder — the app re-points your "Start on system boot" task at the new location automatically.
+### Upgrading
+
+Install the newer **Uniwill-Control-Utility-win.msi** over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`). The in-app updater performs the same install from the downloaded package when you close the app.
+
+Two cases still need a manual uninstall first:
+
+- a pre-release build carrying the **same version number** (Windows Installer skips files whose version is not greater),
+- a copy that came from an old extracted zip - install the MSI and the service follows.
+
+### Uninstalling
+
+Settings → Apps → Installed apps → **Uniwill Control Utility** → Uninstall. That runs `Uninstall.exe`, which closes the app, removes the MSI product, **stops and deletes the `UCUEngine` service**, and clears the leftover registration and install folder.
+
+Deleting the install folder by hand does **not** remove the service: it keeps running against a missing image, and `sc delete UCUEngine` from an elevated prompt is the manual fallback.
+
+### Antivirus & SmartScreen (security-product-guarded machines)
+
+UCU is a free tool and ships **unsigned** — publisher certificates cost money, and this project doesn't have one. Two practical consequences:
+
+- **SmartScreen:** on the first run of `Setup`/`Uniwill Control Utility.exe` you may see "Windows protected your PC". That's the reputation check on an unsigned download — click **More info → Run**.
+- **Aggressive security suites:** UCU registers one Windows service (**UCUEngine**) that owns the hardware control, so the app itself can run unelevated. Products with a service-protection module (observed: Emsisoft Anti-Malware) police the app's access to that service, which shows up as a **UAC prompt for "Uniwill Control Utility Engine" on every launch**, a dashboard that never fills, or `The engine service is not openable` in the app log (`%LOCALAPPDATA%\UCU\logs`).
+
+The fix on such machines is an **application-level allowlist** for both images in your security product — an install-folder exclusion is not enough, because the file scanner is not what's policing the service:
+
+- `C:\Program Files\Uniwill-Control-Utility\current\Uniwill Control Utility.exe`
+- `C:\Program Files\Uniwill-Control-Utility\current\Service\Uniwill Control Utility Engine.exe`
+
+This is the same allowlist commercial control centers rely on — theirs ride on a paid publisher certificate instead, which UCU deliberately doesn't buy.
 
 ## Building & packaging (maintainers)
 
@@ -382,7 +409,7 @@ dotnet tool restore
 .\build\pack.ps1
 ```
 
-The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the GitHub release assets: the per-machine MSI, Velopack full/delta packages, the `releases.win.json` feed index, and the portable zip. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
+The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the GitHub release assets: the per-machine MSI, Velopack full and delta packages, the `Setup` bootstrapper, and the `releases.win.json` feed index. There is no portable zip - the engine is a machine-wide service, so an unpacked copy has no update or removal story. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
 
 ## Optional
 For those who want to use color correction profiles, you need to:
@@ -417,5 +444,5 @@ UCU builds on the work of many open-source projects and reverse-engineering effo
 
 - **MechControl** (decompiled, closed-source) — Original by Okashira (Discord: defty1234), fork by [Heavyfail (GitHub)](https://github.com/Heavyfail). Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports), MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern), and UWACPIDriver.sys IOCTL codes (0x9C40A488/0x9C40A48C) for direct EC access.
 - **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis), and NVRAM GUID/variable names for GPU mode persistence.
-- **[OpenRevo (GitHub)](https://github.com/faintonce/open-revo)** by faintonce — Mechrevo control center (Rust/Tauri), a sibling of UCU's target on the same Uniwill EC family. Used for runtime NVRAM probing to determine the correct offset (98) within `OemMagicVariable` for BIOS-visible GPU MUX mode switching — without this, UCU's NVRAM writes would not have been recognized by the BIOS. Its mode-apply path was also decompiled for the EC OEM mode engine (the per-mode `0x0751` fan-control literals that recolor the Q-key LED, the `0x0787` commit write, the `0x0741` manual-control gate, and the fact that stock modes write **no** power registers at all), which is what UCU's stock presets now assert through, and for the Performance-button intercept architecture behind UCU's own button handling.
+- **[OpenRevo (GitHub)](https://github.com/faintonce/open-revo)** by faintonce — Mechrevo control center (Rust/Tauri), a sibling of UCU's target on the same Uniwill EC family. Used for runtime NVRAM probing to determine the correct offset (98) within `OemMagicVariable` for BIOS-visible GPU MUX mode switching — without this, UCU's NVRAM writes would not have been recognized by the BIOS. Its mode-apply path was also decompiled for the EC OEM mode engine (the per-mode `0x0751` fan-control literals that recolor the Q-key LED, the `0x0787` commit write, the `0x0741` manual-control gate, and the fact that stock modes write **no** power registers at all), which is what UCU's stock presets now assert through, and for the Performance-button intercept architecture behind UCU's own button handling. Its NVRAM gatekeeper handshake — the `OemMagicDoor`=0x01 unlock that must precede every `OemMagicVariable` write on the 50-series chassis generation (`driver\uefi_nvram.rs`) — is ported into UCU's NVRAM write path (U-106). Its power-contract healing pattern (the `heal_gpu_power_contract`/`heal_cpu_power_contract` commands in `commands\tuning_cmd.rs`) is re-implemented — Rust not copied — as UCU's opt-in Power Tuning Guardian (U-107): app-side drift detection against the EC's power-truth registers behind per-feature toggles, with the engine replaying the preset pipeline's own activation sequence. Its device-switch registry (`config\ec_registry.json`: AC-recovery bit on `0x0726`, Fn lock on `0x074E`, win-lock status/trigger pair on `0x0768`/`0x0767`, the trigger-fire driver calls in `driver\wmi_ec.rs`) is re-implemented as UCU's Windows key lock, Fn key lock, and AC power recovery rows in Settings → Hardware management (U-108) — every register semantics field-probed on the lab box (`docs\acpi\SwitchDiagnostic`) before shipping a write path, including the discovery that the win-lock trigger is a debounced toggle, not a state write.
 

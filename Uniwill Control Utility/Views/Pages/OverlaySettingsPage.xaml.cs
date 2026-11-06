@@ -8,7 +8,6 @@ using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
-using Uniwill_Control_Utility.Services.Performance;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -79,12 +78,26 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateRtssStatus()
         {
-            if (RtssReader.IsRunning())
+            // Session-scoped PROCESS witness, not the shared-memory segment:
+            // the segment name is global, RTSS's overlay DLL keeps the mapping
+            // open in every process it injected (so it outlives RTSS), and an
+            // MSI upgrade that force-kills RTSS leaves a VALID header behind
+            // (the DEAD marker is only written on graceful exit). Field report
+            // 2026-11-01: the page said "RTSS running" with zero RTSS
+            // processes and no OSD - and hid the Start button, removing the
+            // self-heal (launching RTSS rewrites the header). The service's
+            // process snapshot answers false with zero processes (and falls
+            // back to the segment only when a security product refuses the
+            // snapshot), so the label, the Start button (CanStart) and the
+            // startup gate now read from one witness.
+            if (RtssDetectionService.IsRunning())
             {
                 RtssStatusIcon.Glyph = "\uE930"; // Positive
                 RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorSuccessBrush") as System.Windows.Media.Brush;
                 RtssStatusText.Text = "RTSS running";
                 RtssStatusText.Foreground = Application.Current.FindResource("TextFillColorSecondaryBrush") as System.Windows.Media.Brush;
+                RtssStartButton.Visibility = Visibility.Collapsed;
+                RtssStartButton.IsEnabled = true;
             }
             else
             {
@@ -92,6 +105,37 @@ namespace Uniwill_Control_Utility.Views.Pages
                 RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
                 RtssStatusText.Text = "RTSS not running";
                 RtssStatusText.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
+
+                // The Start affordance: installed, image located, idle (the
+                // prerequisite row's CanStart rule). It stays visible while a
+                // start is in flight, disabled - the 2 s poll sees the result.
+                RtssStartButton.Visibility = _rtssStartInProgress || RtssLauncher.CanStart()
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                RtssStartButton.IsEnabled = !_rtssStartInProgress;
+            }
+        }
+
+        private bool _rtssStartInProgress;
+
+        private async void RtssStartButton_Click(object sender, RoutedEventArgs e)
+        {
+            // The exact prerequisite-row route: ask the engine to place RTSS
+            // in this session (no UAC, works with the "run as administrator"
+            // flag); without an engine this is the double-click fallback.
+            _rtssStartInProgress = true;
+            RtssStartButton.IsEnabled = false;
+
+            bool started = await RtssLauncher.StartAsync();
+
+            _rtssStartInProgress = false;
+            RtssStartButton.IsEnabled = true;
+
+            if (!started)
+            {
+                // Nothing came up (consent refused on the fallback, engine
+                // down): refresh the row so the state is honest immediately.
+                UpdateRtssStatus();
             }
         }
 

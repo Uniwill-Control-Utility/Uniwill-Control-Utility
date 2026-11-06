@@ -1,0 +1,207 @@
+{
+  "_readme": [
+    "EC hardware registry: every EC address, register encoding, address region and driver",
+    "IOCTL the product touches, declared exactly once. Consumed at build time by",
+    "tools\\EcRegistryGen, which emits UCU.Core\\Ec\\Generated\\EcAddresses.g.cs (committed,",
+    "regenerated when this file is newer; the Core suite pins that the committed artifact",
+    "matches this file). Do NOT add an EC number to product code: add it here.",
+    "",
+    "SCOPE: wire encodings only (addresses, register bit/value encodings, address regions,",
+    "driver IOCTLs). Domain rules and product limits (watt ranges, thresholds, hysteresis,",
+    "percentages) stay in the codecs - they are policy, not wiring.",
+    "",
+    "EVIDENCE: every entry names where the number came from. Provenance levels used by this",
+    "codebase, strongest first: 'probe' (field-verified on the lab box), 'uniwill-laptop-driver'",
+    "(Linux kernel module for the same EC), 'tuxedo-drivers uniwill_interfaces.h', 'MechControl",
+    "decompile' (EcDevice.cs), 'XMG CC GCUService.exe decompile', 'OpenRevo' (foreign chassis -",
+    "its registry is a hypothesis here, never proof), 'declared in EcEngine.cs' (no provenance",
+    "comment survived; treat as unverified).",
+    "",
+    "platform: all | amd | intel (EcPlatform vocabulary). access: rw | ro | wo (omitted = rw).",
+    "Duplicate addresses under different names are legal: the same byte answers to several",
+    "domains (0x0742 is a support byte AND the battery gate status; 0x0402 is the mux state",
+    "AND the design-capacity low byte). Names must be unique."
+  ],
+
+  "address": [
+    { "name": "REG_CPU_TEMP", "value": "0x043E", "access": "ro", "domain": "temperature", "evidence": "uniwill-laptop-driver" },
+    { "name": "REG_GPU_TEMP", "value": "0x044F", "access": "ro", "domain": "temperature", "evidence": "uniwill-laptop-driver" },
+    { "name": "REG_SSD_TEMP", "value": "0x07D1", "access": "ro", "domain": "temperature", "evidence": "uniwill-laptop-driver" },
+
+    { "name": "REG_MAIN_FAN_RPM_LO", "value": "0x0464", "access": "ro", "domain": "fan", "evidence": "uniwill-laptop-driver; big-endian u16 with REG_MAIN_FAN_RPM_HI (EcEngine.cs:38 header, :839 doc - the low-address byte is the HIGH byte)" },
+    { "name": "REG_MAIN_FAN_RPM_HI", "value": "0x0465", "access": "ro", "domain": "fan", "evidence": "uniwill-laptop-driver; big-endian u16 pair with REG_MAIN_FAN_RPM_LO" },
+    { "name": "REG_SECOND_FAN_RPM_LO", "value": "0x046C", "access": "ro", "domain": "fan", "evidence": "uniwill-laptop-driver; 0x046C/0x046B pair (EcEngine.cs:849 doc)" },
+    { "name": "REG_SECOND_FAN_RPM_HI", "value": "0x046B", "access": "ro", "domain": "fan", "evidence": "uniwill-laptop-driver; 0x046C/0x046B pair" },
+
+    { "name": "REG_MANUAL_FAN_CTRL", "value": "0x0751", "domain": "fan", "evidence": "uniwill-laptop-driver; carries FAN_MODE_* level bits (dual-purpose with the OVERBOOST profile, EcEngine.cs:2210)" },
+    { "name": "REG_FAN_SWITCH_SPEED", "value": "0x0787", "domain": "fan", "evidence": "uniwill-laptop-driver; also the last write of every OEM stock-mode body (OEM_MODE_COMMIT, EcEngine.cs:1850)" },
+    { "name": "REG_UNIVERSAL_FAN_CTRL", "value": "0x07C5", "domain": "fan", "evidence": "uniwill-laptop-driver; bits 7/6/5 armed by the init sequence (EcEngine.cs:348)" },
+    { "name": "REG_AP_OEM_6", "value": "0x07C6", "domain": "fan", "evidence": "MechControl decompile; init step 7 writes the fan-curve mode here (EcEngine.cs:372)" },
+
+    { "name": "REG_SUPPORT_1", "value": "0x0765", "access": "ro", "domain": "capability", "evidence": "uniwill-laptop-driver; feature-support byte (FAN_V2_NEW, FAN_V3)" },
+    { "name": "REG_SUPPORT_2", "value": "0x0766", "access": "ro", "domain": "capability", "evidence": "uniwill-laptop-driver; feature-support byte (RGB_KEYBOARD)" },
+    { "name": "REG_SUPPORT_5", "value": "0x0742", "access": "ro", "domain": "capability", "evidence": "uniwill-laptop-driver; feature-support byte (FAN_SUPPORT, FAN_TURBO_SUPPORTED). Same byte as REG_BATTERY_GATE_STATUS" },
+    { "name": "REG_BIOS_OEM_2", "value": "0x0782", "domain": "capability", "evidence": "MechControl decompile; China-mode byte, ENABLE_CHINA_MODE is required for RGB on non-China SKUs (EcEngine.cs:1618)" },
+
+    { "name": "REG_CPU_TEMP_END_TABLE", "value": "0x0F00", "domain": "fan-curve", "evidence": "uniwill-laptop-driver; 16 bytes (EcEngine.cs:57)" },
+    { "name": "REG_CPU_TEMP_START_TABLE", "value": "0x0F10", "domain": "fan-curve", "evidence": "uniwill-laptop-driver; 16 bytes, REG_CPU_TEMP_END_TABLE + FAN_TABLE_TEMP_START_OFFSET" },
+    { "name": "REG_CPU_FAN_SPEED_TABLE", "value": "0x0F20", "domain": "fan-curve", "evidence": "uniwill-laptop-driver; 16 bytes, duty scale 0-200 (EC_DUTY_MAX)" },
+    { "name": "REG_GPU_TEMP_END_TABLE", "value": "0x0F30", "domain": "fan-curve", "evidence": "uniwill-laptop-driver; 16 bytes" },
+    { "name": "REG_GPU_TEMP_START_TABLE", "value": "0x0F40", "domain": "fan-curve", "evidence": "uniwill-laptop-driver; 16 bytes, REG_GPU_TEMP_END_TABLE + FAN_TABLE_TEMP_START_OFFSET" },
+    { "name": "REG_GPU_FAN_SPEED_TABLE", "value": "0x0F50", "domain": "fan-curve", "evidence": "uniwill-laptop-driver; 16 bytes, duty scale 0-200" },
+
+    { "name": "REG_PWM_1_WRITEABLE", "value": "0x1804", "access": "wo", "domain": "fan", "evidence": "MechControl decompile; writeable PWM block, five bytes per fan (EcWriteGatePolicy.cs:45)" },
+    { "name": "REG_PWM_2_WRITEABLE", "value": "0x1809", "access": "wo", "domain": "fan", "evidence": "MechControl decompile; writeable PWM block, five bytes per fan" },
+
+    { "name": "REG_PL1_SETTING", "value": "0x0783", "domain": "power", "evidence": "tuxedo-drivers uw_set_tdp(): PL1 sustained power limit (EcEngine.cs:2119)" },
+    { "name": "REG_PL2_SETTING", "value": "0x0784", "domain": "power", "evidence": "tuxedo-drivers uw_set_tdp(): PL2 boost power limit" },
+    { "name": "REG_PL4_SETTING", "value": "0x0785", "domain": "power", "evidence": "tuxedo-drivers uw_set_tdp(): PL4 peak/clamp power limit" },
+    { "name": "REG_TCC_OFFSET", "value": "0x0786", "domain": "power", "evidence": "uniwill-laptop-driver; CPU TCC offset (EcEngine.cs:704)" },
+    { "name": "REG_PL5_SETTING", "value": "0x0788", "domain": "power", "evidence": "declared in EcEngine.cs:73 - 'appears to be the authoritative sustained power cap on AM5/FireRange' (unverified)" },
+    { "name": "REG_MODE_INDEX", "value": "0x07AB", "domain": "power", "evidence": "MechControl decompile; mode index byte, high bits preserved (MODE_INDEX_HIGH_BITS) and low bit carried across (EcEngine.cs:1847)" },
+    { "name": "REG_POWER_MGMT_726", "value": "0x0726", "domain": "power", "evidence": "MechControl decompile; init step 3b arms bit 7 (POWER_MGMT_726_ENABLE). Bit 3 is AC power recovery, probe-verified U-108" },
+    { "name": "REG_OEM_MODE_FLAG_45B", "value": "0x045B", "domain": "power", "evidence": "OpenRevo (foreign chassis): writes 1 for Office, 0 for the other stock modes (EcEngine.cs:78)" },
+
+    { "name": "REG_RGB_RED", "value": "0x0769", "domain": "keyboard", "evidence": "MechControl decompile (keyboard backlight block, EcEngine.cs:80)" },
+    { "name": "REG_RGB_GREEN", "value": "0x076A", "domain": "keyboard", "evidence": "MechControl decompile" },
+    { "name": "REG_RGB_BLUE", "value": "0x076B", "domain": "keyboard", "evidence": "MechControl decompile" },
+    { "name": "REG_TRIGGER", "value": "0x0767", "domain": "keyboard", "evidence": "MechControl decompile; trigger byte, bits self-consuming. Win-key lock SET rides bit 0 (probe-verified U-108)" },
+    { "name": "REG_WINLOCK_STATUS", "value": "0x0768", "access": "ro", "domain": "switch", "evidence": "probe: field-verified U-108 as the Win-key lock TRUTH byte (bit 0); the SET is a REG_TRIGGER toggle, not a write of this byte" },
+    { "name": "REG_FN_LOCK", "value": "0x074E", "domain": "switch", "evidence": "probe: field-verified U-108 - bit 4 set means locked (0x11 locked / 0x01 idle)" },
+    { "name": "REG_KBD_STATUS", "value": "0x078C", "access": "ro", "domain": "keyboard", "evidence": "MechControl decompile; brightness/white status byte (KBD_BRIGHTNESS_MASK, KBD_WHITE_ONLY)" },
+
+    { "name": "REG_PROJECT_ID", "value": "0x0740", "access": "ro", "domain": "identity", "evidence": "uniwill-laptop-driver; hardware revision / project id" },
+    { "name": "REG_AP_OEM", "value": "0x0741", "domain": "fan", "evidence": "MechControl decompile; manual-control gate byte. probe: bit0 SET disarms the OEM Performance-button engine on NB02, bit2 is the firmware boot value (EcEngine.cs:99-100)" },
+
+    { "name": "REG_CUSTOM_PROFILE", "value": "0x0727", "domain": "power", "evidence": "MechControl decompile; bit 6 (CUSTOM_PROFILE_ENABLE) marks a custom profile owner - the discriminator OpenRevo uses because REG_AP_OEM bit0 is set in both states (EcEngine.cs:660)" },
+    { "name": "REG_CTGP_DB_ENABLE", "value": "0x0743", "domain": "gpu-power", "evidence": "tuxedo-drivers uniwill_interfaces.h; enable bits GENERAL(0x01)/DB(0x02)/CTGP(0x04). Overlaps the manual-mode fan-curve block (EcEngine.cs:539 warning)" },
+    { "name": "REG_CTGP_DB_CTGP_OFFSET", "value": "0x0744", "domain": "gpu-power", "evidence": "tuxedo-drivers; cTGP offset, (targetWatts - defaultWatts) per UCC/tuxedo-drivers (EcEngine.cs:549)" },
+    { "name": "REG_CTGP_DB_TPP_OFFSET", "value": "0x0745", "domain": "gpu-power", "evidence": "tuxedo-drivers; total power pool. MechControl writes 255 only on the ... (EcEngine.cs:596)" },
+    { "name": "REG_CTGP_DB_DB_OFFSET", "value": "0x0746", "domain": "gpu-power", "evidence": "tuxedo-drivers; Dynamic Boost offset" },
+
+    { "name": "REG_GPU_STATUS", "value": "0x072A", "domain": "mux", "evidence": "XMG CC GCUService.exe decompile; MUX mode control (MUX_MODE_* values)" },
+    { "name": "REG_MODULE_ID_GPU", "value": "0x07D2", "access": "ro", "domain": "identity", "evidence": "XMG CC GCUService.exe decompile; 0x1B observed for RTX 5090" },
+    { "name": "REG_MUX_STATE_LO", "value": "0x0402", "access": "ro", "domain": "mux", "evidence": "XMG CC GCUService.exe decompile; hardware MUX state low byte. Same byte as REG_BATTERY_DESIGN_CAP_LO" },
+    { "name": "REG_MUX_STATE_HI", "value": "0x0403", "access": "ro", "domain": "mux", "evidence": "XMG CC GCUService.exe decompile; hardware MUX state high byte" },
+    { "name": "REG_DISPLAY_VARIANT_LO", "value": "0x0408", "access": "ro", "domain": "identity", "evidence": "XMG CC GCUService.exe decompile. Same byte as REG_BATTERY_DESIGN_VOLTAGE_LO" },
+    { "name": "REG_DISPLAY_VARIANT_HI", "value": "0x0409", "access": "ro", "domain": "identity", "evidence": "XMG CC GCUService.exe decompile" },
+
+    { "name": "REG_PWM_1", "value": "0x075B", "domain": "fan", "evidence": "MechControl decompile; direct PWM write/readback (EcEngine.cs:1335)" },
+    { "name": "REG_PWM_2", "value": "0x075C", "domain": "fan", "evidence": "MechControl decompile; direct PWM write/readback" },
+
+    { "name": "REG_BATTERY_MODE", "value": "0x07A6", "domain": "battery", "evidence": "uniwill-laptop-driver / OpenRevo ADDR_BATTERY_PROTECTION_MODE; probe: 0x07A6 decodes cleanly on the lab box (EcBatteryCodec.cs:66)" },
+    { "name": "REG_BATTERY_SOC", "value": "0x04AB", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; state of charge, byte percentage (EcEngine.cs:2383)" },
+    { "name": "REG_BATTERY_GATE_STATUS", "value": "0x0742", "access": "ro", "domain": "battery", "evidence": "OpenRevo ADDR_BATTERY_GATE_STATUS (hypothesis). probe: the lab box shows the gate bit beside other flags (EcEngine.cs:2316); same byte as REG_SUPPORT_5" },
+    { "name": "REG_BATTERY_PLATFORM_OVERRIDE", "value": "0x0770", "domain": "battery", "evidence": "OpenRevo ADDR_BATTERY_PLATFORM_OVERRIDE (hypothesis). probe: 0xFF = no override observed idle" },
+    { "name": "REG_BATTERY_LIMIT_UP", "value": "0x07C9", "domain": "battery", "evidence": "OpenRevo ADDR_BATTERY_LIMIT_UP (hypothesis). probe REFUTES the percent reading on this chassis: reads 0, not a ceiling (EcBatteryCodec.cs:65) - write path stays shut" },
+    { "name": "REG_BATTERY_LIMIT_DOWN", "value": "0x07D0", "domain": "battery", "evidence": "OpenRevo ADDR_BATTERY_LIMIT_DOWN (hypothesis). probe REFUTES the percent reading: reads 95 - write path stays shut" },
+    { "name": "REG_BATTERY_POWER_SOURCE", "value": "0x0490", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; bit 0 = AC connected (EcEngine.cs:2360)" },
+    { "name": "REG_BATTERY_DESIGN_CAP_LO", "value": "0x0402", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; design capacity mAh, LE u16. Same byte as REG_MUX_STATE_LO" },
+    { "name": "REG_BATTERY_FULL_CHARGE_CAP_LO", "value": "0x0404", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; full charge capacity mAh, LE u16" },
+    { "name": "REG_BATTERY_DESIGN_VOLTAGE_LO", "value": "0x0408", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; design voltage mV, LE u16. Same byte as REG_DISPLAY_VARIANT_LO" },
+    { "name": "REG_BATTERY_CHARGE_RATE_LO", "value": "0x0434", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; charge rate mA, LE u16" },
+    { "name": "REG_BATTERY_REMAINING_CAP_LO", "value": "0x0436", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; remaining capacity mAh, LE u16" },
+    { "name": "REG_BATTERY_PRESENT_VOLTAGE_LO", "value": "0x0438", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; present voltage mV, LE u16" },
+    { "name": "REG_BATTERY_TEMP_LO", "value": "0x04A2", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; temperature Kelvin*10, LE u16" },
+    { "name": "REG_BATTERY_CYCLE_COUNT_LO", "value": "0x04A6", "access": "ro", "domain": "battery", "evidence": "uniwill-laptop-driver; cycle count, LE u16" },
+
+    { "name": "REG_HANDSHAKE_709", "value": "0x0709", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 1: write HANDSHAKE_709_VALUE (EcEngine.cs:316-317). Semantics beyond the sequence are undocumented; handshake-only by design - see the raw-literal gate's allowlist rationale" },
+    { "name": "REG_HANDSHAKE_708", "value": "0x0708", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 1: write HANDSHAKE_708_VALUE (EcEngine.cs:317-319)" },
+    { "name": "REG_FEATURE_ENABLE_748", "value": "0x0748", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 3 'feature enable': write FEATURE_ENABLE_748_VALUE (EcEngine.cs:332-333)" },
+    { "name": "REG_BIOS_CTRL_706", "value": "0x0706", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 8 'BIOS_CTRL': write BIOS_CTRL_706_VALUE (EcEngine.cs:377-378)" },
+    { "name": "REG_FAN_CURVE_PARAM_7C7", "value": "0x07C7", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 6 'fan curve parameter': write FAN_CURVE_PARAM_7C7_VALUE (EcEngine.cs:367-368)" }
+  ],
+
+  "value": [
+    { "name": "MODE_INDEX_ARM", "value": "0x10", "register": "REG_MODE_INDEX", "evidence": "declared in EcEngine.cs:75 - bit 4, forced only for Beast/Custom, cleared for Office/Balance" },
+    { "name": "MODE_INDEX_HIGH_BITS", "value": "0xE0", "register": "REG_MODE_INDEX", "evidence": "EcPowerCodec.ModeIndexHighBitsMask: preserved across a mode write (EcEngine.cs:1847)" },
+    { "name": "MODE_INDEX_LOW_BIT", "value": "0x01", "register": "REG_MODE_INDEX", "evidence": "EcPowerCodec.ModeIndexLowBit: carried across a mode write (EcEngine.cs:1847)" },
+    { "name": "MODE_INDEX_MASK", "value": "0x0F", "register": "REG_MODE_INDEX", "evidence": "EcPowerCodec.ModeIndexMask: the decoded mode-index field" },
+    { "name": "POWER_MGMT_726_ENABLE", "value": "0x80", "register": "REG_POWER_MGMT_726", "evidence": "declared in EcEngine.cs:77 - bit 7, custom power-management gate; stock presets clear it" },
+    { "name": "AC_RECOVERY_BIT", "value": "0x08", "register": "REG_POWER_MGMT_726", "evidence": "probe: field-verified U-108, bit 3 = 'turn the machine on when AC is restored' (EcEngine.cs:2005, EcSwitchCodec.cs:37). Bit 7 carries the Q-key LED white / power gate" },
+    { "name": "CUSTOM_PROFILE_ENABLE", "value": "0x40", "register": "REG_CUSTOM_PROFILE", "evidence": "declared in EcEngine.cs:104 - bit 6, custom-profile enable; stock presets clear it" },
+
+    { "name": "MANUAL_MODE_ENABLE", "value": "0x01", "register": "REG_AP_OEM", "evidence": "declared in EcEngine.cs:99 - bit0: the EC honors custom fan tables + cTGP/DB; probe: SETTING it disarms the OEM Performance-button engine on NB02" },
+    { "name": "AP_OEM_FIRMWARE_BOOT_BIT", "value": "0x04", "register": "REG_AP_OEM", "evidence": "declared in EcEngine.cs:100 - bit2, the firmware's boot value; the EC drops it when manual control engages, it is NOT the button freeze switch (bit0 is)" },
+
+    { "name": "CTGP_DB_ENABLE_GENERAL", "value": "0x01", "register": "REG_CTGP_DB_ENABLE", "evidence": "tuxedo-drivers uniwill_interfaces.h (EcEngine.cs:110)" },
+    { "name": "CTGP_DB_ENABLE_DB", "value": "0x02", "register": "REG_CTGP_DB_ENABLE", "evidence": "tuxedo-drivers uniwill_interfaces.h" },
+    { "name": "CTGP_DB_ENABLE_CTGP", "value": "0x04", "register": "REG_CTGP_DB_ENABLE", "evidence": "tuxedo-drivers uniwill_interfaces.h" },
+
+    { "name": "MUX_MODE_HYBRID", "value": "0x00", "register": "REG_GPU_STATUS", "platform": "amd", "evidence": "XMG CC GCUService.exe Define.DGgpuDirectConnectionMode: MS Hybrid, MUX open, both GPUs active (EcEngine.cs:123-126)" },
+    { "name": "MUX_MODE_DGPU_ONLY", "value": "0x01", "register": "REG_GPU_STATUS", "platform": "amd", "evidence": "XMG CC GCUService.exe: dGPU only, MUX closed. Intel encodes dGPU-only as 2 (EcEngine.cs:125)" },
+    { "name": "MUX_MODE_IGPU_ONLY", "value": "0x02", "register": "REG_GPU_STATUS", "platform": "amd", "evidence": "XMG CC GCUService.exe: iGPU only, MUX open. Intel encodes iGPU-only as 1 (EcEngine.cs:125)" },
+    { "name": "MUX_MODE_HYBRID_INTEL", "value": "0x04", "register": "REG_GPU_STATUS", "platform": "intel", "evidence": "XMG CC GCUService.exe: MS Hybrid on Intel (Dynamic); Intel has no raw 0" },
+
+    { "name": "TRIGGER_RGB_APPLY_COLOR", "value": "0x20", "register": "REG_TRIGGER", "evidence": "declared in EcEngine.cs:136 - bit 5" },
+    { "name": "TRIGGER_RGB_LOGO_EFFECT", "value": "0x40", "register": "REG_TRIGGER", "evidence": "declared in EcEngine.cs:137 - bit 6" },
+    { "name": "TRIGGER_RGB_RAINBOW_EFFECT", "value": "0x80", "register": "REG_TRIGGER", "evidence": "declared in EcEngine.cs:138 - bit 7" },
+    { "name": "TRIGGER_PRESERVED_BIT", "value": "0x10", "register": "REG_TRIGGER", "evidence": "EcPowerCodec.TriggerPreservedBit: preserved when the stock-mode trigger byte is rebuilt (EcEngine.cs:1892)" },
+    { "name": "TRIGGER_OFFICE_BIT", "value": "0x08", "register": "REG_TRIGGER", "evidence": "EcPowerCodec.TriggerOfficeBit: Office-only bit of the stock-mode trigger byte (EcEngine.cs:1892)" },
+    { "name": "WINLOCK_TRIGGER_BIT", "value": "0x01", "register": "REG_TRIGGER", "evidence": "probe: field-verified U-108, bit 0 fires the Win-key lock toggle and self-consumes (EcSwitchCodec.cs:43)" },
+
+    { "name": "FAN_MODE_TURBO", "value": "0x10", "register": "REG_MANUAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:141 - bit 4" },
+    { "name": "FAN_MODE_HIGH", "value": "0x20", "register": "REG_MANUAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:142 - bit 5" },
+    { "name": "FAN_MODE_BOOST", "value": "0x40", "register": "REG_MANUAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:143 - bit 6" },
+    { "name": "FAN_MODE_USER", "value": "0x80", "register": "REG_MANUAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:144 - bit 7, USER mode: direct PWM writes to REG_PWM_1/2 are honored (EcEngine.cs:1360)" },
+    { "name": "FAN_LEVEL_MASK", "value": "0x07", "register": "REG_MANUAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:145 - bits 0-2" },
+    { "name": "FAN_OVERBOOST_CLEAR_MASK", "value": "0xB0", "register": "REG_MANUAL_FAN_CTRL", "evidence": "EcEngine.cs:1992 clears (0xA0|0x10) = bits 4,5,7 before setting OVERBOOST. NOTE the source comment says 'bits 1,4,7', which disagrees with the mask - behaviour follows the mask" },
+    { "name": "FAN_PROFILE_OFFICE", "value": "0xA0", "register": "REG_MANUAL_FAN_CTRL", "evidence": "OpenRevo's literal per stock mode (USER|HIGH), the profile that recolors the Q-key LED (EcEngine.cs:147-150)" },
+    { "name": "FAN_PROFILE_BALANCE", "value": "0x00", "register": "REG_MANUAL_FAN_CTRL", "evidence": "OpenRevo's literal per stock mode: profile bits cleared" },
+    { "name": "FAN_PROFILE_BEAST", "value": "0x10", "register": "REG_MANUAL_FAN_CTRL", "evidence": "OpenRevo's literal per stock mode: TURBO" },
+    { "name": "OEM_MODE_COMMIT", "value": "0x83", "register": "REG_FAN_SWITCH_SPEED", "evidence": "declared in EcEngine.cs:155 - the last write of every OEM stock-mode body, absent in Custom (EcEngine.cs:1850)" },
+    { "name": "SPLIT_TABLES", "value": "0x80", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:158 - bit 7: per-CPU/GPU fan tables" },
+    { "name": "UNIVERSAL_FAN_CURVE_ENABLE_BITS", "value": "0xE0", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "MechControl decompiled init sequence, step 4: 'fan curve enable bits - set bits 7,6,5 of 0x7C5 (OR with 0xE0)' (EcEngine.cs:348)" },
+    { "name": "ENABLE_UNIVERSAL_FAN_CTRL", "value": "0x04", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:161 - bit 2" },
+    { "name": "AP_OEM_6_FAN_CURVE_MODE", "value": "0x04", "register": "REG_AP_OEM_6", "evidence": "MechControl decompiled init sequence, step 7 'fan curve mode' (EcEngine.cs:372-373)" },
+
+    { "name": "KBD_WHITE_ONLY", "value": "0x01", "register": "REG_KBD_STATUS", "evidence": "declared in EcEngine.cs:164 - bit 0 (EcKeyboardCodec.WhiteOnlyBit)" },
+    { "name": "KBD_POWER_OFF", "value": "0x02", "register": "REG_KBD_STATUS", "evidence": "declared in EcEngine.cs:165 - bit 1 (EcKeyboardCodec.PowerOffBit)" },
+    { "name": "KBD_APPLY", "value": "0x10", "register": "REG_TRIGGER", "evidence": "declared in EcEngine.cs:166 - bit 4, apply the backlight write (EcKeyboardCodec.ApplyBit)" },
+    { "name": "KBD_BRIGHTNESS_MASK", "value": "0xE0", "register": "REG_KBD_STATUS", "evidence": "declared in EcEngine.cs:167 - bits 5-7 (EcKeyboardCodec.BrightnessMask, BrightnessShift 5)" },
+    { "name": "ENABLE_CHINA_MODE", "value": "0x40", "register": "REG_BIOS_OEM_2", "evidence": "declared in EcEngine.cs:172 - bit 6, needed for RGB on non-China SKUs (EcEngine.cs:1618)" },
+    { "name": "RGB_KEYBOARD", "value": "0x04", "register": "REG_SUPPORT_2", "evidence": "declared in EcEngine.cs:175 - bit 2: board has a per-key RGB keyboard" },
+    { "name": "FAN_V2_NEW", "value": "0x01", "register": "REG_SUPPORT_1", "evidence": "declared in EcEngine.cs:170 - bit 0" },
+    { "name": "FAN_V3", "value": "0x08", "register": "REG_SUPPORT_1", "evidence": "declared in EcEngine.cs:171 - bit 3" },
+    { "name": "FAN_TURBO_SUPPORTED", "value": "0x10", "register": "REG_SUPPORT_5", "evidence": "declared in EcEngine.cs:178 - bit 4" },
+    { "name": "FAN_SUPPORT", "value": "0x20", "register": "REG_SUPPORT_5", "evidence": "declared in EcEngine.cs:179 - bit 5" },
+    { "name": "FN_LOCK_BIT", "value": "0x10", "register": "REG_FN_LOCK", "evidence": "probe: field-verified U-108, bit 4 = F-key lock (0x11 locked / 0x01 idle, EcSwitchCodec.cs:34)" },
+    { "name": "WINLOCK_STATUS_BIT", "value": "0x01", "register": "REG_WINLOCK_STATUS", "evidence": "probe: field-verified U-108, bit 0 = Win-key lock truth (EcSwitchCodec.cs:40)" },
+
+    { "name": "BATTERY_MODE_MASK", "value": "0x38", "register": "REG_BATTERY_MODE", "evidence": "EcBatteryCodec.ModeMask: the charging-mode field (EcEngine.cs:2271)" },
+    { "name": "BATTERY_GATE_ACTIVE_BIT", "value": "0x10", "register": "REG_BATTERY_GATE_STATUS", "evidence": "EcBatteryCodec.GateActiveBit: bit 4 marks an active charge gate (EcBatteryCodec.cs:128)" },
+    { "name": "BATTERY_PLATFORM_OVERRIDE_RESET", "value": "0xFF", "register": "REG_BATTERY_PLATFORM_OVERRIDE", "evidence": "EcBatteryCodec.PlatformOverrideReset: 'no override' (lab idle reading, EcBatteryCodec.cs:140)" },
+    { "name": "BATTERY_PLATFORM_OVERRIDE_PINNED", "value": "5", "type": "byte", "register": "REG_BATTERY_PLATFORM_OVERRIDE", "evidence": "EcBatteryCodec.PlatformOverridePinned: OpenRevo BATTERY_OVERRIDE_PIN_VALUE=5, a tool pinned the platform (probe: observed pinned in tests only)" },
+    { "name": "BATTERY_AC_CONNECTED_BIT", "value": "0x01", "register": "REG_BATTERY_POWER_SOURCE", "evidence": "declared in EcEngine.cs:2360 - bit 0 = AC connected" },
+
+    { "name": "EC_DUTY_MAX", "value": "200", "type": "int", "register": "REG_CPU_FAN_SPEED_TABLE", "evidence": "EcDutyCodec.MaxEcDuty: the EC duty byte scale is 0-200 (EcEngine.cs:59 comment 'duty 0-200')" },
+    { "name": "EC_DUTY_PER_PERCENT", "value": "2", "type": "int", "register": "REG_CPU_FAN_SPEED_TABLE", "evidence": "EcDutyCodec.EcDutyPerPercent: percent * 2 = EC duty" },
+    { "name": "EC_TABLE_LENGTH", "value": "16", "type": "int", "register": "REG_CPU_TEMP_END_TABLE", "evidence": "EcDutyCodec/EcTemperatureCodec TableLength: every fan table spans 16 zones" },
+    { "name": "FAN_TABLE_TEMP_START_OFFSET", "value": "0x10", "register": "REG_CPU_TEMP_START_TABLE", "evidence": "declared in EcEngine.cs:1197: temp-down table sits 16 bytes above the temp-up table base" },
+    { "name": "FAN_TABLE_DUTY_OFFSET", "value": "0x20", "register": "REG_CPU_FAN_SPEED_TABLE", "evidence": "declared in EcEngine.cs:1201: duty table sits 32 bytes above the temp-up table base" },
+
+    { "name": "HANDSHAKE_709_VALUE", "value": "0x05", "register": "REG_HANDSHAKE_709", "evidence": "MechControl decompiled init sequence, step 1 (EcEngine.cs:317)" },
+    { "name": "HANDSHAKE_708_VALUE", "value": "0x01", "register": "REG_HANDSHAKE_708", "evidence": "MechControl decompiled init sequence, step 1 (EcEngine.cs:319)" },
+    { "name": "FEATURE_ENABLE_748_VALUE", "value": "0x81", "register": "REG_FEATURE_ENABLE_748", "evidence": "MechControl decompiled init sequence, step 3 (EcEngine.cs:333)" },
+    { "name": "BIOS_CTRL_706_VALUE", "value": "0x41", "register": "REG_BIOS_CTRL_706", "evidence": "MechControl decompiled init sequence, step 8 (EcEngine.cs:378)" },
+    { "name": "FAN_CURVE_PARAM_7C7_VALUE", "value": "0x0C", "register": "REG_FAN_CURVE_PARAM_7C7", "evidence": "MechControl decompiled init sequence, step 6 (EcEngine.cs:368)" }
+  ],
+
+  "valueArray": [
+    { "name": "BATTERY_MODE_RAW_VALUES", "values": ["0x08", "0x18", "0x28"], "register": "REG_BATTERY_MODE", "evidence": "EcBatteryCodec.ModeRawValues: the three raw encodings behind HighCapacity/80%/60% (probe: 0x28 observed live = Stationary on the lab box, EngineRpcTests.cs:313)" }
+  ],
+
+  "region": [
+    { "name": "FAN_TABLE_BLOCK", "low": "0x0F00", "high": "0x0F5F", "domain": "fan-curve", "evidence": "EcWriteGatePolicy.cs:44 - six 16-byte fan tables: CPU temp-up/temp-down/duty, GPU temp-up/temp-down/duty" },
+    { "name": "PWM_WRITE_1_BLOCK", "low": "0x1804", "high": "0x1808", "domain": "fan", "evidence": "EcWriteGatePolicy.cs:45 - the writeable PWM register block, five bytes per fan" },
+    { "name": "PWM_WRITE_2_BLOCK", "low": "0x1809", "high": "0x180D", "domain": "fan", "evidence": "EcWriteGatePolicy.cs:46 - the writeable PWM register block, five bytes per fan" },
+    { "name": "KBD_RGB_BLOCK", "low": "0x0767", "high": "0x076B", "domain": "keyboard", "evidence": "EcWriteGatePolicy.cs:48 - trigger (0x0767) + RGB channels (0x0769-0x076B)" },
+    { "name": "KBD_STATUS_BLOCK", "low": "0x078C", "high": "0x078C", "domain": "keyboard", "evidence": "EcWriteGatePolicy.cs:49 - brightness status byte row" },
+    { "name": "BATTERY_MODE_BLOCK", "low": "0x07A6", "high": "0x07A6", "domain": "battery", "evidence": "EcWriteGatePolicy.cs:51 - battery charge mode row" }
+  ],
+
+  "driver": [
+    { "name": "IOCTL_ECREAD", "value": "0x9C40A488", "type": "uint", "evidence": "MechControl's decompiled EcDevice.cs (EcEngine.cs header, EcDriverTransport.cs:22)" },
+    { "name": "IOCTL_ECWRITE", "value": "0x9C40A48C", "type": "uint", "evidence": "MechControl's decompiled EcDevice.cs (EcEngine.cs header, EcDriverTransport.cs:23)" }
+  ]
+}
