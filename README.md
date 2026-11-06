@@ -365,17 +365,28 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 
 ### Recommended: installer (auto-updating)
 
-1. Head over to the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
+1. Head over to the [Releases](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases) page
 2. Download and run **Uniwill-Control-Utility-win.msi** (installs to Program Files; requires the .NET 10 Desktop Runtime, which the installer sets up). Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"` — auto-update follows the app wherever it lives.
 3. UCU checks for updates on startup, downloads them silently, and installs them when you close the app — an accent card appears in the title bar when an update is ready. You can also use **Check for Updates** in Settings.
 
-### Portable (no auto-updates)
+### No portable build
 
-1. Download the latest **zip** from the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
-2. Extract the zip
-3. Launch **Uniwill Control Utility.exe**
+There is no zip download. The engine runs as a machine-wide Windows service (`UCUEngine`) so the app itself stays unelevated, and an unpacked copy has no update or removal story of its own - deleting the folder leaves the service registered and pointing at a path that no longer exists. If you still run an old extracted copy, install the MSI: it re-points the service at the Program Files layout, and the old folder can then be deleted.
 
-The portable layout has no installer, so automatic updates are unavailable there (Settings will tell you). If you previously ran UCU from an extracted zip, install the MSI and delete the old folder — the app re-points your "Start on system boot" task at the new location automatically.
+### Upgrading
+
+Install the newer **Uniwill-Control-Utility-win.msi** over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`). The in-app updater performs the same install from the downloaded package when you close the app.
+
+Two cases still need a manual uninstall first:
+
+- a pre-release build carrying the **same version number** (Windows Installer skips files whose version is not greater),
+- a copy that came from an old extracted zip - install the MSI and the service follows.
+
+### Uninstalling
+
+Settings → Apps → Installed apps → **Uniwill Control Utility** → Uninstall. That runs `Uninstall.exe`, which closes the app, removes the MSI product, **stops and deletes the `UCUEngine` service**, and clears the leftover registration and install folder.
+
+Deleting the install folder by hand does **not** remove the service: it keeps running against a missing image, and `sc delete UCUEngine` from an elevated prompt is the manual fallback.
 
 ### Antivirus & SmartScreen (security-product-guarded machines)
 
@@ -388,7 +399,6 @@ The fix on such machines is an **application-level allowlist** for both images i
 
 - `C:\Program Files\Uniwill-Control-Utility\current\Uniwill Control Utility.exe`
 - `C:\Program Files\Uniwill-Control-Utility\current\Service\Uniwill Control Utility Engine.exe`
-- (Portable layout: the two images inside your extracted folder.)
 
 This is the same allowlist commercial control centers rely on — theirs ride on a paid publisher certificate instead, which UCU deliberately doesn't buy.
 
@@ -399,7 +409,7 @@ dotnet tool restore
 .\build\pack.ps1
 ```
 
-The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the GitHub release assets: the per-machine MSI, Velopack full/delta packages, the `releases.win.json` feed index, and the portable zip. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
+The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the GitHub release assets: the per-machine MSI, Velopack full and delta packages, the `Setup` bootstrapper, and the `releases.win.json` feed index. There is no portable zip - the engine is a machine-wide service, so an unpacked copy has no update or removal story. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
 
 ## Optional
 For those who want to use color correction profiles, you need to:
