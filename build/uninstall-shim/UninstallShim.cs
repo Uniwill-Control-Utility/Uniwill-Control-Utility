@@ -1,21 +1,25 @@
 // UCU Uninstall.exe shim — compiled by build\pack.ps1 (csc.exe) into the
 // install layout, so the install directory gets a familiar uninstall entry
 // point next to the app. It:
-//   1. kills running app + guardian (Process.Kill in-proc — milliseconds,
-//      taskkill cost ~9.5s per call), then deletes the "UCU" /
-//      "UCU Guardian" tasks (all console children run hidden — no
-//      flashing terminal windows),
+//   1. stops the UCUEngine service (before killing the app: a force-killed
+//      app is a crash the engine's supervisor would relaunch), kills running
+//      app + legacy guardian (Process.Kill in-proc — milliseconds, taskkill
+//      cost ~9.5s per call), then deletes the "UCU Autostart" task, the legacy
+//      "UCU" / "UCU Guardian" tasks, and the UCUEngine service registration
+//      (all console children run hidden — no flashing terminal windows),
 //   2. launches a hidden detached helper that waits for this shim to exit,
 //      runs the Apps & Features uninstaller synchronously (blocking
 //      msiexec client, so it lasts exactly as long as the wizard needs —
 //      no blind sleep, no racing the engine), then deletes the leftover
-//      install root (logs, packages).
+//      install root (logs, packages) and the engine's %ProgramData% log dir.
 // Compiled against .NET Framework 4 with the framework csc (C# 5 syntax
 // only) — no dependencies beyond the GAC.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -34,13 +38,16 @@ internal static class UninstallShim
         if (answer != DialogResult.Yes)
             return 0;
 
-        // The app's App Paths auto-elevation shim key (registered at startup).
+        // The app's legacy App Paths auto-elevation shim key: registration was
+        // retired with the requireAdministrator manifest (phase 4), this
+        // deletes the key on machines that ran the old builds. Best-effort.
         string shimKey = "\"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Uniwill Control Utility.exe\"";
 
-        string productKey = FindMsiProductKey("Uniwill Control Utility");
+        string productKey = FindMsiProductCode("Uniwill Control Utility", root.TrimEnd('\\'));
 
         const string hkcuUninstall = "\"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Uniwill-Control-Utility\"";
         const string hklmUninstall = "\"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSI:Uniwill-Control-Utility\"";
+        const string hklmShimEntry = "\"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Uniwill-Control-Utility\"";
 
         // The hidden helper's command list, joined with " & " — a strict
         // sequence, one command per element (string concatenation of the
@@ -69,25 +76,73 @@ internal static class UninstallShim
         if (!string.IsNullOrEmpty(productKey))
             cmds.Add("msiexec.exe /x " + productKey + " /qb");
         cmds.Add(Echo("stage3-msiexec-exit rc=!ERRORLEVEL!"));
+        // The engine verb sweep, as SYSTEM via a one-shot scheduled task:
+        // guarded machines label the installed layout System-IL, so this
+        // elevated helper's rd cannot delete the files and only SYSTEM can
+        // (the verb destroys the layout, the service, tasks, husks, and
+        // ProgramData logs - it also deletes this task). On plain machines
+        // the helper's own rd below is the faster path; both are idempotent.
+        // The task command goes through a script file because schtasks /tr
+        // values cannot carry \" escapes (cmd does not honor them), while a
+        // script line parses its own quotes correctly.
+        // The engine exe for the SYSTEM verb sweep: the dev layout keeps
+        // Service\ next to the shim, the per-machine MSI layout nests the
+        // app under current\ (the shim ships there, the engine under
+        // current\Service\). Take whichever exists; with neither, the
+        // elevated helper's own task/sc/rd sweep below is the path
+        // (idempotent - just not the System-IL-strong one on guarded boxes).
+        string verbExe = root + "\\Service\\Uniwill Control Utility Engine.exe";
+        if (!File.Exists(verbExe))
+            verbExe = root + "\\current\\Service\\Uniwill Control Utility Engine.exe";
+        string verbScript = "%TEMP%\\ucu-verb-task.cmd";
+        if (File.Exists(verbExe))
+        {
+            cmds.Add("echo @echo off> \"" + verbScript + "\"");
+            cmds.Add("echo \"" + verbExe + "\" --uninstall-engine >> \"" + verbScript + "\"");
+            cmds.Add("schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
+                verbScript + "\" /sc once /st 23:59 /ru SYSTEM /f");
+            cmds.Add("schtasks /run /tn \"UCU Uninstall Verb\"");
+        }
         cmds.Add("schtasks /delete /tn UCU /f");
+        cmds.Add("schtasks /delete /tn \"UCU Autostart\" /f");
         cmds.Add("schtasks /delete /tn \"UCU Guardian\" /f");
+        cmds.Add("sc delete UCUEngine");
         cmds.Add("reg delete " + shimKey + " /f");
         cmds.Add("reg delete " + hkcuUninstall + " /f");
         cmds.Add("reg delete " + hklmUninstall + " /f");
+        cmds.Add("reg delete " + hklmShimEntry + " /f");
         if (!string.IsNullOrEmpty(productKey))
+        {
+            // The packed entry's current key name (build\msi-edit): MSI: +
+            // the real product code, the documented Control Panel convention
+            // (the msiexec /x above deletes it component-clean; this is the
+            // belt for an orphaned husk).
+            cmds.Add("reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSI:" + productKey + "\" /f");
             cmds.Add("reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + productKey + "\" /f");
+        }
         cmds.Add(Echo("stage4-cleanup-done"));
+        cmds.Add("rd /s /q \"%ProgramData%\\UCU\"");
         cmds.Add("rd /s /q \"" + root + "\"");
         cmds.Add("ping -n 4 127.0.0.1 >nul");
         cmds.Add("rd /s /q \"" + root + "\"");
         cmds.Add(Echo("stage5-done"));
 
-        // Kill running app + guardian directly from this elevated process.
+        // Stop the engine service first, synchronously: a force-killed app
+        // looks like a crash to the engine, which relaunches it (supervision),
+        // and the app's startup would re-register the service we are about to
+        // delete. sc stop is the clean path (no SCM failure-recovery restart).
+        // 1062/1060 (already stopped / absent, e.g. pre-engine installs) are
+        // benign; the helper's "sc delete" removes the registration.
+        RunHidden("sc.exe", "stop UCUEngine", 15000);
+        Thread.Sleep(2000); // let the service's file handles close
+
+        // Kill running app + legacy guardian directly from this elevated
+        // process (the guardian shipped in older builds; killing it here
+        // sweeps installs where its task outlived App.RetireGuardianTask).
         // taskkill was the ~30s stall: the stage log timed each
         // "taskkill /f /im" at ~9.5s (process enumeration as admin) — two
         // of them plus ping equaled the entire delay before the wizard.
-        // Process.Kill is milliseconds. Guardian first: a force-killed app
-        // is a "crash" the guardian would relaunch.
+        // Process.Kill is milliseconds.
         KillProcess("Uniwill Control Utility Service");
         KillProcess("Uniwill Control Utility");
 
@@ -122,6 +177,34 @@ internal static class UninstallShim
         }
     }
 
+    // Run a console command hidden, waiting up to timeoutMs (a wedged
+    // service must not hang the uninstall UI). Failures are silent: the
+    // helper's later cleanup steps are the safety net.
+    private static void RunHidden(string fileName, string arguments, int timeoutMs)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(fileName, arguments);
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+            psi.WorkingDirectory = Environment.SystemDirectory;
+
+            using (Process proc = Process.Start(psi))
+            {
+                if (proc == null)
+                    return;
+                if (!proc.WaitForExit(timeoutMs))
+                {
+                    try { proc.Kill(); }
+                    catch { }
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
     // Timestamped cmd breadcrumb (diagnosing uninstall wall time per
     // stage). Must be one standalone command — embedding the echo in the
     // text of a neighbouring command makes it print as output, not run.
@@ -145,6 +228,134 @@ internal static class UninstallShim
         {
         }
     }
+
+    // The MSI product code (a GUID) for this product. Three sources, in
+    // order of trustworthiness on a guarded machine:
+    //   1. the UCUProductCode value of the product's published ARP entry
+    //      (the packed MSI ships the code INSIDE the Add/Remove Programs
+    //      row: build\msi-edit inserts the row, Windows Installer expands
+    //      [ProductCode] at install and deletes the row with the product),
+    //   2. the GUID-named ARP key whose DisplayName matches (packs from
+    //      before the ARP suppression),
+    //   3. the MSI database itself via MsiEnumProductsW.
+    // Source 1 is first because of the field-proven guarded-box signature:
+    // the Windows Installer registration tree is phantom to in-process
+    // readers (MsiEnumProductsW enumerates every OTHER product and never
+    // ours, elevated included) while the component-published ARP entry
+    // stays visible - the Control Panel reads it. Source 3's location
+    // preference still keeps a stale per-user ghost of the same name from
+    // becoming the registration we /x.
+    private static string FindMsiProductCode(string displayName, string root)
+    {
+        string fromEntry = ReadPublishedProductCode();
+        if (!string.IsNullOrEmpty(fromEntry))
+            return fromEntry;
+
+        string fromArp = FindMsiProductKey(displayName);
+        if (!string.IsNullOrEmpty(fromArp))
+            return fromArp;
+
+        string first = null;
+        StringBuilder product = new StringBuilder(39);
+        for (int index = 0; index < 4096; index++)
+        {
+            if (MsiEnumProductsW(index, product) != 0)
+                break;
+
+            string candidate = product.ToString();
+            product.Clear();
+            if (candidate.Length == 0)
+                continue;
+
+            StringBuilder name = new StringBuilder(256);
+            uint nameLength = 256;
+            if (MsiGetProductInfoW(candidate, "ProductName", name, ref nameLength) != 0 ||
+                !string.Equals(name.ToString(), displayName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            StringBuilder location = new StringBuilder(260);
+            uint locationLength = 260;
+            if (MsiGetProductInfoW(candidate, "InstalledLocation", location, ref locationLength) == 0 &&
+                string.Equals(location.ToString().TrimEnd('\\'), root, StringComparison.OrdinalIgnoreCase))
+                return candidate;
+
+            if (first == null)
+                first = candidate;
+        }
+
+        return first;
+    }
+
+    // The product code carried by the product's own Control Panel entry,
+    // both hive views (the entry is machine-scope on installed machines,
+    // and reading the user hive costs nothing). Identity is content, not
+    // the key name: the packed entry publishes under vpk's chosen key
+    // (currently the plain "Uniwill-Control-Utility"; packs from the
+    // transitional window use "MSI:Uniwill-Control-Utility"), and only a
+    // row with our DisplayName and a GUID-shaped UCUProductCode is the
+    // live registration - Velopack's per-user shim husks carry no such
+    // row, so they never answer here.
+    private static string ReadPublishedProductCode()
+    {
+        string[] hives = { "HKLM", "HKCU" };
+        foreach (string hiveName in hives)
+        {
+            try
+            {
+                RegistryKey baseKey = hiveName == "HKLM"
+                    ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    : Registry.CurrentUser;
+
+                using (RegistryKey uninstall = baseKey.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                    RegistryKeyPermissionCheck.ReadSubTree))
+                {
+                    if (uninstall == null)
+                        continue;
+
+                    foreach (string keyName in uninstall.GetSubKeyNames())
+                    {
+                        // GUID keys are the Windows Installer engine's
+                        // canonical entry: its key name is the code, and
+                        // FindMsiProductKey's scan handles it.
+                        if (keyName.Length == 38 && keyName[0] == '{' && keyName[37] == '}')
+                            continue;
+
+                        using (RegistryKey entry = uninstall.OpenSubKey(
+                            keyName, RegistryKeyPermissionCheck.ReadSubTree))
+                        {
+                            if (entry == null)
+                                continue;
+
+                            string dn = entry.GetValue("DisplayName") as string;
+                            if (dn != "Uniwill Control Utility")
+                                continue;
+
+                            string code = entry.GetValue("UCUProductCode") as string;
+                            if (code == null)
+                                continue;
+
+                            code = code.Trim();
+                            if (code.Length == 38 && code[0] == '{' && code[37] == '}')
+                                return code;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return null;
+    }
+
+    [System.Runtime.InteropServices.DllImport("msi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MsiEnumProductsW(int iProductIndex, StringBuilder lpProductBuf);
+
+    [System.Runtime.InteropServices.DllImport("msi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MsiGetProductInfoW(
+        string szProduct, string szAttribute, StringBuilder lpValueBuf, ref uint pcchValueBuf);
 
     // The MSI product registration key (a GUID) whose DisplayName matches.
     // We build "msiexec.exe /x {GUID}" from it and delete the key if the

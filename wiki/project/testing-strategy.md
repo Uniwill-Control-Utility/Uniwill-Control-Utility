@@ -2,7 +2,17 @@
 
 ## Current state
 
-The solution contains no test project, test framework, test files, coverage configuration, or CI test command. Testing must therefore be introduced as a new engineering layer. The first goal is not maximal coverage; it is to create fast deterministic boundaries around code that currently feeds hardware writes.
+The solution ships five xUnit test projects, run with `dotnet test` (Release, per project). They are the standing gate for every commit: all five suites green plus a clean Release build at the known-warning baseline.
+
+| Project | What it covers |
+| --- | --- |
+| `UCU.Core.Tests` | Pure codecs (EC encodings) and pure supervision policies (guardian, preset arbiter). No Windows, no hardware. |
+| `UCU.Contracts.Tests` | Frame codec, envelope, verb-table contract pins, serializer. |
+| `UCU.Hardware.Tests` | EC engine addressing, register sequencing against fakes, driver-boundary guards (the app must never reference the hardware layer). |
+| `UCU.Engine.Tests` | Dispatcher, domain queues, verb handlers, pipe transport against in-process hosts. |
+| `Uniwill Control Utility.Tests` | App-layer services and stores: arbiter runtime, profile applier logic, SKU resolution, migrations, localization parse gates, layering guards. Source-shape assertions lock a few compositing/startup orders that cannot be unit-tested. |
+
+The determinism rule the projects follow: decision cores live in `UCU.Core` as pure functions (policy), the runtime that consumes them injects seams (clock, applier, capability fakes). `coverlet.collector` is referenced for coverage capture; coverage is not yet a gate.
 
 ## Qualification model
 
@@ -18,17 +28,19 @@ flowchart TB
 
 Each level answers a different question. A physical device run cannot replace deterministic protocol tests, and a unit suite cannot establish firmware behavior.
 
-## Proposed test projects
+## Test project layout
+
+The projects sit beside their subjects (one directory per product project), not under a central `tests/` tree:
 
 ```text
-tests/
-├── Ucu.Core.Tests/             Pure models, parsers, curves, migrations, commands
-├── Ucu.Services.Tests/         Stores and coordinators using adapter fakes
-├── Ucu.Windows.Tests/          WMI/registry/filesystem integration on Windows
-└── Ucu.HardwareQualification/  Explicit opt-in runner for named devices
+UCU.Core.Tests/               Pure models, parsers, codecs, policies
+UCU.Contracts.Tests/          Protocol contract pins
+UCU.Hardware.Tests/           EC/engine hardware-adapter contract tests
+UCU.Engine.Tests/             Service host, dispatcher, verb tests
+Uniwill Control Utility.Tests/ App services, stores, coordination, layering guards
 ```
 
-The application project is currently monolithic. Tests can initially reference it, but the medium-term boundary should extract protocol/core logic and hardware interfaces into focused libraries without changing behavior.
+The application project remains large; new deterministic logic keeps moving into `UCU.Core` (policy) and the capability/verb boundaries without changing behavior, and the app suite tests the runtime shells around them.
 
 ## First deterministic test set
 
@@ -39,6 +51,13 @@ The application project is currently monolithic. Tests can initially reference i
 - Watercooler command frames, Nordic UART UUIDs, flow/status parsing, and enum-to-byte mappings.
 - Keyboard global report bytes, speed/direction transforms, per-key row announcement and BGR planar output.
 - EC temperature/duty conversion and fan-curve table shape.
+- ICC profile header gate (declared size, `acsp`, major version, tag-table bounds) before an imported profile can be associated.
+
+### Takeover, shortcuts and diagnostics
+
+- OEM takeover eligibility gate: catalog name/keyword, existing path, signature, publisher allowlist, UCU-root self-guard, package/system identity exemptions; restore planner (kills drop, dedup newest, service starts last); state decider; journal text round-trip with the `|running` flag.
+- Shortcut chord grammar, `shortcuts.json` sanitiser (invalid chord, duplicate first-wins, missing payload, cap) and corrupt-file quarantine.
+- Diagnostics report composition (sections, `unknown` fallbacks, attachment listing) plus a real zip round-trip against fake capabilities.
 
 ### Profiles and SKU resolution
 
@@ -159,6 +178,6 @@ A release candidate is qualified only when:
 - Upgrade and in-app update paths succeed from the previous release.
 - Results are attached to the release commit.
 
-The data-validation stage is immediately actionable: the current `zh-CN.json` fails parsing at line 389, while the other catalogues parse. CI should prevent another invalid embedded catalogue from reaching a release branch.
+The data-validation stage is cheap insurance: every embedded localization catalogue parses today (verified with the app's own serializer, System.Text.Json). CI should keep an invalid embedded catalogue from ever reaching a release branch.
 
 [Back to documentation index](../README.md)

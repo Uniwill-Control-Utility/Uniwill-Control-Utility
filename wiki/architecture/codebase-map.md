@@ -4,69 +4,89 @@
 
 ```text
 .
-├── .github/
-│   ├── FUNDING.yml
-│   └── ISSUE_TEMPLATE/
-├── docs/                       Existing protocol research
-├── screenshots/                README screenshots
-├── wiki/                       Maintainer and contributor documentation
-├── Uniwill Control Utility/
-│   ├── Assets/                 Images, PawnIO modules, RTSS and stress-test payloads
-│   ├── Helpers/                WPF converters and behaviors
-│   ├── Localization/           22 embedded translation JSON files
-│   ├── Models/                 Settings, protocol frames, curves, SKU and device models
-│   ├── Properties/             Generated .NET user settings
-│   ├── Scripts/                CPU/GPU/system backends and inherited helpers
-│   ├── Services/               Hardware sessions, coordination and persistence
-│   ├── SkuData/                Model-specific profile database
-│   ├── ViewModels/             MVVM state for selected surfaces
-│   ├── Views/                  WPF controls, pages, windows and overlay
-│   ├── App.xaml(.cs)           Process composition and lifecycle
+├── .github/                  CI (workflow validating build/pack)
+├── build/                    pack.ps1, uninstall-shim/, updater-shim/ (framework-csc shims)
+├── docs/                     Protocol research (ACPI dumps, EC notes) + EC probe tools
+│                             (FanDiagnostic, BatteryDiagnostic: read-only, run elevated)
+├── screenshots/              README screenshots
+├── wiki/                     Maintainer and contributor documentation
+├── UCU.Core/                 Pure domain: EC encodings, validation, GuardianPolicy,
+│                             PresetArbiterPolicy, EcWriteGatePolicy
+├── UCU.Contracts/            Verbs, envelope, DTOs, frame codec, capability interfaces, JSON context
+├── UCU.Client/               EngineClient RPC + capability proxies (the app's only EC path)
+├── UCU.Hardware/             EcEngine + IEcTransport (\\.\ACPIDriver); engine-only assembly
+├── UCU.Engine/               The UCUEngine service (pipe server, dispatcher, queues, gate,
+│                             raw-write guard, watchdog, AppSupervision, AppSessionLauncher,
+│                             EngineInstaller)
+├── UCU.*.Tests/              Core/Contracts/Hardware/Engine test projects
+├── Uniwill Control Utility/  WPF UI (asInvoker)
+│   ├── Assets/               Images, PawnIO modules, RTSS and stress-test payloads
+│   ├── Helpers/              WPF converters and behaviors
+│   ├── Localization/         22 embedded translation JSON files
+│   ├── Models/               Settings, protocol frames, curves, SKU and device models
+│   ├── Properties/           Generated .NET user settings
+│   ├── Scripts/              CPU/GPU/system backends, ElevatedProcess, misc helpers
+│   ├── Services/             Device sessions, EC proxies/telemetry, engine lifecycle, profiles
+│   ├── SkuData/              Model-specific profile database
+│   ├── ViewModels/           MVVM state for selected surfaces
+│   ├── Views/                WPF controls, pages, windows and overlay
+│   ├── App.xaml(.cs)         Process composition and lifecycle
 │   └── Uniwill Control Utility.csproj
+├── Uniwill Control Utility.Tests/
 ├── LICENSE
 ├── README.md
 └── Uniwill Control Utility.sln
 ```
 
+`UCU.Guardian` (the user-mode watchdog) and `UCU.Bridge` (the dev in-process EC bridge) were deleted when the engine service took over supervision and became the single EC path; the uninstall shim still cleans up their leftovers.
+
 ## Entry and composition files
 
 | File | Role |
 | --- | --- |
-| `App.xaml` | WPF resources and startup/exit exception event wiring. |
-| `App.xaml.cs` | Logging, prerequisites, host/DI composition, single-instance logic, detection, device auto-connect, deferred tasks, shutdown. |
-| `app.manifest` | Administrator execution level, Windows compatibility, Per-Monitor DPI awareness, long-path awareness. |
+| `App.xaml` | WPF resources, startup/exit exception wiring. |
+| `App.xaml.cs` | Logging, prerequisites, host/DI composition (RPC proxies for EC capabilities), single-instance, detection, task migration, shutdown. |
+| `app.manifest` | **asInvoker** execution level, Windows compatibility, Per-Monitor DPI, long paths. |
+| `UCU.Engine\Program.cs` | Engine entry: service host, `--console`, `--install-engine`, `--uninstall-engine`. |
+| `UCU.Engine\EngineHostFactory.cs` | Service graph shared by installed service, console runs and in-process tests. |
 | `ApplicationHostService.cs` | Creates and activates the main window when the Generic Host starts. |
-| `MainWindow.xaml(.cs)` | Navigation shell, tray surface, power/resume handling, startup application of persisted hardware state. |
+| `MainWindow.xaml(.cs)` | Navigation shell, tray, power/resume handling, startup application of persisted state. |
 
-## Model groups
+## Engine file guide
 
-| Group | Representative files | Purpose |
-| --- | --- | --- |
-| Profiles | `CustomPreset.cs`, `VfCurvePreset.cs`, `VfStockCurve.cs`, `EcFanCurve.cs` | Durable preset models and fan/V-F curve data. |
-| Peripheral protocols | `Bs1Protocol.cs`, `Bs2ProProtocol.cs`, `WaterCoolerProtocol.cs` | Frame constants, commands, response parsers, RGB uploads. |
-| Peripheral settings | `Bs1Settings.cs`, `Bs2ProSettings.cs`, `WaterCoolerSettings.cs`, `KeyboardSettings.cs` | Durable user configuration and migration behavior. |
-| Device identity | `LaptopModelInfo.cs`, `PanelInfo.cs`, `SkuDatabase.cs` | Model detection and model-specific profile values. |
-| Overlay | `OverlayOptions.cs` | Immutable overlay configuration record. |
+| File | Purpose |
+| --- | --- |
+| `EnginePipeServer.cs` | Accepts pipe connections, reads/writes length-prefixed frames. |
+| `EngineDispatcher.cs` | Verb lookup, protocol-version check, exception→error-code mapping. |
+| `EngineDomainQueues.cs`, `SerialExecutor.cs` | Per-domain FIFO executors, depth/timeout limits. |
+| `EcEngineGate.cs` | EC engine init/availability, `\\.\ACPIDriver` handle lifetime. |
+| `EcRawWriteGuard.cs` | Raw-verb chokepoint: address/GUID allowlist over the raw register + NVRAM write verbs (`EcWriteGatePolicy`). |
+| `Verbs/*.cs` | The verb handlers per domain (fan, power, mux, keyboard, battery, telemetry, engine). |
+| `EngineWatchdog.cs` | Fail-fast on wedged queues. |
+| `AppSupervision.cs`, `AppSessionLauncher.cs` | Crash relaunch of the app into the user session. |
+| `EngineInstaller.cs` | `sc` install/uninstall/self-heal passes, service DACL. |
+| `PipeSecurityBuilder.cs` | Pipe DACL SDDL. |
+| `CpuPlatformDetector.cs`, `EnginePaths.cs` | AMD/Intel detection, log/flag paths. |
 
-## Service groups
+## App service groups
 
 | Group | Files | Purpose |
 | --- | --- | --- |
-| Platform hardware | `UniwillECService`, `HardwareMonitoringService`, `GpuInventoryService`, `SkuResolver`, `LaptopDetector` | Core laptop I/O, telemetry, and identity. |
-| Peripheral sessions | `KeyboardHidService`, `FlydigiCoolerHidService`, `FlydigiCoolerBleService`, `WaterCoolerService` | Transport lifecycle and commands. |
+| EC via engine | `EcTelemetryService`, `EngineLifecycle`, `EcPlatformResolver`, `EcDriverDetectionService`, `EcSmartFanControl` | Telemetry cache over RPC proxies, engine install/start, platform identity, driver prerequisite, smart-fan loop (writes via capabilities). |
+| Platform hardware | `HardwareMonitoringService`, `GpuInventoryService`, `SkuResolver`, `LaptopDetector` | Telemetry leases and identity (app-side). |
+| Peripheral sessions | `KeyboardHidService`, `FlydigiCoolerHidService`, `FlydigiCoolerBleService`, `WaterCoolerService`/`HydroUIService` | Transport lifecycle and commands. |
 | Smart control | `EcSmartFanControl`, `FlydigiSmartControl`, `FlydigiBs1SmartControl` | Temperature-driven periodic control. |
-| Profiles | `PresetProfileApplier`, `AdaptivePresetManager`, `PresetBackupService`, `DeviceApplier` | Profile storage, translation, application, override and import/export. |
+| Profiles | `PresetArbiter`, `PresetProfileApplier`, `AdaptivePresetManager`, `PresetBackupService`, `DeviceApplier`, `PowerContractStore`, `PowerGuardianService` | Intent arbitration (serialization, boot grace, Adaptive ownership, debounce), profile storage, translation, application, override, import/export, and the persisted applied-power contract with its opt-in drift-healing guardian. |
 | Overlay/performance | `OverlayManagerService`, `OverlaySettingsStore`, `Performance/*` | Overlay lifecycle, telemetry and FPS sources. |
-| App support | `LocalizationService`, `UpdateManager`, `PawnIoDetectionService`, `LastAppliedSettingsService` | Translation, releases, prerequisites and last-applied state. |
+| App support | `LocalizationService`, `VelopackUpdateService`, `PawnIoDetectionService`, `ScheduledTaskService`, `LastAppliedSettingsService`, `Scripts/Misc/ElevatedProcess` | Translation, updates, prerequisites, autostart task, last-applied state, per-operation elevation. |
 
-## Backend scripts
+## Backend scripts (app-side)
 
-- `Scripts/AMD Backend/` loads AMD PawnIO modules and implements the Ryzen SMU mailbox.
-- `Scripts/Intel Backend/` loads Intel PawnIO modules and exposes MSR/MCHBAR tuning operations.
-- `Scripts/GPUs/NVIDIA/` contains MUX detection, NVAPI/NVML bindings, GPU power/clock logic, and V-F curve operations.
-- `Scripts/Misc/` contains logging, cached system data, WMI/system discovery, display operations, sensor compatibility helpers, and notifications.
-- `RyzenAdj_To_UCU.cs` is the shared command interpreter used by profile flows for AMD, Intel, NVIDIA, display, and Windows power settings.
-- `Game_Manager.cs` discovers installed games and launches configured applications.
+- `Scripts/AMD Backend/` — PawnIO modules + Ryzen SMU mailbox.
+- `Scripts/Intel Backend/` — PawnIO modules, MSR/MCHBAR tuning.
+- `Scripts/GPUs/NVIDIA/` — MUX detection, NVAPI/NVML, power/clock and V-F curve logic.
+- `Scripts/Misc/` — logging, cached system data, WMI discovery, display operations (mode/refresh, ICC association + imported profiles, WDDM brightness), `HardwareManagement` (elevated PnP flows), `NvramAccess` (NVRAM routes: engine-first, local fallback with the 50-series door handshake), notifications.
+- `RyzenAdj_To_UCU.cs` — shared command interpreter for AMD/Intel/NVIDIA/display/Windows-power options.
 
 ## Presentation surfaces
 
@@ -75,43 +95,38 @@
 | Dashboard | Device identity and hardware snapshots. |
 | Presets | Built-in/custom CPU and GPU profiles, V-F curves, backup/import. |
 | Adaptive | Per-game profiles and selected-domain overrides. |
-| Automations | AC, battery and resume profile selection. |
+| Automations | AC, battery and resume profile selection; Power Tuning Guardian opt-in toggles; keyboard shortcuts (chord -> vetted action, dispatched from the overlay's hook). |
+| Display | GPU mode/MUX, iGPU power saving, MiniLED, panel refresh, ICC profile association + import/export, display brightness. |
+| About | Update controls, third-party libraries, and the one-click diagnostics bundle. |
 | Fan Control | EC curves, turbo, split/unified modes, smart fan mode. |
-| Keyboard | Global effects, per-key editor, brightness, direction, idle behavior. |
-| Light Bar | EC-backed color/effect controls. |
-| Battery | Charge modes and battery telemetry. |
-| Flydigi Cooler | HID/BLE device selection, fan/RGB/curve/device settings. |
-| Watercooler | BLE discovery, pump/fan/RGB, smart mode, standby/fill cycle. |
-| Overlay Settings | Overlay metrics, appearance, placement and hotkeys. |
-| Settings | Application preferences, update controls, backup/import, diagnostics, system details. |
+| Keyboard / Light Bar | HID per-key editor + EC effects. |
+| Battery | Charge modes (engine verbs) and telemetry. |
+| Flydigi Cooler / Watercooler | HID/BLE devices, fan/RGB/curve control. |
+| Overlay Settings | Overlay metrics, appearance, placement, hotkeys. |
+| Settings | Preferences, update controls, autostart, backup/import, diagnostics, system details. |
 
 ## Size and concentration
 
-The repository contains 53,706 C# lines and 11,920 XAML lines. Thirty-six source files exceed 500 lines, 18 exceed 1,000, 11 exceed 1,500, and four exceed 2,000. The largest file is `Adaptive.xaml.cs` at 3,660 lines.
-
-High-concentration files include:
+The app projects contain about 60,800 C# lines and 14,500 XAML lines; the engine-era libraries add 5,700 and the test projects 4,300. Across app and library code, 35 source files exceed 500 lines, 21 exceed 1,000, 13 exceed 1,500, and 7 exceed 2,000.
 
 | File | Approximate lines |
 | --- | ---: |
-| `Views/Pages/Adaptive.xaml.cs` | 3,660 |
-| `Views/Pages/FlydigiCooler.xaml.cs` | 2,872 |
-| `Services/FlydigiCoolerHidService.cs` | 2,413 |
-| `Views/Windows/MainWindow.xaml.cs` | 2,241 |
-| `Services/UniwillECService.cs` | 1,893 |
-| `Views/Pages/FanControl.xaml.cs` | 1,862 |
-| `Views/Pages/Adaptive.xaml` | 1,812 |
-| `Services/WaterCoolerService.cs` | 1,714 |
-| `Views/Pages/Presets.xaml.cs` | 1,700 |
-| `Views/Controls/VfCurveEditor.xaml.cs` | 1,610 |
-
-These files are the primary orientation points for their features, but also the highest-cost areas for review and change isolation.
+| `Views/Pages/Adaptive.xaml.cs` | 4,366 |
+| `Views/Windows/MainWindow.xaml.cs` | 2,909 |
+| `Views/Pages/FlydigiCooler.xaml.cs` | 2,892 |
+| `Views/Pages/Keyboard.xaml.cs` | 2,708 |
+| `Services/FlydigiCoolerHidService.cs` | 2,418 |
+| `Services/HydroUIService.cs` | 2,307 |
+| `UCU.Hardware/Ec/EcEngine.cs` | 2,118 |
+| `Views/Pages/Presets.xaml.cs` | 1,971 |
+| `Views/Pages/FanControl.xaml.cs` | 1,970 |
+| `Services/KeyboardHidService.cs` | 1,962 |
 
 ## Generated and bundled content
 
-- `Properties/Settings.Designer.cs` is generated from `Settings.settings`; edit the settings definition rather than the generated file.
-- Localization JSON files are embedded resources.
-- `SkuData/skus.json` is copied to output and read at runtime.
-- PawnIO modules, native DLLs, the RTSS bridge, and the AVX2 stress-test helper are copied or bundled according to the project file.
-- Thirty tracked `.dll`, `.exe`, `.bin`, `.lib`, and `.exp` files total approximately 12.66 MiB.
+- `Properties/Settings.Designer.cs` is generated from `Settings.settings` (the legacy `GuardianEnabled` entry is kept for schema stability and cleared by `App.RetireGuardianTask`).
+- Localization JSON files are embedded resources; `SkuData/skus.json` is copied to output.
+- PawnIO modules, native DLLs, the RTSS bridge and the AVX2 stress helper ship in the app root (the RyzenSmu loader resolves the `.bin` modules there).
+- The engine's payload closure is staged in `Service\` (see [Dependency inventory](dependency-inventory.md)).
 
 [Back to documentation index](../README.md)

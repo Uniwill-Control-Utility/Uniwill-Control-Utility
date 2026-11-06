@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,23 +14,27 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Services;
+using Uniwill_Control_Utility.Views.Windows;
+using UCU.Contracts.Capabilities;
+using UCU.Core.Ec;
+using UCU.Core.Supervision;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class Automations : Page
     {
         bool setup = false;
-        private readonly UniwillECService? _ecService;
+        private readonly IGpuMuxCapability? _mux;
 
         public Automations()
         {
             InitializeComponent();
             _ = Tablet.TabletDevices;
 
-            _ecService = App.GetService<UniwillECService>();
+            _mux = App.GetService<IGpuMuxCapability>();
 
-            PopulateComboBox(cbxCharge, ActivePresetMode);
-            PopulateComboBox(cbxDischarge, ActivePresetMode);
+            PopulateComboBox(cbxCharge, ActivePresetMode, KeepCurrentLabel);
+            PopulateComboBox(cbxDischarge, ActivePresetMode, KeepCurrentLabel);
             PopulateComboBox(cbxResume, ActivePresetMode);
 
             // Restore saved selections — resets to None if the saved preset is from the wrong mode pool.
@@ -47,6 +55,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             setRefreshRatePluggedIn(Settings.Default.RefreshRatePluggedIn);
             UpdateRefreshRateVisibility();
 
+            // Power Guardian toggles (U-107): persisted rows, defaults OFF.
+            cbPowerGuardGpu.IsChecked = Settings.Default.PowerGuardGpu;
+            cbPowerGuardCpu.IsChecked = Settings.Default.PowerGuardCpu;
+
+            // Watcher Rules card (U-201): rows from watchers.json; edits save
+            // through the store, which reloads the hosted hub.
+            InitWatcherRules();
+            InitShortcuts();
+
             setup = true;
         }
 
@@ -60,14 +77,24 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region ComboBox Population
 
+        /// <summary>Persisted value of the leading item on the power-edge rows.
+        /// It stays "None" because the power-edge re-apply (WatcherHubService) and
+        /// MainWindow's automation gate compare against that exact string.</summary>
+        private const string NoPresetValue = "None";
+
+        /// <summary>Shown instead of "None": the app re-applies the current preset
+        /// on the edge so the battery clamp lands, so "None" would read as "do nothing".</summary>
+        internal const string KeepCurrentLabel = "Keep current preset";
+
         /// <summary>
-        /// Populates a ComboBox with "None" plus all available preset display names
-        /// filtered to only include custom presets from the currently active preset mode.
-        /// Built-in profiles (Office, Gaming, Turbo) are always included.
+        /// Populates a ComboBox with the "keep current" item plus all available preset
+        /// display names, filtered to only include custom presets from the currently
+        /// active preset mode. Built-in profiles (Office, Gaming, Turbo) are always
+        /// included.
         /// </summary>
-        private static void PopulateComboBox(ComboBox comboBox, PresetMode mode)
+        private static void PopulateComboBox(ComboBox comboBox, PresetMode mode, string noneLabel = "None")
         {
-            comboBox.Items.Add("None");
+            comboBox.Items.Add(new ComboBoxItem { Content = noneLabel, Tag = NoPresetValue });
 
             // Always show built-in profiles
             foreach (string name in PresetProfileApplier.BuiltInProfileNames)
@@ -95,7 +122,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = false;
             string oldPreset = Settings.Default.acPreset;
             cbxCharge.Items.Clear();
-            PopulateComboBox(cbxCharge, ActivePresetMode);
+            PopulateComboBox(cbxCharge, ActivePresetMode, KeepCurrentLabel);
             getAcPreset(oldPreset);
             setup = true;
         }
@@ -105,7 +132,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = false;
             string oldPreset = Settings.Default.dcPreset;
             cbxDischarge.Items.Clear();
-            PopulateComboBox(cbxDischarge, ActivePresetMode);
+            PopulateComboBox(cbxDischarge, ActivePresetMode, KeepCurrentLabel);
             getDcPreset(oldPreset);
             setup = true;
         }
@@ -140,10 +167,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (!setup) return;
 
-                string? selectedText = (sender as ComboBox)?.SelectedItem?.ToString();
+                string? selectedText = SelectedPresetValue(sender as ComboBox);
                 string profileName = ResolveProfileName(selectedText);
 
-                Settings.Default.acPreset = selectedText ?? "None";
+                Settings.Default.acPreset = selectedText ?? NoPresetValue;
                 Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(profileName);
                 Settings.Default.Save();
             }
@@ -154,10 +181,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (!setup) return;
 
-            string? selectedText = (sender as ComboBox)?.SelectedItem?.ToString();
+            string? selectedText = SelectedPresetValue(sender as ComboBox);
             string profileName = ResolveProfileName(selectedText);
 
-            Settings.Default.dcPreset = selectedText ?? "None";
+            Settings.Default.dcPreset = selectedText ?? NoPresetValue;
             Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(profileName);
             Settings.Default.Save();
         }
@@ -168,10 +195,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (!setup) return;
 
-                string? selectedText = (sender as ComboBox)?.SelectedItem?.ToString();
+                string? selectedText = SelectedPresetValue(sender as ComboBox);
                 string profileName = ResolveProfileName(selectedText);
 
-                Settings.Default.resumePreset = selectedText ?? "None";
+                Settings.Default.resumePreset = selectedText ?? NoPresetValue;
                 Settings.Default.resumeCommandString = PresetProfileApplier.BuildCommandString(profileName);
                 Settings.Default.Save();
             }
@@ -184,9 +211,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Maps a display name ("Office", "Custom 3") back to the profile key ("Office", "Custom 3").
-        /// Returns empty string for "None" or unrecognized values.
+        /// Returns empty string for "None" or unrecognized values. Internal: the watcher rule
+        /// dialog resolves its preset selection through the same mapping.
         /// </summary>
-        private static string ResolveProfileName(string? displayName)
+        internal static string ResolveProfileName(string? displayName)
         {
             if (string.IsNullOrEmpty(displayName) || displayName == "None")
                 return string.Empty;
@@ -205,6 +233,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _ => string.Empty
             };
         }
+
+        /// <summary>
+        /// The persisted name carried by a combobox item: the Tag when the item has one
+        /// (the leading "keep current" row), otherwise the item's text.
+        /// </summary>
+        private static string? PresetItemValue(object? item) =>
+            item is ComboBoxItem { Tag: string tag } ? tag : item?.ToString();
+
+        private static string? SelectedPresetValue(ComboBox? comboBox) =>
+            PresetItemValue(comboBox?.SelectedItem);
 
         private void getAcPreset(string searchName)
         {
@@ -237,7 +275,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Exact match first
             foreach (var item in comboBox.Items)
             {
-                if (item.ToString() == searchName)
+                if (PresetItemValue(item) == searchName)
                 {
                     comboBox.SelectedItem = item;
                     return;
@@ -251,7 +289,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 string newDisplayName = PresetProfileApplier.DisplayName(profileKey);
                 foreach (var item in comboBox.Items)
                 {
-                    if (item.ToString() == newDisplayName)
+                    if (PresetItemValue(item) == newDisplayName)
                     {
                         comboBox.SelectedItem = item;
                         saveCallback(newDisplayName);
@@ -335,10 +373,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                if (_ecService is not null)
+                if (_mux is not null)
                 {
-                    var mode = _ecService.GetCurrentGpuMuxMode();
-                    isHybrid = mode == UniwillECService.GpuMuxMode.Hybrid;
+                    var mode = _mux.GetModeAsync().GetAwaiter().GetResult();
+                    isHybrid = mode == GpuMuxMode.Hybrid;
                 }
             }
             catch (Exception ex)
@@ -414,8 +452,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                return _ecService is not null
-                    && _ecService.GetCurrentGpuMuxMode() == UniwillECService.GpuMuxMode.DgpuOnly;
+                return _mux is not null
+                    && _mux.GetModeAsync().GetAwaiter().GetResult() == GpuMuxMode.DgpuOnly;
             }
             catch
             {
@@ -506,6 +544,396 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _ = Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
             }
+        }
+
+        #endregion
+
+        #region Power Tuning Guardian
+
+        // Persist-only rows (U-107): the constructor reflects the saved state
+        // before `setup` is armed, so the events that write raises are ignored;
+        // a handler past the guard is user intent, and the row actuates nothing
+        // on reflection — the guardian loop reads these Settings itself.
+
+        private void cbPowerGuardGpu_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardGpu = true;
+            Settings.Default.Save();
+        }
+
+        private void cbPowerGuardGpu_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardGpu = false;
+            Settings.Default.Save();
+        }
+
+        private void cbPowerGuardCpu_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardCpu = true;
+            Settings.Default.Save();
+        }
+
+        private void cbPowerGuardCpu_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardCpu = false;
+            Settings.Default.Save();
+        }
+
+        #endregion
+
+        #region Watcher Rules (U-201)
+
+        // The card edits watchers.json through the WatcherStore: every change
+        // goes Save -> the store raises Changed -> the hosted hub reloads its
+        // live rule set. The rows carry the rule records; Enabled lives on the
+        // row and is folded back into the record at save time.
+
+        private readonly WatcherStore? _watcherStore = App.GetService<WatcherStore>();
+        private readonly ObservableCollection<WatcherRuleRow> _watcherRows = new();
+        private bool _watcherLoading;
+
+        /// <summary>Loads the store, binds the rows, and arms culture-aware
+        /// summary refresh. Called from the constructor.</summary>
+        private void InitWatcherRules()
+        {
+            try
+            {
+                _watcherStore?.Load();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Automations] watchers.json load failed: {Message}", ex.Message);
+            }
+
+            icWatcherRules.ItemsSource = _watcherRows;
+            RefreshWatcherRows();
+
+            LocalizationService.CultureChanged += OnWatcherCultureChanged;
+        }
+
+        private void OnWatcherCultureChanged(object? sender, EventArgs e)
+        {
+            // Summaries are localized fragments; rebuild the rows so they
+            // re-render in the new culture.
+            Dispatcher.BeginInvoke(new Action(RefreshWatcherRows));
+        }
+
+        private void RefreshWatcherRows()
+        {
+            _watcherLoading = true;
+
+            foreach (WatcherRuleRow row in _watcherRows)
+                row.PropertyChanged -= WatcherRowChanged;
+            _watcherRows.Clear();
+
+            if (_watcherStore is not null)
+            {
+                foreach (WatcherRule rule in _watcherStore.Rules)
+                {
+                    WatcherRuleRow row = new(rule);
+                    row.PropertyChanged += WatcherRowChanged;
+                    _watcherRows.Add(row);
+                }
+            }
+
+            _watcherLoading = false;
+
+            txtWatcherRulesEmpty.Visibility = _watcherRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void WatcherRowChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_watcherLoading || e.PropertyName != nameof(WatcherRuleRow.Enabled))
+                return;
+
+            SaveWatcherRules(_watcherRows.Select(r => r.ToRule()).ToList());
+        }
+
+        private void SaveWatcherRules(List<WatcherRule> rules)        {
+            if (_watcherStore is null)
+                return;
+
+            try
+            {
+                // The store validates every rule and raises Changed (the hub
+                // reloads): the page never touches the hub directly.
+                _watcherStore.Save(rules);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message,
+                    LocalizationService.Get("Watcher Rules"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            RefreshWatcherRows();
+        }
+
+        /// <summary>The preset display names for the dialog's combo — the
+        /// same pool the AC/DC/resume rows offer (built-ins + the changed
+        /// custom slots of the active mode), minus "None": a watcher rule's
+        /// apply-preset action requires a profile.</summary>
+        private static List<string> WatcherPresetDisplayNames()
+        {
+            List<string> names = new();
+            foreach (string name in PresetProfileApplier.BuiltInProfileNames)
+                names.Add(PresetProfileApplier.DisplayName(name));
+
+            PresetMode mode = ActivePresetMode;
+            var presets = CustomPresetStore.Load(mode);
+            for (int i = 0; i < presets.Length; i++)
+            {
+                if (presets[i].HasChanges)
+                    names.Add(PresetProfileApplier.CustomProfileKey(i, mode));
+            }
+
+            return names;
+        }
+
+        private void btnAddWatcherRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (_watcherStore is null)
+                return;
+
+            if (_watcherRows.Count >= WatcherPolicy.MaxRules)
+            {
+                MessageBox.Show(
+                    LocalizationService.Format("At most {0} watcher rules.", WatcherPolicy.MaxRules),
+                    LocalizationService.Get("Watcher Rules"),
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            WatcherRuleDialog dialog = new(null, WatcherPresetDisplayNames())
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() == true && dialog.Rule is WatcherRule rule)
+            {
+                List<WatcherRule> updated = _watcherRows.Select(r => r.ToRule()).ToList();
+                updated.Add(rule);
+                SaveWatcherRules(updated);
+            }
+        }
+
+        private void btnEditWatcherRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (_watcherStore is null || sender is not FrameworkElement { DataContext: WatcherRuleRow row })
+                return;
+
+            int index = _watcherRows.IndexOf(row);
+            if (index < 0)
+                return;
+
+            WatcherRuleDialog dialog = new(row.ToRule(), WatcherPresetDisplayNames())
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() == true && dialog.Rule is WatcherRule edited)
+            {
+                List<WatcherRule> updated = _watcherRows.Select(r => r.ToRule()).ToList();
+                updated[index] = edited;
+                SaveWatcherRules(updated);
+            }
+        }
+
+        private void btnDeleteWatcherRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (_watcherStore is null || sender is not FrameworkElement { DataContext: WatcherRuleRow row })
+                return;
+
+            List<WatcherRule> updated = _watcherRows
+                .Where(r => !ReferenceEquals(r, row))
+                .Select(r => r.ToRule())
+                .ToList();
+
+            SaveWatcherRules(updated);
+        }
+
+        /// <summary>One card row: the rule plus the live Enabled toggle and
+        /// the localized one-line summary.</summary>
+        #region Keyboard shortcuts (U-204)
+
+        private readonly ObservableCollection<ShortcutRow> _shortcutRows = new();
+        private ShortcutService? _shortcutService;
+
+        private sealed class ShortcutRow
+        {
+            public string Chord { get; init; } = string.Empty;
+
+            public string Summary { get; init; } = string.Empty;
+
+            public ShortcutBinding Binding { get; init; } = new();
+        }
+
+        /// <summary>Binds the shortcut map (U-204). The dispatcher lives in the
+        /// overlay's global hook; this page only edits and saves the file.</summary>
+        private void InitShortcuts()
+        {
+            _shortcutService = App.GetService<ShortcutService>();
+
+            icShortcuts.ItemsSource = _shortcutRows;
+            RefreshShortcutRows();
+
+            // Summaries are localized fragments: rebuild on culture change.
+            LocalizationService.CultureChanged += (_, _) =>
+                Dispatcher.BeginInvoke(new Action(RefreshShortcutRows));
+        }
+
+        private void RefreshShortcutRows()
+        {
+            _shortcutRows.Clear();
+
+            if (_shortcutService is not null)
+            {
+                foreach (ShortcutBinding binding in _shortcutService.Bindings)
+                {
+                    _shortcutRows.Add(new ShortcutRow
+                    {
+                        Chord = binding.Chord,
+                        Summary = ShortcutSummary(binding),
+                        Binding = binding,
+                    });
+                }
+            }
+
+            txtShortcutsEmpty.Visibility = _shortcutRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static string ShortcutSummary(ShortcutBinding binding) => binding.Action switch
+        {
+            ShortcutAction.ApplyPreset =>
+                LocalizationService.Get("Apply preset") + ": " + PresetProfileApplier.DisplayName(binding.PresetName ?? string.Empty),
+            ShortcutAction.SetPerformanceMode =>
+                LocalizationService.Get("Set performance mode") + ": " + binding.PerformanceMode,
+            ShortcutAction.SetFanTurbo => LocalizationService.Get("Enable fan turbo"),
+            ShortcutAction.PauseOemTakeover => LocalizationService.Get("Pause OEM Control Center"),
+            ShortcutAction.ResumeOemTakeover => LocalizationService.Get("Restore OEM Control Center"),
+            _ => binding.Action.ToString(),
+        };
+
+        private IReadOnlyList<string> ShortcutPresetChoices() => WatcherPresetDisplayNames();
+
+        private void SaveShortcuts(List<ShortcutBinding> bindings)
+        {
+            if (_shortcutService is null)
+                return;
+
+            ShortcutStore? store = App.GetService<ShortcutStore>();
+            if (store is null)
+                return;
+
+            try
+            {
+                store.Save(bindings);
+                _shortcutService.Reload();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message,
+                    LocalizationService.Get("Keyboard shortcuts"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            RefreshShortcutRows();
+        }
+
+        private void btnAddShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shortcutService is null || _shortcutService.Bindings.Count >= ShortcutStore.MaxBindings)
+                return;
+
+            var dialog = new ShortcutDialog(ShortcutPresetChoices())
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() != true || dialog.Result is null)
+                return;
+
+            List<ShortcutBinding> updated = _shortcutService.Bindings.ToList();
+            updated.Add(dialog.Result);
+            SaveShortcuts(updated);
+        }
+
+        private void btnEditShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shortcutService is null ||
+                (sender as FrameworkElement)?.DataContext is not ShortcutRow row)
+            {
+                return;
+            }
+
+            var dialog = new ShortcutDialog(ShortcutPresetChoices(), row.Binding)
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() != true || dialog.Result is null)
+                return;
+
+            List<ShortcutBinding> updated = _shortcutService.Bindings.ToList();
+            int index = updated.FindIndex(b => string.Equals(b.Chord, row.Binding.Chord, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+                return;
+
+            updated[index] = dialog.Result;
+            SaveShortcuts(updated);
+        }
+
+        private void btnDeleteShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shortcutService is null ||
+                (sender as FrameworkElement)?.DataContext is not ShortcutRow row)
+            {
+                return;
+            }
+
+            List<ShortcutBinding> updated = _shortcutService.Bindings
+                .Where(b => !string.Equals(b.Chord, row.Binding.Chord, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            SaveShortcuts(updated);
+        }
+
+        #endregion
+
+        public sealed class WatcherRuleRow : INotifyPropertyChanged
+        {
+            private readonly WatcherRule _rule;
+            private bool _enabled;
+
+            public WatcherRuleRow(WatcherRule rule)
+            {
+                _rule = rule;
+                _enabled = rule.Enabled;
+            }
+
+            public string Name => _rule.Name;
+
+            public string Summary => WatcherVocabulary.Describe(_rule);
+
+            public bool Enabled
+            {
+                get => _enabled;
+                set
+                {
+                    if (_enabled == value)
+                        return;
+                    _enabled = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Enabled)));
+                }
+            }
+
+            public WatcherRule ToRule() => _rule with { Enabled = _enabled };
+
+            public event PropertyChangedEventHandler? PropertyChanged;
         }
 
         #endregion

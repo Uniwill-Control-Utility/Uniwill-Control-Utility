@@ -167,15 +167,61 @@ namespace Uniwill_Control_Utility.Views.Pages
             e.Handled = true;
         }
 
+        private async void ExportDiagnostics_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".zip",
+                FileName = $"UCU-Diagnostics-{DateTime.Now:yyyy-MM-dd-HHmm}.zip",
+                Filter = LocalizationService.Get("Diagnostics bundle (*.zip)|*.zip"),
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            btnExportDiagnostics.IsEnabled = false;
+            try
+            {
+                DiagnosticsExportService? service = App.GetService<DiagnosticsExportService>();
+                if (service is null)
+                    return;
+
+                await service.ExportAsync(dialog.FileName);
+                Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Diagnostics"),
+                    LocalizationService.Get("Diagnostics bundle exported."));
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[About] diagnostics export failed");
+                Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Diagnostics"),
+                    LocalizationService.Get("The diagnostics bundle could not be written."));
+            }
+            finally
+            {
+                btnExportDiagnostics.IsEnabled = true;
+            }
+        }
+
         private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
         {
-            var appPath = Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location ?? AppDomain.CurrentDomain.BaseDirectory) ?? ".";
-            var logFolder = Path.Combine(appPath, "logs");
+            // Both logs, because a field report is rarely answered by one of them:
+            // the app log holds the preset/fan decisions, the engine log holds what
+            // reached the EC. The app folder is per-user (App.LOGS_FOLDER) - in a
+            // per-machine install the exe's own directory is not writable at all -
+            // and the engine's lives under ProgramData, readable by an admin.
+            string engineFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "UCU",
+                "engine");
 
-            if (Directory.Exists(logFolder))
-            {
-                Process.Start(new ProcessStartInfo(logFolder) { UseShellExecute = true });
-            }
+            if (Directory.Exists(App.LOGS_FOLDER))
+                Process.Start(new ProcessStartInfo(App.LOGS_FOLDER) { UseShellExecute = true });
+
+            if (Directory.Exists(engineFolder))
+                Process.Start(new ProcessStartInfo(engineFolder) { UseShellExecute = true });
 
             e.Handled = true;
         }

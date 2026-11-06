@@ -52,6 +52,23 @@ namespace Uniwill_Control_Utility.Services
             return entry.Value;
         }
 
+        /// <summary>
+        /// Age of the current entry: time since the last successful refresh
+        /// (infinite while none ever ran). Stale-while-revalidate keeps serving
+        /// the last value across refresh failures, so consumers that must not
+        /// repaint frozen data (the engine sensor readings) gate on this.
+        /// </summary>
+        public TimeSpan Age
+        {
+            get
+            {
+                ThrowIfDisposed();
+
+                CacheEntry entry = Volatile.Read(ref _entry);
+                return _timeProvider.GetUtcNow() - entry.RefreshedAt;
+            }
+        }
+
         public Task RefreshAsync()
         {
             lock (_refreshSync)

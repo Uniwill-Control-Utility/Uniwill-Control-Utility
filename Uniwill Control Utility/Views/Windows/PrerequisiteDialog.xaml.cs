@@ -74,12 +74,41 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void UpdateRtssStatus()
         {
-            bool running = RtssReader.IsRunning();
+            // The prerequisite is INSTALLED, not running: RTSS installed but
+            // not in the boot set is satisfied, not missing (the running-only
+            // check warned real installs). Liveness shows on the button, and
+            // installed-idle offers Start (the elevation-free task route).
+            bool installed = RtssDetectionService.IsInstalled();
+            bool running = RtssDetectionService.IsRunning();
+            bool startable = installed && !running && RtssLauncher.CanStart();
 
-            RtssStatusIcon.Symbol = running ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Warning20;
-            RtssStatusIcon.Foreground = FindResource("SystemFillColor" + (running ? "Success" : "Caution") + "Brush") as Brush;
+            RtssStatusIcon.Symbol = installed ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Warning20;
+            RtssStatusIcon.Foreground = FindResource("SystemFillColor" + (installed ? "Success" : "Caution") + "Brush") as Brush;
 
-            UpdateButtonContent(RtssButton, running, "Running", "Download");
+            if (installed)
+            {
+                RtssButton.Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children =
+                    {
+                        new SymbolIcon
+                        {
+                            Symbol = running ? SymbolRegular.Checkmark20 : SymbolRegular.Play20,
+                            Margin = new Thickness(0, 0, 6, 0)
+                        },
+                        new System.Windows.Controls.TextBlock { Text = running ? "Running" : "Start" }
+                    }
+                };
+                RtssButton.IsEnabled = startable;
+                RtssButton.Appearance = startable
+                    ? Wpf.Ui.Controls.ControlAppearance.Primary
+                    : Wpf.Ui.Controls.ControlAppearance.Transparent;
+            }
+            else
+            {
+                UpdateButtonContent(RtssButton, false, "Installed", "Download");
+            }
         }
 
       private static void UpdateButtonContent(Wpf.Ui.Controls.Button button, bool isReady, string readyText, string actionText)
@@ -122,9 +151,24 @@ namespace Uniwill_Control_Utility.Views.Windows
             new InstallpawnIo().Show();
         }
 
-        private void RtssButton_Click(object sender, RoutedEventArgs e)
+        private async void RtssButton_Click(object sender, RoutedEventArgs e)
         {
-            Process.Start(new ProcessStartInfo(RtssUrl) { UseShellExecute = true });
+            // Installed-idle: start it (task route, no UAC). Absent: the download page.
+            if (!RtssDetectionService.IsInstalled())
+            {
+                Process.Start(new ProcessStartInfo(RtssUrl) { UseShellExecute = true });
+                return;
+            }
+
+            RtssButton.IsEnabled = false;
+
+            bool started = await RtssLauncher.StartAsync();
+            if (!started)
+            {
+                // Nothing came up (consent refused on the fallback, scheduler
+                // wedged): hand the row back so Download/Start is reachable.
+                UpdateRtssStatus();
+            }
         }
 
         private void ContinueButton_Click(object sender, RoutedEventArgs e)

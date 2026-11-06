@@ -1,8 +1,38 @@
 # Startup and Lifecycle
 
-## Startup sequence
+The product has two lifecycles: the **engine service** (installed once, running from boot) and the **UI app** (launched by the user, the autostart task, or the engine's supervisor). The app owns the engine's lifecycle; the engine supervises the app.
 
-`App.OnStartup` is the process-level orchestrator. It deliberately performs device identity and baseline telemetry initialization before the main window is shown, then moves peripheral connection and update work to deferred tasks.
+## Engine service lifecycle
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant App as UI app (asInvoker)
+    participant UAC as UAC
+    participant SCM
+    participant Eng as UCUEngine service
+
+    App->>App: OnStartup, deferred tasks
+    App->>SCM: EngineLifecycle.EnsureAsync — query UCUEngine
+    alt service missing (fresh install / portable zip)
+        App->>UAC: runas "Service\...Engine.exe --install-engine"
+        UAC-->>Eng: sc create start= auto, binPath, DACL, failure actions, sc start
+    else service stopped
+        App->>SCM: ScmNative.StartServiceW (SERVICE_START, granted by service DACL, no UAC)
+    else service not openable (access denied)
+        App->>UAC: runas "--install-engine" again - sc sdset re-asserts the DACL
+    else dev checkout (no Service\ staging)
+        App->>App: silent no-op — dev runs target a console-mode engine
+    end
+    SCM->>Eng: boot: start= auto starts the service
+```
+
+- The install pass (`EngineInstaller` in the engine) is idempotent and re-applies binPath and DisplayName (the registration follows the exe through Velopack version directories, and re-applies the user-facing label "UCU Engine"; the SCM service name `UCUEngine` is the stable identity used by sc.exe and the app), the DACL `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWRPRC;;;AU)` (Authenticated Users: query-config, query-status, **start**, read-control - and **not** `SERVICE_CHANGE_CONFIG`, which would let any authenticated user re-point `binPath` and execute as LocalSystem), the description, and SCM failure actions (restart ×3/min).
+- `--console` runs the identical host as a console app with logs under `%LOCALAPPDATA%\UCU\engine`; the installed service logs to `%ProgramData%\UCU\engine\`.
+
+## App startup sequence
+
+`App.OnStartup` orchestrates the process. Device identity and baseline telemetry initialize before the window shows; peripheral connection and maintenance work move to deferred tasks.
 
 ```mermaid
 sequenceDiagram
@@ -11,96 +41,82 @@ sequenceDiagram
     participant Host as Generic Host
     participant Detect as Detection and LHM
     participant Win as MainWindow
-    participant Dev as Device services
+    participant Eng as Engine service
 
-    OS->>App: Start elevated process
-    App->>App: Set working directory and localization
-    App->>App: Create logs/ and configure Serilog
-    App->>App: Check VC++ redistributable
-    App->>Host: Register services and build host
-    App->>App: Upgrade user settings if required
-    App->>App: Acquire single-instance mutex
+    OS->>App: Start unelevated process (asInvoker)
+    App->>App: Working directory, localization, logs/, Serilog
+    App->>App: VC++ prerequisite check
+    App->>Host: Compose host (capability proxies = RPC to engine)
+    App->>App: Settings upgrade, single-instance mutex
     par Hardware identity
         App->>Detect: CPU family, laptop, panel, SKU, WMI cache
     and Monitoring baseline
-        App->>Detect: Acquire persistent CPU/GPU/memory/battery categories
+        App->>Detect: CPU/GPU/memory/battery LHM leases
     end
-    Detect-->>App: Hardware detection complete
-    App->>App: Store install path and unblock payload files
     App->>Host: StartAsync
     Host->>Win: Resolve and show main window
-    Win->>Win: Apply startup preset, keyboard, light bar, EC fan/battery
-    par Deferred peripheral work
-        App->>Dev: Auto-connect Hydro UI, Flydigi HID, Flydigi BLE
-    and Deferred state
-        App->>Dev: Restore Adaptive Mode override flags
-    and Deferred discovery
-        App->>App: Update/PawnIO checks, game scan, prerequisite dialog
+    Win->>Eng: Apply persisted EC state (fan, battery, keyboard) via capability proxies
+    par Deferred
+        App->>Eng: EngineLifecycle.EnsureAsync (install/start engine)
+        App->>App: Autostart task migration, RetireGuardianTask
+        App->>App: Device auto-connect, Adaptive flags, update/PawnIO checks
     end
 ```
 
-## Detailed stages
+Detailed stages:
 
-### 1. Process preparation
+1. **Process preparation.** Working directory set to the exe directory (native modules load from there; the autostart task and the supervisor set it too). Localization from settings. Logs go to `%LOCALAPPDATA%\UCU\logs\` — daily-rolling `ucu_log.txt` — and the file sink is non-fatal: a directory the user cannot write degrades logging to the console instead of refusing the launch. UI/AppDomain exception handlers. VC++ runtime registry probe.
+2. **Host composition.** Navigation, monitoring, overlay, peripheral sessions, pages — plus the EC capability interfaces bound to the **RPC proxies** (`UCU.Client`). There is no in-process EC path: no app assembly references `UCU.Hardware`/`UCU.Engine` (the test suite's layering guard pins it). A developer points the same proxies at a console engine: `dotnet run --project UCU.Engine -- --console`.
+3. **Settings migration and single instance.** `Upgrade()` once per version. The `UniwillControlUtility` mutex elects the active process; a second instance signals the first to show, then exits.
+4. **Detection gate.** WMI/identity and LibreHardwareMonitor leases run in parallel; failures degrade, the UI still starts.
+5. **Main-window initialization.** `MainWindow.Loaded` applies persisted profile/keyboard/light-bar/EC-fan/battery state — through the capability proxies, so an engine that is missing mid-startup degrades those pages instead of crashing. When relaunched by the supervisor (`--from-guardian`) the startup overlay is suppressed and the window opens minimized to the tray.
+6. **Deferred tasks.** `EngineLifecycle.EnsureAsync`, legacy scheduled-task migration (below), device auto-connect, Adaptive override flags, update/PawnIO checks, game scan, prerequisite dialog.
 
-- The working directory is set to the executable directory.
-- Localization initializes from `Properties.Settings.Default.Language`.
-- `./logs/` is created and Serilog writes `ucu_log.txt` with daily rolling and an 8 MiB file-size limit.
-- UI-thread and AppDomain unhandled-exception handlers are registered.
-- Registry keys are inspected for x64/x86 VC++ runtime installation. If neither is detected, the app offers the Microsoft download page and exits.
+### Startup budgets
 
-### 2. Host composition
+The deferred tasks probe resources outside the app's control, and each is bounded so the splash cannot be held by one slow resource:
 
-The Generic Host registers WPF navigation, monitoring, overlay, hardware sessions, device coordination, and pages. `UniwillECService` searches for `ACPIDriverDll.dll` in this order:
+- **Update check:** 10 s.
+- **Game-library scan:** 10 s (`SyncGameLibraryWithBudgetAsync`). The scan walks every local volume plus the current user's Store packages, so the splash is released at the budget and the list publishes whenever the scan lands (`PublishGameLibraryScan`); a failed scan keeps the list already published, since `null` reads as "no games" to the FPS overlay and Adaptive Mode. The scan's drive loop also skips `DriveType.Network`: a disconnected mapped drive blocks `Directory.Exists` in the redirector until the redirector times out (measured 21–63 s per process pass against a dead host), which is what the "sluggish 60–71%" report was.
 
-1. Application directory.
-2. `C:\Program Files\OEM\Control Center\AiStoneService\MyControlCenter`.
-3. The equivalent `Program Files (x86)` directory.
+- **EC writes at startup:** the engine is ensured first, then the writes are gated. Phase-1 task "Applying startup settings" begins with `EnsureEngineAndApplyDeferredAsync`: a missing service is registered and started there (the one UAC prompt of the product, inside the splash), and a stopped one is started unelevated through the DACL's `SERVICE_START` grant, which is why a first launch ends with the EC-fed metrics on screen and no trip to `services.msc`. The writes are then gated inside `EngineClient` by `IEngineServiceGate`: a verb for a service the SCM says is stopped is refused with `HardwareUnavailable` before the connect, because a connect to the missing pipe polls for the whole 5 s connect timeout and the call sites are many - the EC apply chain, a preset's `ec-*` writes, page constructors, the tray tick, the three EC telemetry caches. A preset batch also stops sending `ec-*` verbs at the first `HardwareUnavailable`/`Timeout`/`Busy`: that state does not change mid-batch. Writes skipped for a stopped engine are marked pending (`EngineStartupApply`) and applied when the service reaches `Running`: the EC resets the battery charge limit to the BIOS default at every cold boot, so "skipped" must not become "lost". The 78 % freeze this replaces was arithmetic: the tracker maps phase 1 as `50 + done/6 x 42`, so 78 % is 4 of 6 visible tasks done with the EC apply still pending, every verb in it paying 5 s.
 
-### 3. Settings migration and single instance
+Bounded tasks report at `Warning` when they outlive their budget, so the log distinguishes "the app is slow" from "a resource the user has is offline".
 
-- Generated .NET settings call `Upgrade()` once per version when `SettingsUpgradeRequired` is true.
-- A named mutex, `UniwillControlUtility`, elects the active process.
-- A second process opens the named `UniwillControlUtility.Show` event, signals the first process, and shuts down.
-- The first process runs a listener that restores and activates the main window when signalled.
+## Autostart and scheduled tasks
 
-### 4. Detection gate
+- The logon task is **"UCU Autostart"**, registered with **limited** privileges (`TaskRunLevel.LUA`) for the interactive user. The action's working directory is the exe folder.
+- **The engine registers it, not the app** (`engine.set_autostart` -> `UCU.Engine\AutostartTask`): the Task Scheduler refuses task creation to a medium-integrity token, so the unelevated app cannot register its own entry (field, 2026-11-06: opening Settings threw `E_ACCESSDENIED` from `RegisterTaskDefinition`; 0.9.6 only managed it because the whole app ran elevated). The request carries the toggle and the delay; the service resolves the action path from its own `Service\` layout and the account from the app's session (console session as fallback) - never from the caller, or the verb would be a "schedule any program as this user" primitive.
+- The app calls the engine first from `ScheduledTaskService` and keeps the local registration as the fallback for a dev run with no service.
+- `MigrateLegacyAutostartTask` moves the pre-engine **"UCU"** task (highest privileges, for the old `requireAdministrator` manifest) to the new task once, preserving the delay setting.
+- `RetireGuardianTask` removes the retired **"UCU Guardian"** watchdog task (the supervisor in the engine replaced it) and clears the vestigial `GuardianEnabled` setting.
+- `SelfHealScheduledTask` re-points the task at the running exe when a moved install (zip → MSI migration) baked an old path.
 
-The window does not open until two parallel jobs finish:
+## Crash supervision (engine-side)
 
-- WMI/identity: processor family, laptop model, MiniLED panel, SKU, and cached system information.
-- LibreHardwareMonitor: persistent leases for CPU, GPU, memory, and battery categories.
+`AppSupervision` is a hosted service in the engine: the XMG Control Center "relaunch the shell when it dies" behaviour, running the same policy (`UCU.Core\Supervision\GuardianPolicy`) the retired user-mode guardian used.
 
-Failures are logged and degraded behavior is allowed; the UI is still started.
+```mermaid
+stateDiagram-v2
+    [*] --> Disarmed: engine start / app never sighted
+    Disarmed --> Armed: probe sees the app running (5 s poll)
+    Armed --> Armed: app still running
+    Armed --> Disarmed: graceful-exit signal (user closed the app)
+    Armed --> Relaunch: crash after a real run (immediate, budget reset)
+    Armed --> Backoff: fast crash (10 s base, exponential, max 3 budgeted)
+    Backoff --> Relaunch: delay elapsed
+    Armed --> Disarmed: crash-loop budget exhausted
+    Relaunch --> Armed: CreateProcessAsUser in the user session
+```
 
-### 5. Main-window initialization
-
-`ApplicationHostService` resolves the window and navigation service. `MainWindow.Loaded` is the current single startup point for applying persisted profile, keyboard, light-bar, EC fan, and battery state. This placement avoids duplicate hardware writes when Dashboard navigation occurs.
-
-The window also pre-resolves several heavy pages in the background/dispatcher sequence to reduce first-navigation delay.
-
-### 6. Deferred tasks
-
-The following tasks do not block the initial dashboard:
-
-- Hydro UI and Flydigi auto-connect after a two-second Bluetooth stabilization delay.
-- Restoration of Adaptive Mode override flags.
-- Update check and PawnIO prerequisite check when an ICMP check to `8.8.8.8` succeeds.
-- Installed-game synchronization.
-- First-run prerequisite dialog.
+- Arming rule: the supervisor watches only after it has seen the app — logon autostart is the task's job, the supervisor is a crash/kill respawn.
+- The probe reads the app process's `StartTime` (LocalSystem sees every session). The graceful-exit signal is a verb, not a file: the app calls `engine.notify_app_exit` at the top of `OnExit` and `AppExitSignal` records the timestamp. It must belong to the run that ended, so a signal from an earlier run (or one older than the 2-minute window) does not mask a crash. A flag file in the install root was the old mechanism — an unelevated app cannot write Program Files in a per-machine install, and no privilege boundary should require it to.
+- The relaunch crosses the session-0 boundary through `AppSessionLauncher`: `WTSGetActiveConsoleSessionId` → `WTSQueryUserToken` (needs `SE_TCB_NAME`, LocalSystem holds it) → `DuplicateTokenEx` → `CreateEnvironmentBlock` → `CreateProcessAsUser` on `winsta0\default`, carrying `--from-guardian` (the app's historical crash-relaunch marker: minimized, no overlay).
+- `--no-supervision` and a missing app exe beside the engine (dev layout) disable it, so dev and test hosts never spawn UI processes.
 
 ## Power-source automation
 
-`MainWindow` subscribes to `SystemEvents.PowerModeChanged`.
-
-On AC/battery status changes, and only when Adaptive Mode is not running:
-
-1. WMI reads `Win32_Battery.BatteryStatus`.
-2. The configured AC or DC preset is resolved.
-3. `PresetProfileApplier.BuildCommandString` produces the command.
-4. The command is saved to .NET settings.
-5. The shared translation pipeline applies it.
-6. A notification is shown only when the effective power state changes.
+`MainWindow` subscribes to `SystemEvents.PowerModeChanged`. On AC/battery changes, and only when Adaptive Mode is not running, WMI reads battery status, resolves the configured AC/DC preset, builds the command string, persists it, and applies it through the shared translation pipeline (CPU/GPU backends in-process, EC fields via the engine). A toast fires only when the effective power state changes.
 
 ## Resume sequence
 
@@ -111,48 +127,39 @@ sequenceDiagram
     participant OS as Windows resume
     participant Main as MainWindow handler
     participant Profile as PresetProfileApplier
-    participant EC as UniwillECService
+    participant Eng as Engine (capability proxies)
     participant Devices as HID/BLE services
 
     OS->>Main: PowerModes.Resume
-    Main->>Main: Delay 1.5 seconds
-    Main->>Main: Invalidate Adaptive diff tracking
+    Main->>Main: Delay 1.5 s, invalidate Adaptive diff tracking
     Main->>Profile: Reapply active preset
-    Main->>Main: Reapply keyboard and light bar
-    Main->>EC: Reapply battery mode and fan state
-    alt Smart EC fan mode enabled
-        Main->>EC: Recreate and start EcSmartFanControl
-    else Fixed EC fan curve
-        Main->>EC: Apply saved CPU/GPU curves
+    Main->>Eng: Reapply keyboard, light bar, battery mode, fan state
+    alt Smart EC fan mode
+        Main->>Eng: Recreate EcSmartFanControl loop
+    else Fixed curve
+        Main->>Eng: Apply saved CPU/GPU curves
     end
-    Main->>Devices: Reconnect Hydro UI
-    Main->>Devices: Reset stale Flydigi HID/BLE sessions
-    Main->>Devices: Resume background services
+    Main->>Devices: Reconnect Hydro UI, reset stale Flydigi sessions
 ```
 
-## Minimize and close behavior
+The engine service survives sleep itself; after resume, the gate's driver handle is reused and the app re-pushes the state the firmware may have reset.
 
-- The notification-area icon remains available while the window is minimized or hidden.
-- The `MinimizeClose` preference determines whether a normal close hides the window instead of terminating.
-- Explicit tray exit allows shutdown.
-- Navigation changes update title-bar device identity and tray state is refreshed whenever the tray menu opens.
+## Minimize, close and shutdown
 
-## Shutdown sequence
+- The tray icon persists while the window is hidden; `MinimizeClose` decides whether close hides or exits; tray exit terminates.
+- `App.OnExit` reports the intentional exit to the engine first — `engine.notify_app_exit`, best-effort with a 2 s budget so a wedged engine cannot wedge the exit — then deinitializes SMU/Intel backends, disposes peripheral services, and stops the Generic Host on a background task (dispatcher-deadlock avoidance). A staged Velopack update can be applied via the updater shim from here.
+- Stopping the app never stops the engine; the service remains for the next launch and supervises this one's death as intentional.
 
-1. Cancel/dispose the single-instance listener and mutex.
-2. Deinitialize AMD SMU or Intel backend according to detected family.
-3. Dispose the Flydigi page timers.
-4. Disconnect Flydigi HID and synchronously dispose Flydigi BLE so Windows releases device sessions.
-5. Stop and dispose the Generic Host on a background task to avoid a dispatcher deadlock.
+## Updates and uninstall
 
-Shutdown is best-effort in several device paths: exceptions are suppressed so process exit can continue. Because host shutdown is not awaited by the UI thread, maintainers should treat device-specific `Dispose` methods as the primary deterministic cleanup point.
+- **Update:** `VelopackUpdateService.ApplyAndRestart`/`TryApplyOnExit` route through `UCU.Updater.exe` when the stamped shim is present: it elevates, runs `sc stop UCUEngine` (the service locks the `Service\` payload), runs Velopack's `Uninstall.exe -a --from-update` (apply + relaunch), and starts the engine on the new payload. Declined consent (1223) falls back to a normal shutdown; the staged package is kept. Layouts without the shim (plain dev builds) keep the direct Velopack path.
+- **Uninstall:** the elevated `Uninstall.exe` shim stops the engine synchronously (a force-killed app would look like a crash the supervisor resurrects), kills app and legacy guardian processes, deletes the "UCU Autostart"/legacy "UCU"/"UCU Guardian" tasks, `sc delete UCUEngine`, removes the legacy App Paths shim key and uninstall registry entries, then sweeps `%ProgramData%\UCU` and the install root.
 
 ## Failure behavior
 
-- Startup composition failures are logged as fatal and shown in a message box.
-- Dispatcher exceptions are logged, shown, and marked handled, so the process may continue.
-- Terminating background exceptions are logged and an error dialog is attempted through the dispatcher.
-- Deferred tasks use a fire-and-forget continuation that observes task exceptions but does not surface them to the UI.
-- Many hardware discovery paths intentionally fall back to unavailable/unsupported state instead of aborting the application.
+- Composition failures are fatal (log + message box); dispatcher/domain exceptions are logged and (for dispatcher ones) marked handled.
+- Engine unavailable: every RPC proxy answers `EngineException(HardwareUnavailable)`; pages disable EC features, the rest of the app runs.
+- Deferred tasks observe exceptions in the log without surfacing them.
+- A wedged engine queue fails fast and the SCM restarts the service (3/min); supervision of the app is untouched by the service restart because it re-arms on sighting.
 
 [Back to documentation index](../README.md)

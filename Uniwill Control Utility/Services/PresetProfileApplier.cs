@@ -147,7 +147,7 @@ namespace Uniwill_Control_Utility.Services
         /// Maps a stock preset to OpenRevo's mode-apply case selector (0=Office,
         /// 1=Balance, 2=Beast). This is NOT the value written to 0x7AB: the per-mode
         /// signal is the literal written to 0x751 plus the 0x45B flag and the 0x7AB
-        /// bit4 force, all derived inside UniwillECService.ApplyOemStockMode.
+        /// bit4 force, all derived inside EcEngine.ApplyOemStockMode.
         /// </summary>
         public static int OemModeIndexFor(string profileName)
         {
@@ -241,7 +241,12 @@ namespace Uniwill_Control_Utility.Services
                 var ecGate = RyzenAdj_To_UCU.EcService;
                 if (ecGate is not null)
                 {
-                    ecGate.ApplyOemStockMode(OemModeIndexFor(profileName));
+                    await ecGate.ApplyOemStockModeAsync(OemModeIndexFor(profileName)).ConfigureAwait(false);
+
+                    // The contract yields with the values (U-107): a stock
+                    // preset deliberately leaves power bytes to the firmware,
+                    // so the guardian must not "heal" custom values back.
+                    Services.PowerContractStore.ClearAll();
                 }
             }
 
@@ -298,7 +303,38 @@ namespace Uniwill_Control_Utility.Services
                             };
                         }
                     }
-                    ec.ApplyCpuPowerLimits(pl1, pl2);
+                    // Battery envelope (measured 2026-11-02, CPU + GPU loaded:
+                    // Intel 30-40 W CPU / 35 W GPU, AMD 30-40 W CPU / 40 W GPU).
+                    // On DC the firmware owns the limits and a request above its
+                    // ceiling is refused or penalised (160 W asked -> 30 W actual),
+                    // so clamp the CPU pair to the measured envelope and say so.
+                    UCU.Core.Power.BatteryPowerPolicy.Envelope envelope =
+                        UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(
+                            Family.TYPE == Family.ProcessorType.Intel);
+                    UCU.Core.Power.BatteryPowerPolicy.Verdict verdict =
+                        UCU.Core.Power.BatteryPowerPolicy.ClampCpu(
+                            pl1, pl2,
+                            onBattery: System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                                       == System.Windows.Forms.PowerLineStatus.Offline,
+                            cpuCeiling: envelope.CpuWatts);
+
+                    if (verdict.Clamped)
+                    {
+                        Scripts.Misc.DiagnosticLogger.LogInfo(
+                            $"[Power] battery envelope: CPU limits clamped {verdict.RequestedPl1}/{verdict.RequestedPl2} W -> {verdict.Pl1}/{verdict.Pl2} W");
+                        Scripts.Misc.ToastNotification.ShowToastNotification(
+                            Services.LocalizationService.Get("Power limits"),
+                            Services.LocalizationService.Format(
+                                "On battery, power is limited to the platform envelope (CPU {0} W, GPU {1} W).",
+                                verdict.Pl1, envelope.GpuWatts));
+                    }
+
+                    await ec.ApplyCpuPowerLimitsAsync(verdict.Pl1, verdict.Pl2).ConfigureAwait(false);
+
+                    // The contract note (U-107): the watts pair this preset
+                    // established is what the guardian re-applies if the EC
+                    // reports it changed.
+                    Services.PowerContractStore.NoteCpuApplied(verdict.Pl1, verdict.Pl2);
                 }
             }
 
@@ -605,7 +641,7 @@ namespace Uniwill_Control_Utility.Services
 
         private static void ApplyFanCurveToEc(CustomPreset preset)
         {
-            var ec = RyzenAdj_To_UCU.EcService;
+            var ec = RyzenAdj_To_UCU.FanService;
             if (ec is null)
                 return;
 
@@ -649,7 +685,7 @@ namespace Uniwill_Control_Utility.Services
 
             try
             {
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                ec.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                 Debug.WriteLine($"[PresetProfileApplier] Fan curve applied from preset: unified={preset.FanUnifiedMode}");
             }
             catch (Exception ex)

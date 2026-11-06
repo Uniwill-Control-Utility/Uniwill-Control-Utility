@@ -4,6 +4,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
+      xmlns:helpers="clr-namespace:Uniwill_Control_Utility.Helpers"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       d:DataContext="{d:DesignInstance local:Automations, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
@@ -13,6 +14,8 @@
       d:DesignWidth="800"
       Title="Automations"
       Loaded="Page_Loaded"
+      ScrollViewer.CanContentScroll="False"
+      helpers:MouseWheelScrollBehavior.IsEnabled="True"
       SnapsToDevicePixels="True"
       UseLayoutRounding="True">
 
@@ -34,8 +37,9 @@
     <!-- Root Grid spans full window space -->
     <Grid>
 
-        <!-- Full-width, full-height ScrollViewer -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto"
+        <!-- Scrollable content -->
+        <ScrollViewer x:Name="mainScroll"
+                      VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
                       PanningMode="VerticalOnly"
@@ -102,11 +106,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Preset" />
+                                <ui:TextBlock FontTypography="Body" Text="Preset on battery" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset whenever the system begins running from battery power"
+                                           Text="Applied when the system switches to battery power"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -126,6 +130,13 @@
                                 </ui:Button>
                             </StackPanel>
                         </Grid>
+
+                        <!-- What a power-edge preset now controls (power limits are capped by the firmware on battery) -->
+                        <ui:TextBlock Margin="0,8,0,0"
+                                      FontTypography="Caption"
+                                      Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                      Text="Power limits stay capped on battery; a preset changes fan noise and who controls the fans."
+                                      TextWrapping="Wrap" />
 
                         <!-- Divider (hidden while the GPU row below is hidden) -->
                         <Border x:Name="SeparatorGpuBattery" Height="1" Margin="-58,12,-46,12"
@@ -209,11 +220,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Preset" />
+                                <ui:TextBlock FontTypography="Body" Text="Preset when plugged in" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset whenever the battery begins charging"
+                                           Text="Applied when the charger is connected"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -233,6 +244,13 @@
                                 </ui:Button>
                             </StackPanel>
                         </Grid>
+
+                        <!-- Same note for the plugged-in edge: charging does not lift the battery cap -->
+                        <ui:TextBlock Margin="0,8,0,0"
+                                      FontTypography="Caption"
+                                      Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                      Text="Power limits stay capped on battery; a preset changes fan noise and who controls the fans."
+                                      TextWrapping="Wrap" />
 
                         <!-- Divider (hidden while the GPU row below is hidden) -->
                         <Border x:Name="SeparatorGpuPluggedIn" Height="1" Margin="-58,12,-46,12"
@@ -340,6 +358,285 @@
                                 </ui:Button>
                             </StackPanel>
                         </Grid>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Power Tuning Guardian (OpenRevo's heal-contract pattern): opt-in
+                     drift-healing of the preset's power limits. Persist-only rows —
+                     reflected constructor writes stay behind the setup guard. -->
+                <ui:CardExpander x:Name="ExpanderPowerGuardian"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="False">
+                    <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE945;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="Power Tuning Guardian" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Re-applies your preset's power limits when another program resets them"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <!-- Row: GPU power limit healing -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="GPU power limit (TGP / Dynamic Boost)" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Restore the preset's GPU power ceiling when the firmware reports it was changed"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch x:Name="cbPowerGuardGpu"
+                                             Grid.Column="1"
+                                             LabelPosition="Left"
+                                             OnContent="On"
+                                             OffContent="Off"
+                                             Checked="cbPowerGuardGpu_Checked"
+                                             Unchecked="cbPowerGuardGpu_Unchecked" />
+                        </Grid>
+
+                        <!-- Row: CPU power limits healing -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="CPU power limits (PL1 / PL2)" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Restore the preset's CPU power limits when the firmware reports they were changed"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch x:Name="cbPowerGuardCpu"
+                                             Grid.Column="1"
+                                             LabelPosition="Left"
+                                             OnContent="On"
+                                             OffContent="Off"
+                                             Checked="cbPowerGuardCpu_Checked"
+                                             Unchecked="cbPowerGuardCpu_Unchecked" />
+                        </Grid>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Watcher Rules (U-201, open-revo watcher_hub.rs port): user
+                     automation rules evaluated by the hosted hub on a 1 s tick.
+                     Rows edit through the WatcherRuleDialog; the store persists
+                     watchers.json and the hub reloads on save. -->
+                <ui:CardExpander x:Name="ExpanderWatcherRules"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="False">
+                    <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE781;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="Watcher Rules" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Fire an action when telemetry thresholds, foreground apps, power events, or EC values change"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <!-- Toolbar row: note + Add -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,18,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Rules run while the app is open, each at most once per its cooldown." />
+                            <Button Grid.Column="1"
+                                    x:Name="btnAddWatcherRule"
+                                    Content="Add Rule"
+                                    Width="100"
+                                    VerticalAlignment="Center"
+                                    Click="btnAddWatcherRule_Click" />
+                        </Grid>
+
+                        <!-- Empty state -->
+                        <TextBlock x:Name="txtWatcherRulesEmpty"
+                                   Margin="0,10,0,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="No watcher rules yet. Add one to automate the fan, presets, performance modes, or notifications." />
+
+                        <!-- Rule rows -->
+                        <ItemsControl x:Name="icWatcherRules" Margin="0,8,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:ToggleSwitch Grid.Column="0"
+                                                         x:Name="tsRuleEnabled"
+                                                         LabelPosition="Right"
+                                                         VerticalAlignment="Center"
+                                                         OnContent="On"
+                                                         OffContent="Off"
+                                                         IsChecked="{Binding Enabled, Mode=TwoWay}" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Summary}"
+                                                       FontSize="11"
+                                                       Margin="0,2,0,0"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2"
+                                                x:Name="btnEditWatcherRule"
+                                                Content="&#xE70F;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Width="36"
+                                                Height="32"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Edit"
+                                                Click="btnEditWatcherRule_Click" />
+                                        <Button Grid.Column="3"
+                                                x:Name="btnDeleteWatcherRule"
+                                                Content="&#xE74D;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                Width="36"
+                                                Height="32"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Delete"
+                                                Click="btnDeleteWatcherRule_Click" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Keyboard shortcuts (U-204): the user's chord -> action map,
+                     dispatched from the overlay's existing global hook. The
+                     action set is the watcher hub's class (preset through the
+                     arbiter, performance mode, fan turbo, OEM takeover). -->
+                <ui:CardExpander x:Name="ExpanderShortcuts"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="False">
+                    <ui:CardExpander.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE765;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="Keyboard shortcuts" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Run any UCU action from a global shortcut while the app is open"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,18,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="A shortcut fires once per press; chords need at least one of Ctrl, Alt or Shift." />
+                            <Button Grid.Column="1"
+                                    x:Name="btnAddShortcut"
+                                    Content="Add shortcut"
+                                    Width="120"
+                                    VerticalAlignment="Center"
+                                    Click="btnAddShortcut_Click" />
+                        </Grid>
+
+                        <TextBlock x:Name="txtShortcutsEmpty"
+                                   Margin="0,10,0,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="No shortcuts yet. Add one to trigger presets, performance modes, fan turbo, or the OEM takeover from the keyboard." />
+
+                        <ItemsControl x:Name="icShortcuts" Margin="0,8,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0"
+                                                Padding="8,3"
+                                                CornerRadius="4"
+                                                VerticalAlignment="Center"
+                                                Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                            <TextBlock Text="{Binding Chord}" FontFamily="Consolas" FontSize="12" />
+                                        </Border>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Summary}"
+                                                   Margin="10,0,8,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <Button Grid.Column="2"
+                                                Content="&#xE70F;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Width="36"
+                                                Height="32"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Edit"
+                                                Click="btnEditShortcut_Click" />
+                                        <Button Grid.Column="3"
+                                                Content="&#xE74D;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                Width="36"
+                                                Height="32"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Delete"
+                                                Click="btnDeleteShortcut_Click" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                     </StackPanel>
                 </ui:CardExpander>

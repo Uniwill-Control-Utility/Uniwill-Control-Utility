@@ -1,0 +1,153 @@
+using System.IO;
+using UCU.Contracts;
+using UCU.Core.Ec;
+using UCU.Hardware.Ec;
+
+namespace UCU.Engine
+{
+    /// <summary>
+    /// Engine configuration. Defaults are what the installed service runs with;
+    /// overrides exist so the host can be started in-process by tests, with a fake EC
+    /// transport, on a private pipe, with the pipe ACL turned off.
+    /// </summary>
+    public sealed record EngineRuntimeOptions
+    {
+        /// <summary>Pipe name (without the <c>\\.\pipe\</c> prefix).</summary>
+        public string PipeName { get; init; } = EngineProtocol.PipeName;
+
+        /// <summary>
+        /// When true (the service default) the pipe's DACL grants the pipe to
+        /// LocalSystem and Administrators plus the interactive console user only.
+        /// A pipe that any process can open is a way to move the EC without a UAC
+        /// prompt, so the ACL is the security boundary of this design.
+        /// </summary>
+        public bool RestrictPipeAccess { get; init; } = true;
+
+        public int MaxConcurrentConnections { get; init; } = 8;
+
+        /// <summary>
+        /// How long a hardware call may take before the caller gets
+        /// <see cref="EngineErrorCode.Timeout"/>. The EC operation itself is not
+        /// cancellable (the IOCTL has no cancellation), so the write completes and the
+        /// queue stays serialised; the client stops waiting.
+        /// </summary>
+        public TimeSpan HardwareCallBudget { get; init; } = TimeSpan.FromSeconds(30);
+
+        /// <summary>Queue depth that counts as saturation, answered with Busy.</summary>
+        public int MaxQueuedCallsPerDomain { get; init; } = 64;
+
+        /// <summary>
+        /// A hardware call older than this is a wedged EC (the driver stopped
+        /// answering), not a slow one: the watchdog terminates the process so the
+        /// service control manager restarts it, which is the only way to clear a stuck
+        /// kernel handle.
+        /// </summary>
+        public TimeSpan StuckCallThreshold { get; init; } = TimeSpan.FromMinutes(2);
+
+        /// <summary>
+        /// App crash supervision (phase 5): the engine relaunches the app after
+        /// a crash/kill, following GuardianPolicy. True for the installed
+        /// service; tests and dev console runs pass <c>--no-supervision</c> so
+        /// a debug session never spawns UI processes.
+        /// </summary>
+        public bool SupervisionEnabled { get; init; } = true;
+
+        /// <summary>
+        /// Enforcement mode for the raw-write gate (<see cref="EcWriteGatePolicy"/>):
+        /// the address allowlist on the raw register verbs and the NVRAM GUID
+        /// allowlist. The service default is <see cref="RawWriteGateMode.Enforce"/>;
+        /// <c>--gate=report-only</c> logs the violation and lets the write through,
+        /// for field debugging of an allowlist that is too strict (the codec
+        /// Validate* range checks are not gated — a bad value is always reported).
+        /// </summary>
+        public RawWriteGateMode RawWriteGate { get; init; } = RawWriteGateMode.Enforce;
+
+        /// <summary>Log directory. Null selects ProgramData for the service, LocalAppData for --console.</summary>
+        public string? LogDirectory { get; init; }
+
+        /// <summary>Platform override; null resolves it from the CPU.</summary>
+        public EcPlatform? PlatformOverride { get; init; }
+
+        /// <summary>
+        /// Transport override. The service leaves it null and talks to
+        /// UWACPIDriver.sys; tests inject a fake so the whole RPC path, dispatcher and
+        /// queues can be exercised without hardware.
+        /// </summary>
+        public IEcTransport? TransportOverride { get; init; }
+
+        /// <summary>
+        /// Sensor probe override, same test seam as the transport: the production
+        /// probe opens real sensor drivers (Ring0 MSR access, SMBus SPD), which has
+        /// no place in a test process. Tests inject a scripted probe.
+        /// </summary>
+        public UCU.Hardware.Metrics.ISensorProbe? SensorProbeOverride { get; init; }
+
+        /// <summary>
+        /// PnP device service override, same test seam: the production service
+        /// enables and disables real device nodes (the camera, the dGPU), which has
+        /// no place in a test process. Tests inject a scripted device tree.
+        /// </summary>
+        public UCU.Hardware.Devices.IPnpDeviceService? PnpDeviceOverride { get; init; }
+
+        /// <summary>
+        /// Firmware NVRAM service override, same test seam: the production service
+        /// writes real UEFI variables, which has no place in a test process. Tests
+        /// inject a scripted variable store.
+        /// </summary>
+        public UCU.Hardware.Firmware.IFwNvramService? FwNvramOverride { get; init; }
+
+        /// <summary>
+        /// AMD SMU service override, same test seam: the production service drives
+        /// real CPU power telemetry registers through PawnIO, which has no place in
+        /// a test process. Tests inject a scripted command table.
+        /// </summary>
+        public UCU.Hardware.Cpu.IAmdSmuService? AmdSmuOverride { get; init; }
+
+        /// <summary>
+        /// Intel MSR service override, same test seam: the production service
+        /// writes real CPU power MSRs through PawnIO, which has no place in a test
+        /// process. Tests inject a scripted register file.
+        /// </summary>
+        public UCU.Hardware.Cpu.Intel.IIntelMsrService? IntelMsrOverride { get; init; }
+
+        /// <summary>
+        /// MiniLED service override, same test seam: the production service
+        /// executes the OEM ACPI WMI handshake that switches a real panel's
+        /// local dimming, which has no place in a test process. Tests inject a
+        /// scripted handshake.
+        /// </summary>
+        public UCU.Hardware.Devices.IMiniLedService? MiniLedOverride { get; init; }
+
+        /// <summary>
+        /// RTSS session-launch override, same test seam: the production route
+        /// starts a REAL process in the active user's session with the console
+        /// user's linked (elevated) token, which has no place in a test
+        /// process. Tests inject a recorder that answers the launch result.
+        /// </summary>
+        public Func<string, bool>? RtssLaunchOverride { get; init; }
+
+        /// <summary>
+        /// OEM takeover service override, same test seam (story U-203): the
+        /// production service stops and re-arms REAL OEM services, disables
+        /// REAL scheduled tasks, rewrites REAL HKLM run keys and kills REAL
+        /// processes, which has no place in a test process. Tests inject a
+        /// scripted machine.
+        /// </summary>
+        public UCU.Hardware.Takeover.IOemTakeoverService? OemTakeoverOverride { get; init; }
+
+        /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
+        public string EngineVersion { get; init; } = ReadEngineVersion();
+
+        public static string ReadEngineVersion()
+        {
+            string? version = typeof(EngineRuntimeOptions).Assembly
+                .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault()?.InformationalVersion;
+
+            // Strip the source-link "+commithash" suffix: this string is shown in the UI.
+            int plus = version?.IndexOf('+') ?? -1;
+            return plus > 0 ? version![..plus] : version ?? "0.0.0";
+        }
+    }
+}

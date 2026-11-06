@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -35,6 +35,9 @@ using Uniwill_Control_Utility.Views.Windows;
 using Velopack;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions;
+using UCU.Contracts;
+using UCU.Client;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility
 {
@@ -74,6 +77,26 @@ namespace Uniwill_Control_Utility
             StartupArgs = args ?? Array.Empty<string>();
             GuardianRestart = StartupArgs.Contains("--from-guardian");
 
+            // The uninstall sweep window: the Control Panel /x removes the
+            // registration in ~2 s, then the sentinel's verb sweep (service,
+            // layout, husks) runs for a few tens of seconds. The engine's
+            // supervision relaunches the app it sees die during that window,
+            // and a relaunch that opened windows, the tray, or its own
+            // sentinel elevation prompt is the "UCU in task manager with no
+            // window" + repeated-prompt state users report. Silent exit.
+            if (UninstallSentinel.IsBeingUninstalled())
+                return;
+
+            // Velopack's MSI launches this exe with --velopackuninstall during any
+            // /x transaction of the product. Since the sentinel design the handler
+            // is a logged no-op (see the method): a ghost registration's /x fires
+            // the same hook, and the sweep the hook used to run destroyed live
+            // installs. Removal intent belongs to UninstallSentinel; the verb owns
+            // the sweep. The app never launches from this argument:
+            // VelopackApp.Run() handles --velopackuninstall and exits the process.
+            if (StartupArgs.Contains("--velopackuninstall", StringComparer.OrdinalIgnoreCase))
+                CleanupEngineOnVelopackUninstall();
+
             VelopackApp.Build()
                 .SetAppUserModelId(AppUserModelId)
                 .SetAutoApplyOnStartup(false)
@@ -86,16 +109,54 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
+        /// Velopack's uninstall hook is a logged no-op since the sentinel design,
+        /// and this is field-proven necessity. The hook fires during ANY of the
+        /// product's /x transactions - including Velopack's own startup
+        /// self-repair passes over stale per-user ghost registrations, which
+        /// fire on machines that carry them long after nobody uninstalled
+        /// anything. The pre-sentinel hook ran a machine sweep (stop+delete the
+        /// service, kill the app, delete the tasks and the install root), so a
+        /// ghost /x destroyed the LIVE install: the app died ~20 s after every
+        /// launch, the service and layout were removed, and the registration
+        /// /x loop kept re-firing the hook (observed on the dev box: the whole
+        /// install self-destructed at 18:12:35, eighteen seconds after launch).
+        /// Uninstall intent is detected by UninstallSentinel - the vanished
+        /// registration arms the full sweep through the verb's SYSTEM task,
+        /// within ~10 s of a real Control Panel /x - and the thin Velopack MSI
+        /// needs no help inside its own wizard (it removes no locked files:
+        /// /x completes in ~2.3 s, no reboot prompt). This method contributes
+        /// its log line and nothing else.
+        /// </summary>
+        private static void CleanupEngineOnVelopackUninstall()
+        {
+            string log = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(), "ucu_uninstall_log.txt");
+
+            try
+            {
+                System.IO.File.AppendAllText(log,
+                    "velopack-hook: noop (the sentinel detects removal intent; " +
+                    "the verb sweep owns uninstall completeness) " +
+                    DateTime.Now + System.Environment.NewLine);
+            }
+            catch
+            {
+                // Logging is a luxury here; the uninstall proceeds.
+            }
+        }
+
+        /// <summary>
         /// Command-line arguments captured in Main before the WPF app exists.
         /// Used for --from-update (Velopack restart) and --from-guardian
-        /// (crash-guardian relaunch).
+        /// (supervisor relaunch; the name is the app's historical marker for
+        /// "relaunched after a crash", and the engine's supervisor passes it).
         /// </summary>
         internal static string[] StartupArgs { get; private set; } = Array.Empty<string>();
 
         /// <summary>
-        /// True when the guardian relaunched us after a crash: the startup
-        /// overlay is suppressed and the main window opens minimized to the
-        /// tray, so the recovery never interrupts what the user is doing.
+        /// True when the engine's supervisor relaunched us after a crash: the
+        /// startup overlay is suppressed and the main window opens minimized to
+        /// the tray, so the recovery never interrupts what the user is doing.
         /// </summary>
         internal static bool GuardianRestart { get; private set; }
 
@@ -108,30 +169,27 @@ namespace Uniwill_Control_Utility
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
-        // Written at the top of OnExit so the guardian distinguishes an
-        // intentional shutdown from a crash (see UCU.Guardian / GuardianPolicy).
-        // A file, not a named event: kernel objects die with the process, and
-        // the guardian's 5s poll only opens the handle after we are gone.
-        internal static string GracefulExitFlagPath => Path.Combine(LOGS_FOLDER, "graceful-exit.flag");
-
-        // Must match GuardianConstants in UCU.Guardian\Program.cs.
-        private const string GuardianMutexName = "UniwillControlUtility.Guardian";
-
-        private const string AutostartTaskName = "UCU";
-        private const string GuardianTaskName = "UCU Guardian";
-        private static DispatcherTimer? _guardianWatchTimer;
+        private const string AutostartTaskName = "UCU Autostart";
+        private const string LegacyAutostartTaskName = "UCU";
 
         /// <summary>
-        /// The guardian ships as its own executable (project UCU.Guardian) in
-        /// the Service\ subfolder, so the install directory shows a single
-        /// "Uniwill Control Utility.exe" and Task Manager shows a distinct
-        /// "Uniwill Control Utility Service" entry.
+        /// The RTSS verb proxy, resolved from the running host: the callers are
+        /// paths that DI does not construct (the prerequisite dialog is created
+        /// with new). Null before the host exists (the splash path) - and
+        /// RtssLauncher's fallback covers that, as it covers an engine that is
+        /// not there.
         /// </summary>
-        internal static string GuardianExePath =>
-            Path.Combine(AppContext.BaseDirectory, "Service", "Uniwill Control Utility Service.exe");
+        internal static IRtssCapability? RtssCapability => _host?.Services.GetService<IRtssCapability>();
 
         internal static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
-        internal static readonly string LOGS_FOLDER = ".\\logs\\";
+
+        // Logs live with the app's other per-user state, not beside the exe: a
+        // per-machine (MSI) install runs from Program Files, which an unelevated
+        // user cannot write, and this is the process that logs. %LOCALAPPDATA% is
+        // writable in every layout (dev, portable, installed), and it is where the
+        // About page's "Open logs" button and the docs point.
+        internal static readonly string LOGS_FOLDER = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UCU", "logs") + "\\";
 
         internal static string product = "";
         public static Task DisplaySetupTask { get; private set; } = Task.CompletedTask;
@@ -201,22 +259,64 @@ namespace Uniwill_Control_Utility
 
                 await startupProgressReporter.ReportAsync(StartupStage.PreparingDiagnostics);
 
-                // Ensure logs directory exists before configuring the logger
-                if (!Directory.Exists(LOGS_FOLDER))
-                    Directory.CreateDirectory(LOGS_FOLDER);
-
-                Log.Logger = new LoggerConfiguration()
+                var loggerConfiguration = new LoggerConfiguration()
                     .MinimumLevel.ControlledBy(Scripts.Misc.DiagnosticLogger.LevelSwitch)
-                    .WriteTo.Console(theme: AnsiConsoleTheme.Code, applyThemeToRedirectedOutput: true)
-                    .WriteTo.File(LOGS_FOLDER + "ucu_log.txt",
+                    .WriteTo.Console(theme: AnsiConsoleTheme.Code, applyThemeToRedirectedOutput: true);
+
+                // The file sink is diagnostics, never a reason to refuse startup: a
+                // directory the user may not write (a per-machine install root, a
+                // full disk) degrades logging to the console instead of ending the
+                // launch with an access-denied popup.
+                try
+                {
+                    Directory.CreateDirectory(LOGS_FOLDER);
+                    loggerConfiguration.WriteTo.File(LOGS_FOLDER + "ucu_log.txt",
                         fileSizeLimitBytes: 8 * 1024 * 1024, // 8MB
                         rollingInterval: RollingInterval.Day
-                    )
-                    .CreateLogger();
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"File logging to '{LOGS_FOLDER}' unavailable: {ex.Message}");
+                }
+
+                Log.Logger = loggerConfiguration.CreateLogger();
 
                 Log.Information("Logger initialized");
 
                 Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
+
+                // Mixed-install guard. Installing the MSI while the app is running
+                // leaves the running exe in place (Windows cannot replace a locked
+                // image) while the new DLLs land beside it - field, 2026-11-02: an
+                // old app exe next to a new UCU.Core.dll, so every preset apply
+                // died with MissingMethodException and the EC kept the previous
+                // session's fan curve. Fail loudly at startup instead of half
+                // working: nothing below can be trusted in that state.
+                if (!IsInstallationConsistent())
+                {
+                    Log.Error("[Startup] Mixed installation: this exe and the UCU.* assemblies beside it come from different builds");
+                    MessageBox.Show(
+                        LocalizationService.Get("This installation mixes files from different builds because the app was running while it was updated. Close the app and run the installer again."),
+                        LocalizationService.Get("Installation needs repair"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    Shutdown();
+                    return;
+                }
+
+                // Uninstall self-heal (see UninstallSentinel): start it right
+                // here, before anything can block - the post-startup task
+                // queue it lived in first waits behind the PawnIO installer
+                // dialog and the whole window init, and the Control Panel
+                // /x it must react to can land at any moment.
+                UninstallSentinel.CreateDefault(
+                    message => Log.Warning("[UninstallSentinel] {Message}", message)).Start();
+
+                // Ghost-registration self-heal (see SelfHealStaleVelopackRoot):
+                // must run before the first UpdateManager call, which is where
+                // Velopack's registration-repair /x storm fires from.
+                SelfHealStaleVelopackRoot();
 
                 // Catch unhandled exceptions from all threads (not just the UI thread)
                 AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
@@ -302,7 +402,15 @@ namespace Uniwill_Control_Utility
                         // Velopack update engine (GitHub Releases feed; no-op on portable layouts).
                         services.AddSingleton<VelopackUpdateService>();
 
-                        services.AddSingleton<IHardwareMonitoringService, HardwareMonitoringService>();
+                        // The EC CPU temperature is the fallback sensor source for the CPU
+                        // metric: the CPU's own MSR sensor needs the PawnIO driver, whose
+                        // device ACL admits System + Administrators, so the asInvoker app
+                        // of a per-machine install has no CPU sensor at all. The source is
+                        // EcTelemetryService (engine RPC, cached, non-blocking).
+                        services.AddSingleton<IHardwareMonitoringService>(provider =>
+                            new HardwareMonitoringService(
+                                provider.GetService<IEcCpuTemperatureSource>(),
+                                provider.GetService<IEcEngineMetricsSource>()));
                         services.AddSingleton<GpuInventoryService>();
                         services.AddSingleton<IFpsMonitoringService, FpsMonitoringService>();
                         services.AddSingleton<OverlaySettingsStore>();
@@ -313,7 +421,8 @@ namespace Uniwill_Control_Utility
                                 provider.GetRequiredService<IFpsMonitoringService>(),
                                 provider.GetService<EcTelemetryService>(),
                                 provider.GetService<HydroUIService>(),
-                                provider.GetService<FlydigiCoolerHidService>()));
+                                provider.GetService<FlydigiCoolerHidService>(),
+                                provider.GetService<Services.ShortcutService>()));
                         services.AddHostedService(provider => provider.GetRequiredService<OverlayManagerService>());
 
                         // Main window with navigation
@@ -344,6 +453,10 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.HydroUI>();
                         services.AddSingleton<HydroUIService>();
 
+                        // One-shot "dashboard has real data" signal: gates the
+                        // splash's final stage (see StartupProgressWindow use).
+                        services.AddSingleton<Services.DashboardFirstFrameSignal>();
+
                         // Flydigi BS2 Pro cooling pad page and service
                         // Singleton so the host disposes it on shutdown (stops background timers).
                         services.AddSingleton<Views.Pages.FlydigiCooler>();
@@ -352,12 +465,86 @@ namespace Uniwill_Control_Utility
                         // Flydigi BS1 (BLE-only) cooling pad service
                         services.AddSingleton<FlydigiCoolerBleService>();
 
-                        // Uniwill EC access (for XMG / TUXEDO laptops)
-                        services.AddSingleton<UniwillECService>(provider =>
-                        {
-                            return new UniwillECService();
-                        });
+                        // EC access (for XMG / TUXEDO laptops). The UI process reaches the
+                        // EC only through the capability interfaces: RPC proxies into the
+                        // UCUEngine service — the product's single path to a register. No
+                        // app assembly references the hardware layer (the test suite's
+                        // layering guard pins that).
+                        services.AddSingleton<EngineClient>();
+                        services.AddSingleton<IFanCapability, FanCapability>();
+                        services.AddSingleton<IPowerCapability, PowerCapability>();
+                        services.AddSingleton<IGpuMuxCapability, GpuMuxCapability>();
+                        services.AddSingleton<IKeyboardCapability, KeyboardCapability>();
+                        services.AddSingleton<IBatteryCapability, BatteryCapability>();
+                        services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
+                        services.AddSingleton<IDeviceCapability, DeviceCapability>();
+                        services.AddSingleton<IAmdSmuCapability, AmdSmuCapability>();
+                        services.AddSingleton<IIntelMsrCapability, IntelMsrCapability>();
+                        services.AddSingleton<IEngineCapability, EngineCapability>();
+                        services.AddSingleton<IRtssCapability, RtssCapability>();
+                        services.AddSingleton<IOemCapability, OemCapability>();
                         services.AddSingleton<EcTelemetryService>();
+                        services.AddSingleton<IEcCpuTemperatureSource>(provider =>
+                            provider.GetRequiredService<EcTelemetryService>());
+                        // The engine's kernel-side sensor snapshot travels on the same
+                        // cached-read pattern as the EC temperature: injected into the
+                        // snapshot producer and merged into every snapshot, so the tray
+                        // flyout, FanControl cards, the RTSS OSD and the dashboard all
+                        // get the Ring0/SPD fields from one merge point.
+                        services.AddSingleton<IEcEngineMetricsSource>(provider =>
+                            provider.GetRequiredService<EcTelemetryService>());
+
+                        // Engine service state: the SCM probe every EC call site gates
+                        // on (a connect to a stopped engine's pipe costs the full 5 s
+                        // connect timeout, and the startup path issues many), plus the
+                        // pending marker for EC writes skipped while it was down. The
+                        // RPC ping is the liveness override for the state where the SCM
+                        // cannot speak (a security product guarding service descriptors
+                        // denies the app's opens while the engine answers RPC fine).
+                        services.AddSingleton(new EngineAvailability(EngineRpcReachableAsync));
+                        services.AddSingleton<EngineStartupApply>();
+                        // The client's transport gate: a verb for a stopped engine is
+                        // refused before the connect (which costs the full 5 s
+                        // connect timeout), so the startup path, page constructors,
+                        // the tray tick and the EC telemetry caches degrade at the
+                        // cost of an SCM query.
+                        services.AddSingleton<UCU.Contracts.IEngineServiceGate>(provider =>
+                            new EngineServiceGate(provider.GetRequiredService<EngineAvailability>()));
+
+                        // The single execution pipeline for preset power-mode intents
+                        // (OpenRevo's power-arbiter pattern): startup restore, resume,
+                        // tray, Q-key, and the AC/DC automations all send intents here;
+                        // the pure PresetArbiterPolicy rules boot-grace, Adaptive
+                        // ownership, and duplicate debounce. Registered before the
+                        // Q-key service that consumes it.
+                        services.AddSingleton<PresetArbiter>();
+
+                        // The watcher/trigger hub (U-201, open-revo watcher_hub.rs
+                        // port): user automation rules (watchers.json) evaluated on
+                        // a 1 s tick — telemetry thresholds, foreground edges, OS
+                        // power/session edges, named-value diffs — acting only
+                        // through the whitelisted verbs and the arbiter above.
+                        services.AddSingleton<WatcherStore>();
+                        services.AddSingleton<WatcherHubService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<WatcherHubService>());
+
+                        // The OEM takeover composition (U-203, open-revo takeover/
+                        // lifecycle.rs port): the user scope (HKCU Run keys, UWP
+                        // AppModel startup tasks, StartupApproved flags, the user
+                        // journal) composed app-side; the machine scope (services,
+                        // tasks, HKLM, gated kills) called through the oem.* verbs.
+                        // The Settings card is the only consumer; the merge is pure.
+                        services.AddSingleton<Services.OemTakeoverService>();
+
+                        // Diagnostics bundle (U-208): versions, hardware,
+                        // engine and takeover state plus logs and journals.
+                        // App-side only; best-effort per file.
+                        services.AddSingleton<Services.DiagnosticsExportService>();
+
+                        // User shortcut map (U-204): chord -> vetted action,
+                        // dispatched from the overlay's existing global hook.
+                        services.AddSingleton<Services.ShortcutStore>();
+                        services.AddSingleton<Services.ShortcutService>();
 
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.
@@ -369,6 +556,15 @@ namespace Uniwill_Control_Utility
                         // OpenRevo's BetterRGB). Hosted so shutdown stops the loop.
                         services.AddSingleton<BetterRgbStreamService>();
                         services.AddHostedService(provider => provider.GetRequiredService<BetterRgbStreamService>());
+
+                        // The power-tuning guardian (OpenRevo's heal-contract
+                        // pattern): asks the EC what power contract it enforces
+                        // and re-applies the preset's contract when a third-party
+                        // tuner reset it. Per-feature opt-in, off by default; the
+                        // hosted loop is gated, throttled, and never queues onto
+                        // a saturated engine domain.
+                        services.AddSingleton<PowerGuardianService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<PowerGuardianService>());
 
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
@@ -431,17 +627,61 @@ namespace Uniwill_Control_Utility
 
                 var monitoring = _host.Services.GetRequiredService<IHardwareMonitoringService>();
 
-                // Wire the EC service to the static field before startup preset apply.
+                // Wire the power capability to the static field before startup preset apply.
                 // The MainWindowViewModel constructor also sets this field (idempotent —
                 // same singleton instance), but ApplyOnStart() runs here in the pre-loader
                 // phase _before_ _host.StartAsync() creates the MainWindow.
                 // Without this, RyzenAdj_To_UCU.EcService is null during startup preset
                 // apply and GPU power limit writes fail silently.
-                var ecService = _host.Services.GetService<UniwillECService>();
-                if (ecService != null)
+                var powerCapability = _host.Services.GetService<IPowerCapability>();
+                if (powerCapability != null)
                 {
-                    Scripts.RyzenAdj_To_UCU.EcService = ecService;
+                    Scripts.RyzenAdj_To_UCU.EcService = powerCapability;
                 }
+
+                // Load the persisted power contract (U-107) before the
+                // startup apply: the EC keeps the last applied power values
+                // across app restarts, so when boot apply cannot reach the
+                // engine the guardian's contract is the one the PREVIOUS
+                // session established, not an empty one. A boot apply that
+                // does run notes over it with its own exact bytes.
+                Services.PowerContractStore.Load();
+
+                var fanCapability = _host.Services.GetService<IFanCapability>();
+                if (fanCapability != null)
+                {
+                    Scripts.RyzenAdj_To_UCU.FanService = fanCapability;
+                }
+
+                // Wire the device capability (webcam/dGPU PnP rows) to the two
+                // statics that actuate them, before any startup apply can reach
+                // the GPU power saving chain. Same idempotent-singleton idiom as
+                // the power/fan capabilities above; the engine answers these with
+                // no consent prompt, which is what retires the automatic-path UAC.
+                var deviceCapability = _host.Services.GetService<IDeviceCapability>();
+                if (deviceCapability != null)
+                {
+                    Scripts.GPUs.NVIDIA.GpuPowerSaving.Devices = deviceCapability;
+                    Scripts.Misc.HardwareManagement.Devices = deviceCapability;
+                    Scripts.Misc.NvramAccess.Devices = deviceCapability;
+                    Scripts.Misc.MiniLedAccess.Devices = deviceCapability;
+                }
+
+                // The SMU rows (Curve Optimizer, preset power commands) actuate
+                // through the engine's cpu capability: PawnIO's device ACL admits
+                // System/Administrators, so the app's own driver open is
+                // access-denied unelevated. The RyzenAdj interpreter routes
+                // engine-first through this static.
+                var smuCapability = _host.Services.GetService<IAmdSmuCapability>();
+                if (smuCapability != null)
+                    Scripts.Misc.SmuAccess.Cpu = smuCapability;
+
+                // The Intel MSR rows (TDP, voltage, ratio, power balance) ride
+                // the same PawnIO ACL as the SMU; the interpreter's Intel
+                // commands route engine-first through IntelManagement.Msr.
+                var intelMsrCapability = _host.Services.GetService<IIntelMsrCapability>();
+                if (intelMsrCapability != null)
+                    Scripts.Intel_Backend.IntelManagement.Msr = intelMsrCapability;
 
                 var updateService = _host.Services.GetRequiredService<VelopackUpdateService>();
 
@@ -538,21 +778,13 @@ namespace Uniwill_Control_Utility
                 }));
 
                 // Load game library so the FPS overlay and Adaptive Mode have the
-                // installed games list ready immediately.
-                phase1Tasks.Add(Task.Run(() =>
+                // installed games list ready immediately. The scan is bounded by a
+                // startup budget (see SyncGameLibraryWithBudgetAsync) so a volume the
+                // user is not using cannot hold the splash.
+                phase1Tasks.Add(Task.Run(async () =>
                 {
-                    try
-                    {
-                        Game_Manager.installedGames = Game_Manager.syncGame_Library();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Logger.Error(ex, "Failed to sync game library during startup");
-                    }
-                    finally
-                    {
-                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
-                    }
+                    await SyncGameLibraryWithBudgetAsync();
+                    _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
                 }));
 
                 // Check the GitHub Releases feed for a new Velopack package. The
@@ -634,8 +866,40 @@ namespace Uniwill_Control_Utility
                 }
                 await RestoreAdaptiveModeAsync();
 
+                if (startupWindow is not null)
+                    Views.Windows.MainWindow.GateFirstShowWindow = true;
+
                 await _host.StartAsync(CancellationToken.None);
 
+                // The dashboard window must be shown for its navigation to
+                // start the metrics timers, and the first tick fills it 1-2 s
+                // (healthy) up to ~6 s (guarded: the sensor probe parks and
+                // the first-snapshot budget runs out). MainWindow.ShowWindow
+                // (gate above) initializes it hidden; release on the first
+                // frame with real OS-path data (bounded), then show it
+                // populated - the splash card is a small centered card, so
+                // "window hidden until data" is what removes the empty-
+                // window field signature.
+                if (startupWindow is not null)
+                {
+                    var firstFrame = _host.Services.GetService<Services.DashboardFirstFrameSignal>();
+                    if (firstFrame is not null)
+                    {
+                        await Task.WhenAny(
+                            firstFrame.FirstFrame,
+                            Task.Delay(DashboardFirstFrameBudget));
+                    }
+                }
+
+                Views.Windows.MainWindow.GateFirstShowWindow = false;
+
+                // Play the splash out and close it BEFORE the window lands.
+                // Releasing the gate while the 320x290 card is up exposes the
+                // 1080x1080 dashboard on the rest of the screen (the field's
+                // "the main window blips at 92% of the pre-loader" signature),
+                // and the window's first visible presentation should be the
+                // populated dashboard, not a frame beside the splash. The
+                // window stays parked off-screen through the whole playback.
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
                 if (startupWindow is not null)
                 {
@@ -644,6 +908,8 @@ namespace Uniwill_Control_Utility
                     startupWindow = null;
                 }
                 startupProgressReporter.Detach();
+
+                Views.Windows.MainWindow.Instance?.ReleaseStartupGate();
 
                 SafeFireAndForget(RunPostStartupTasksAsync());
             }
@@ -978,6 +1244,18 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private static async Task ApplyStartupSettingsAsync()
         {
+            // The EC branches below need the engine, and keeping the engine alive is
+            // the app's job (the XMG Control Center shell does the same for GCUBridge).
+            // So the engine is ensured first, inside the splash: the SCM query is
+            // sub-millisecond in the common case (already running), a missing service
+            // is registered here - the one UAC prompt of the product, and the reason
+            // the service is created AND started by the first launch - and a stopped
+            // one is started unelevated through the DACL's SERVICE_START grant. The EC
+            // writes that follow then land on a running engine, which is why the
+            // dashboard shows the EC-fed metrics on a first launch rather than after
+            // the user opens services.msc.
+            await EnsureEngineAndApplyDeferredAsync();
+
             // Run keyboard RGB, EC fan control, and preset apply in parallel.
             // Keyboard RGB has retries (up to ~6s), EC writes are fast, preset
             // translation varies. Running them concurrently hides all latency.
@@ -985,6 +1263,124 @@ namespace Uniwill_Control_Utility
                 Views.Windows.MainWindow.ApplyOnStart(),
                 Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStart),
                 Views.Windows.MainWindow.AsyncApplyKeyboardOnStart());
+        }
+
+        /// <summary>One subscription per process to the engine's Running transition.</summary>
+        private static bool _engineStartedHooked;
+
+        /// <summary>
+        /// Ensures the engine service, then applies the EC settings that startup
+        /// skipped because the engine was not running (fan curve, battery charge
+        /// limit - see <see cref="EngineStartupApply"/>).
+        ///
+        /// Called from the startup EC task (so the service is created and started
+        /// before any EC verb) and again from the post-splash deferred chain: a start
+        /// that needed elevation shows its prompt there, with the window already up.
+        /// </summary>
+        private static async Task<EngineEnsureOutcome> EnsureEngineAndApplyDeferredAsync()
+        {
+            var availability = GetService<EngineAvailability>();
+            if (availability is null)
+                return EngineEnsureOutcome.Failed;
+
+            // A service the app cannot start (declined UAC) may come up later: at the
+            // next boot, from services.msc, or from a repair pass in this process. The
+            // transition event is what makes the deferred apply survive that.
+            if (!_engineStartedHooked)
+            {
+                _engineStartedHooked = true;
+                availability.Started += () => SafeFireAndForget(ApplyDeferredEcSettingsIfPendingAsync());
+            }
+
+            EngineEnsureOutcome outcome = await EngineLifecycle.EnsureAsync(availability, EngineRpcReachableAsync);
+
+            await ApplyDeferredEcSettingsIfPendingAsync(outcome);
+
+            return outcome;
+        }
+
+        /// <summary>
+        /// Liveness through the engine's own pipe, for the state where the SCM
+        /// cannot describe the service (a security product guarding service
+        /// descriptors reverts every DACL write, so the app's opens are denied):
+        /// the RPC pipe is independent of the SCM descriptor, and the engine
+        /// answers. Two attempts with a gap: a service in START_PENDING has not
+        /// opened its pipe yet, and declaring it dead on the first miss is how a
+        /// working engine gets a repair elevation. The probe re-runs on its own
+        /// 5 s timer, so the budget here is only the startup path's stall.
+        /// </summary>
+        private static async Task<bool> EngineRpcReachableAsync()
+        {
+            for (int attempt = 1; attempt <= 2; attempt++)
+            {
+                try
+                {
+                    var client = new UCU.Client.EngineClient(
+                        connectTimeout: TimeSpan.FromSeconds(2));
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                    // Typed overload, deliberately: engine.ping is a result-bearing
+                    // verb (it answers true), and the untyped InvokeAsync runs with
+                    // T=object, which the source-generated contract refuses
+                    // ("'Object' is not registered"). Field-proven (2026-10-28):
+                    // the untyped call threw AFTER a healthy 60 ms round trip, so
+                    // the probe reported a live engine dead on every guarded-SCM
+                    // machine, and every EC feature (fan speeds, battery health,
+                    // charge control) stayed gated off while the pipe answered
+                    // fine. The typed shape is the one the proxy (PingAsync) uses.
+                    await client.InvokeAsync<bool>(UCU.Contracts.EngineVerbs.Engine.Ping, cts.Token);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug(
+                        ex, "Engine RPC liveness probe attempt {Attempt} failed", attempt);
+
+                    if (attempt < 2)
+                        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Applies the deferred EC settings when the engine is up and the mark is
+        /// pending. The mark survives an engine that is still down: the EC charge
+        /// limit resets to the BIOS default at every cold boot, so a skipped write
+        /// must stay pending rather than be dropped on the floor.
+        /// </summary>
+        private static async Task ApplyDeferredEcSettingsIfPendingAsync(
+            EngineEnsureOutcome? outcome = null)
+        {
+            var availability = GetService<EngineAvailability>();
+            var deferred = GetService<EngineStartupApply>();
+            if (availability is null || deferred is null || !deferred.IsPending)
+                return;
+
+            if (!availability.IsRunning)
+            {
+                _logger?.LogWarning(
+                    "Engine service is not running{Outcome}; the deferred EC fan curve and battery charge limit stay pending"
+                    + " until the service starts",
+                    outcome is null ? "" : $" ({outcome})");
+                return;
+            }
+
+            if (!deferred.ConsumePending())
+                return;
+
+            _logger?.LogInformation(
+                "Engine service is running{Outcome}; applying the EC settings startup deferred",
+                outcome is null ? "" : $" ({outcome})");
+
+            try
+            {
+                await Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStart);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Deferred EC settings apply failed");
+            }
         }
 
         private static async Task RunPostStartupTasksAsync()
@@ -1009,23 +1405,51 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed during deferred update and PawnIO checks");
             }
 
-            // Register the App Paths auto-elevation shim once (XMG CC-style
-            // launch UX): the app manifest stays requireAdministrator for
-            // EC/MSR access, but ShellExecute launches (Start menu, tray,
-            // taskbar, guardian) from an admin account then elevate silently.
-            TryRegisterAutoElevation();
+            // Engine service: install when missing (one elevated self-launch,
+            // the single UAC prompt of the product), start when stopped (the
+            // service DACL grants the unelevated app SERVICE_START), re-assert
+            // the registration when it is not openable (a DACL from a build
+            // before that grant). This replaces the App Paths auto-elevation
+            // shim the retired requireAdministrator manifest needed: the app is
+            // asInvoker now.
+            SafeFireAndForget(EnsureEngineAndApplyDeferredAsync());
 
-            // Guardian: mutual guarding — the app respawns the watchdog if it is
-            // enabled but not running (the watchdog already watches the app).
-            if (Settings.Default.GuardianEnabled)
-                EnsureGuardianRunning();
+            // Migrate the legacy "UCU" autostart task (pre-engine name,
+            // registered with highest privileges) to the "UCU Autostart" task.
+            MigrateLegacyAutostartTask();
+
+            // The engine's supervisor replaced the scheduled-task guardian
+            // (the guardian exe is no longer shipped), so an install that had
+            // the feature enabled drops its "UCU Guardian" task on this start.
+            RetireGuardianTask();
 
             // Self-heal the scheduled task action paths: the path is baked at
             // registration time, so installs that moved (zip → MSI migration)
-            // would otherwise autostart / watchdog-launch the old exe.
+            // would otherwise autostart the old exe.
             SelfHealScheduledTask(AutostartTaskName, "", null, TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds), "Start UCU");
-            if (Settings.Default.GuardianEnabled)
-                SelfHealScheduledTask(GuardianTaskName, "", GuardianExePath, TimeSpan.FromSeconds(30), "Keep UCU running (crash guardian)");
+
+            // Point the per-user Add/Remove Programs entry (Velopack writes
+            // HKCU\...\Uninstall\Uniwill-Control-Utility) at the layout's
+            // Uninstall.exe shim. Its default action is Velopack's own uninstaller,
+            // which leaves the engine service registration and the MSI's ARP entry
+            // behind - the "husk" entry users report after an uninstall. The shim is
+            // the complete route; this hive is the user's own, so no elevation.
+            SelfHealControlPanelUninstall();
+
+            // RTSS auto-start for the overlay (boot-start contract, or the
+            // Overlay page's "Enable overlay" + "Show on startup" pair): the
+            // overlay's frame source is expected live at startup - RTSS
+            // installed but not running means the overlay silently runs
+            // without RTSS data, and games launched while RTSS is absent are
+            // never hooked (no OSD at all, field-proven with the zombie
+            // section forensics 2026-10-31). The APP is the starter, not the
+            // engine: RTSS is a user-session overlay (tray icon, game
+            // injection) and a SYSTEM session-0 launch would render it
+            // invisible. The start goes through the elevation-free launcher:
+            // RTSS commonly carries the "Run as administrator" flag
+            // (field-reported: double-clicking it prompts UAC), and a plain
+            // Process.Start would pop that prompt at every logon.
+            SafeFireAndForget(AutoStartRtssForOverlayAsync());
 
             // Show the prerequisite checklist on first startup.
             if (Settings.Default.ShowPrerequisiteDialog)
@@ -1033,52 +1457,51 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Starts the guardian now (if not already running) and arms the 5-min
-        /// respawn timer. Called at startup when GuardianEnabled is set and
-        /// immediately when the user flips the Settings toggle, so enabling the
-        /// feature takes effect without an app restart.
+        /// RTSS auto-start: starts it when the startup expects the overlay
+        /// live - (a) UCU is the boot-started app (the "UCU Autostart" task
+        /// is the witness: the overlay's frame source is expected live at
+        /// boot - RTSS installed but not in the user's startup set means the
+        /// overlay silently runs without RTSS data), or (b) the Overlay
+        /// page's "Enable overlay" and "Show on startup" are both ON (the
+        /// user wants the overlay every session - and the OSD needs RTSS
+        /// running before games launch, because RTSS hooks at game start).
+        /// Silent no-op otherwise (no RTSS, RTSS running, neither contract).
+        /// The APP is the starter, not the engine: RTSS is a user-session
+        /// overlay (tray icon, game injection) and a SYSTEM session-0 launch
+        /// would render it invisible. The start goes through the
+        /// elevation-free launcher: RTSS commonly carries the "Run as
+        /// administrator" flag (field-reported: double-clicking it prompts
+        /// UAC), and a plain Process.Start would pop that prompt at every
+        /// logon.
         /// </summary>
-        public static void EnsureGuardianRunning()
-        {
-            RespawnGuardianIfMissing();
-
-            if (_guardianWatchTimer is null)
-            {
-                _guardianWatchTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
-                _guardianWatchTimer.Tick += (s, e) => RespawnGuardianIfMissing();
-                _guardianWatchTimer.Start();
-            }
-        }
-
-        /// <summary>
-        /// Relaunches the guardian executable when the user has the feature
-        /// enabled but the guardian is not running (GCUService-style mutual
-        /// guarding).
-        /// </summary>
-        private static void RespawnGuardianIfMissing()
+        private static async Task AutoStartRtssForOverlayAsync()
         {
             try
             {
-                using var probe = new Mutex(false, GuardianMutexName, out bool createdNew);
-                if (!createdNew)
-                    return; // guardian is already running
+                bool bootStarted = ScheduledTaskService.GetActionPath(AutostartTaskName) is not null;
 
-                string guardianExe = GuardianExePath;
-                if (!File.Exists(guardianExe))
-                {
-                    _logger?.LogWarning("Guardian executable missing: {Path}", guardianExe);
+                OverlayOptions overlay = _host?.Services.GetService<OverlaySettingsStore>()?.Current
+                    ?? new OverlayOptions();
+                bool overlayDemandsRtss = overlay.Enabled && overlay.ShowOnStartup;
+
+                if (!bootStarted && !overlayDemandsRtss)
+                    return; // Neither the boot-start contract nor the overlay toggles ask for RTSS.
+
+                if (!RtssDetectionService.IsInstalled() || RtssDetectionService.IsRunning())
                     return;
-                }
 
-                Process.Start(new ProcessStartInfo(guardianExe)
-                {
-                    UseShellExecute = true,
-                });
-                _logger?.LogInformation("Respawned the crash guardian");
+                bool started = await RtssLauncher.StartAsync();
+                if (started)
+                    // Warning severity by project rule (the app log's field
+                    // level): this startup action must be verifiable in a
+                    // field report, not silently successful.
+                    _logger?.LogWarning("[Startup] RTSS was installed but not running - started for the overlay");
+                else
+                    _logger?.LogWarning("[Startup] RTSS auto-start did not bring RTSS up");
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Failed to respawn the crash guardian");
+                _logger?.LogWarning(ex, "[Startup] RTSS auto-start failed");
             }
         }
 
@@ -1101,42 +1524,186 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Registers the well-known App Paths auto-elevation shim
-        /// (HKLM\...\App Paths\&lt;exename&gt; with Type=AppUserModelID and an
-        /// empty PackageSid): ShellExecute launches of the exe from an
-        /// admin-account user then elevate without a UAC prompt. The manifest
-        /// itself stays requireAdministrator — EC/MSR access is non-negotiable;
-        /// this only removes the per-launch consent for our own exe. The
-        /// uninstall shim deletes this key. Idempotent, best-effort.
+        /// Moves the pre-engine "UCU" autostart task (registered with highest
+        /// privileges for the requireAdministrator manifest) to the
+        /// "UCU Autostart" task the asInvoker app registers with limited
+        /// privileges. The old task only exists on installs that had autostart
+        /// enabled, so re-registering the new one preserves the user's choice;
+        /// a task created by the new app never appears under the old name.
+        /// Idempotent: after one run the legacy task is gone.
         /// </summary>
-        private static void TryRegisterAutoElevation()
+        private static void MigrateLegacyAutostartTask()
         {
             try
             {
-                string? exe = Environment.ProcessPath;
-                if (string.IsNullOrEmpty(exe))
+                string? legacyPath = ScheduledTaskService.GetActionPath(LegacyAutostartTaskName);
+                if (legacyPath is null)
                     return;
 
-                using var appPaths = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
-                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths", writable: true);
-                if (appPaths is null)
-                    return;
-
-                string keyName = Path.GetFileName(exe);
-                using var key = appPaths.CreateSubKey(keyName, writable: true);
-                key.SetValue(null, exe);
-
-                if (key.GetValue("Type") as string != "AppUserModelID")
-                {
-                    key.SetValue("Type", "AppUserModelID");
-                    key.SetValue("PackageSid", string.Empty);
-                    _logger?.LogInformation("[Elevation] Registered App Paths auto-elevation shim for {Exe}", keyName);
-                }
+                ScheduledTaskService.Register(
+                    AutostartTaskName, "Start UCU", "",
+                    TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds));
+                ScheduledTaskService.Unregister(LegacyAutostartTaskName);
+                _logger?.LogInformation("Migrated the legacy '{Legacy}' autostart task to '{Task}'",
+                    LegacyAutostartTaskName, AutostartTaskName);
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "[Elevation] App Paths auto-elevation shim registration failed");
+                _logger?.LogWarning(ex, "Failed to migrate the legacy autostart scheduled task");
             }
+        }
+
+        /// <summary>
+        /// The engine's supervisor (AppSupervision) replaced the scheduled-task
+        /// guardian, and the guardian exe no longer ships: an install that had
+        /// the feature enabled unregisters its "UCU Guardian" task and clears
+        /// the (now vestigial) setting. Idempotent: the setting is cleared the
+        /// first time, so the task removal runs once.
+        /// </summary>
+        private static void RetireGuardianTask()
+        {
+            if (!Settings.Default.GuardianEnabled)
+                return;
+
+            try
+            {
+                ScheduledTaskService.Unregister("UCU Guardian");
+                _logger?.LogInformation("Removed the retired 'UCU Guardian' task (the engine supervisor owns crash relaunch now)");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to remove the retired guardian scheduled task");
+            }
+
+            Settings.Default.GuardianEnabled = false;
+            Settings.Default.Save();
+        }
+
+        /// <summary>
+        /// Points this user's Add/Remove Programs entry (Velopack writes
+        /// HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Uniwill-Control-Utility)
+        /// at the layout's <c>Uninstall.exe</c> shim. Its default action is Velopack's
+        /// own uninstaller, which leaves the engine service registration and the MSI's
+        /// ARP entry behind - the husk entry that stays in the program list after a
+        /// "successful" uninstall. The shim is the complete route (service stop +
+        /// delete, MSI uninstall, ARP entries, install root), and this hive belongs to
+        /// the user, so it needs no elevation. The MSI's machine-level entry is
+        /// redirected by the elevated engine install pass.
+        /// </summary>
+        private static void SelfHealControlPanelUninstall()
+        {
+            try
+            {
+                string shim = Path.Combine(AppContext.BaseDirectory, "Uninstall.exe");
+                if (!File.Exists(shim))
+                    return;
+
+                using RegistryKey? entry = Registry.CurrentUser.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Uniwill-Control-Utility",
+                    writable: true);
+
+                if (entry is null)
+                    return;
+
+                // Quoted: the path contains spaces, and the shell splits an unquoted value.
+                entry.SetValue("UninstallString", "\"" + shim + "\"", RegistryValueKind.String);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Control Panel uninstall redirect (per-user entry) skipped");
+            }
+        }
+
+        /// <summary>
+        /// Ghost-registration self-heal, field-proven necessity. The per-user
+        /// Velopack root (%LOCALAPPDATA%\Uniwill-Control-Utility, created by
+        /// the per-machine MSI install's bootstrap in a user context) feeds
+        /// Velopack's registration-repair: the app's own UpdateManager sees
+        /// the ghost root, decides the live machine registrations are stale,
+        /// and runs "msiexec /x" on them - observed at +4 min into a healthy
+        /// session, removing the live product's registration. The sentinel
+        /// reads the vanished registration plus the genuine removal events as
+        /// the Control Panel uninstall it is contracted to detect, and runs
+        /// the full sweep: the app dies seconds after the dashboard, the
+        /// machine is cleaned under a running app. This is the upgrade path
+        /// every old per-user-install user walks into. The per-machine layout
+        /// is authoritative: when the app runs from Program Files, the
+        /// per-user root is stale by definition and this app never reads it,
+        /// so the self-heal deletes it. The root lives in the user's own
+        /// AppData, so no elevation is involved. Runs before the first
+        /// UpdateManager call.
+        /// </summary>
+        /// <summary>
+        /// True when this exe can actually reach the newest API on the UCU
+        /// assemblies shipped beside it. A method that exists in the source but
+        /// not in the deployed assembly throws MissingMethodException at the call
+        /// site, which is the signature of an install that overwrote the DLLs
+        /// while the app was running (the locked exe survives, everything else
+        /// moves on) - field, 2026-11-02: BatteryPowerPolicy.ClampForBattery gone
+        /// from the new core, every preset apply dead, fans left on the previous
+        /// session's curve.
+        /// </summary>
+        internal static bool IsInstallationConsistent()
+        {
+            try
+            {
+                _ = UCU.Core.Power.BatteryPowerPolicy.ClampCpu(1, 1, onBattery: false, cpuCeiling: 1);
+                return true;
+            }
+            catch (MissingMethodException)
+            {
+                return false;
+            }
+            catch (TypeLoadException)
+            {
+                return false;
+            }
+            catch (System.IO.FileLoadException)
+            {
+                return false;
+            }
+        }
+
+        private static void SelfHealStaleVelopackRoot()
+        {
+            try
+            {
+                string? root = StaleVelopackRootPath(
+                    AppContext.BaseDirectory,
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+                if (root is null || !Directory.Exists(root))
+                    return;
+
+                Directory.Delete(root, recursive: true);
+                _logger?.LogWarning(
+                    "[SelfHeal] removed the stale per-user Velopack root {Root}: the app runs " +
+                    "per-machine, and the ghost root drives Velopack's registration-repair /x " +
+                    "storm that the uninstall sentinel executes",
+                    root);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[SelfHeal] stale per-user Velopack root not removed");
+            }
+        }
+
+        /// <summary>
+        /// Derivation seam: the per-user Velopack root is stale only when the
+        /// app image runs from the per-machine layout (Program Files);
+        /// dev/portable layouts keep their roots (Velopack's own storage)
+        /// untouched. The machine root name is the packer's app name
+        /// (vpk pack -u Uniwill-Control-Utility).
+        /// </summary>
+        internal static string? StaleVelopackRootPath(string appBaseDirectory, string programFiles, string localAppData)
+        {
+            if (string.IsNullOrEmpty(programFiles) ||
+                !appBaseDirectory.StartsWith(programFiles, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return Path.Combine(localAppData, "Uniwill-Control-Utility");
         }
 
         /// <summary>
@@ -1162,6 +1729,82 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Failed to self-heal the {Task} scheduled task", taskName);
+            }
+        }
+
+        /// <summary>
+        /// How long the splash's final stage waits for the dashboard's first
+        /// data frame. Field-tuned: the first snapshot lands 1-2 s after the
+        /// window exists on a healthy machine, and up to the 6 s
+        /// first-snapshot budget on a guarded one (the sensor probe parks,
+        /// the dashboard fills from the OS-only path) - 10 s keeps margin
+        /// over the observed fill while capping the worst case, and a wedged
+        /// probe releases the splash at the cap.
+        /// </summary>
+        private static readonly TimeSpan DashboardFirstFrameBudget = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// How long the splash waits for the game-library scan before releasing it.
+        /// Mirrors the update check's 10 s gate: both probe resources outside the app's
+        /// control (a feed, every volume on the machine) on the startup path.
+        /// </summary>
+        private static readonly TimeSpan GameLibraryStartupBudget = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Scans the game library under a startup budget. The scan walks every local
+        /// volume, and one the user is not using can block a directory probe for tens of
+        /// seconds - a disconnected mapped network drive measured 21-63 s in the
+        /// redirector - so the splash is released at the budget and the list publishes
+        /// when the scan finishes. The scan's own drive loop skips network drives, so
+        /// reaching this budget means something else is slow; the budget is the guard for
+        /// the class, not for one device.
+        /// </summary>
+        private static async Task SyncGameLibraryWithBudgetAsync()
+        {
+            Task<List<Game_Manager.GameLauncherItem>?> scan =
+                Task.Run(() => Game_Manager.syncGame_Library());
+
+            bool finishedInBudget;
+            try
+            {
+                finishedInBudget = scan.Wait(GameLibraryStartupBudget);
+            }
+            catch (AggregateException)
+            {
+                // Faulted inside the budget: PublishGameLibraryScan logs it.
+                finishedInBudget = true;
+            }
+
+            if (finishedInBudget)
+            {
+                PublishGameLibraryScan(scan);
+                return;
+            }
+
+            _logger?.LogWarning(
+                "Game library scan outlived the {Budget}s startup budget; the list publishes when the scan finishes",
+                GameLibraryStartupBudget.TotalSeconds);
+            _ = scan.ContinueWith(t => PublishGameLibraryScan(t), TaskScheduler.Default);
+        }
+
+        /// <summary>
+        /// Publishes a completed scan. A failed or empty scan keeps the list that is
+        /// already published: null means "no games" to the FPS overlay and Adaptive Mode,
+        /// so a late failure must not wipe a list the UI is showing.
+        /// </summary>
+        private static void PublishGameLibraryScan(Task<List<Game_Manager.GameLauncherItem>?> scan)
+        {
+            try
+            {
+                if (scan.IsCompletedSuccessfully && scan.Result is not null)
+                    Game_Manager.installedGames = scan.Result;
+                else if (scan.IsFaulted || scan.IsCanceled)
+                    Log.Logger.Error(scan.Exception?.GetBaseException(),
+                        "Failed to sync game library during startup");
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to sync game library during startup");
             }
         }
 
@@ -1338,16 +1981,25 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private void OnExit(object sender, ExitEventArgs e)
         {
-            // Marks this shutdown as intentional (tray Exit / window close), so the
-            // guardian does not relaunch the app. Crash paths never reach OnExit.
-            // The flag file outlives the process, so the guardian's next poll
-            // (up to 5s later) still sees it.
+            // Tell the engine this shutdown is intentional so its supervisor does
+            // not relaunch the app (a crash never reaches OnExit). The app exits
+            // right after this, so the call is waited on - bounded, because a
+            // wedged engine must never wedge the exit. A signal the engine never
+            // receives costs one relaunch, not correctness.
             try
             {
-                Directory.CreateDirectory(LOGS_FOLDER);
-                File.WriteAllText(GracefulExitFlagPath, DateTime.UtcNow.ToString("O"));
+                IEngineCapability? engine = GetService<IEngineCapability>();
+                if (engine is not null)
+                {
+                    using var notifyCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    engine.NotifyAppExitAsync(notifyCts.Token).GetAwaiter().GetResult();
+                }
             }
-            catch { /* best-effort during teardown */ }
+            catch
+            {
+                // Best effort during teardown. This is also the normal path when
+                // the engine is not running, where there is nothing to disarm.
+            }
 
             _showListenerCts?.Cancel();
             _showEvent?.Dispose();
@@ -1452,27 +2104,15 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Log.Logger.Fatal(e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()), "Unhandled exception on non-UI thread");
-
-            if (e.IsTerminating)
-            {
-                // Try to show a message box, but this may not work if the UI thread is dead
-                try
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show(
-                            $"A critical error occurred:\n\n{e.ExceptionObject}\n\nThe application will now close.",
-                            "Critical Error",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
-                    });
-                }
-                catch
-                {
-                    // UI thread is dead, can't show dialog
-                }
-            }
+            // Log only - never block here. The message box this handler used to
+            // show ran through Dispatcher.Invoke, and while it was up the runtime
+            // could not terminate the process: field, 2026-11-04, a background
+            // NRE at 08:41 left a frozen app behind a dialog until the user
+            // dismissed it at 08:57, so the engine's supervisor saw a live
+            // process the whole time and could not revive anything. A logged
+            // death the supervisor can react to beats a hang nobody can see.
+            Log.Logger.Fatal(e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()),
+                "Unhandled exception on non-UI thread (terminating={Terminating})", e.IsTerminating);
         }
 
         private static void SafeFireAndForget(Task task)

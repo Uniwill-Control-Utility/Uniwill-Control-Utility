@@ -1,10 +1,12 @@
-﻿using Gma.System.MouseKeyHook;
+using Gma.System.MouseKeyHook;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Forms;
+using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services.Performance;
 
@@ -22,9 +24,28 @@ namespace Uniwill_Control_Utility.Services
         private readonly FlydigiCoolerHidService? _flydigi;
 
         private readonly object _settingsSaveLock = new();
+        // The user shortcut map (U-204): same hook, same debounce, one
+        // dispatcher for both consumers.
+        private readonly ShortcutService? _shortcuts;
+
         private readonly object _hookLock = new();
+        private readonly object _hookThreadLock = new();
 
         private IKeyboardMouseEvents? _hook;
+
+        // The global hook's owning thread: a dedicated pumped dispatcher thread.
+        // SetWindowsHookEx(WH_KEYBOARD_LL) can stall in win32k - proven from a
+        // process dump of a frozen app: the UI thread sat inside the native call
+        // (installing the hook during the secure-desktop transition of a UAC
+        // prompt), and the frozen dispatcher left the splash overlay unable to
+        // dismiss and the dashboard never rendered. Installing on a dedicated
+        // thread, and posting rather than invoking, makes a stalled install cost
+        // a late-activating hotkey - never a frozen window. The pump is required:
+        // low-level hook callbacks are delivered to the installing thread's
+        // message queue, and an unpumped thread gets the hook silently removed
+        // after LowLevelHooksTimeout.
+        private Thread? _hookThread;
+        private Dispatcher? _hookDispatcher;
 
         private DateTime _lastHotkeyUtc = DateTime.MinValue;
         private bool _disposed;
@@ -35,6 +56,56 @@ namespace Uniwill_Control_Utility.Services
         private IDisposable? _rtssOsdHardwareLease;
         private IDisposable? _rtssOsdFpsLease;
         private bool _rtssOsdWasShowing; // tracks if OSD was last showing for focus-loss detection
+        private DateTime _rtssOsdLastBeatUtc;
+
+        /// <summary>
+        /// In-focus heartbeat cadence for the field diagnostics (see
+        /// OnRtssOsdTick). 10 s: a 2-minute field repro yields ~12 lines, and
+        /// the fingerprint resolution is plenty to tell streaming values from
+        /// frozen ones.
+        /// </summary>
+        private static readonly TimeSpan OsdHeartbeatInterval = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Tick duration that earns a stage-time line (see the tick's
+        /// finally). Healthy ticks run sub-millisecond work every
+        /// RefreshIntervalMs; 500 ms is ~2 refresh intervals - the field
+        /// hiccup report (the OSD skips an update every ~3 ticks) lives
+        /// there, and the stage times name the slow call. Debounced to one
+        /// line per 5 s so a persistently slow chain stays readable.
+        /// </summary>
+        private const long SlowTickMs = 500;
+
+        private DateTime _rtssOsdLastSlowLogUtc;
+
+        /// <summary>Stage segment for the slow-tick line: "-" when the tick
+        /// never reached that stage (it is parked inside the previous one).</summary>
+        private static string Seg(long end, long start) =>
+            end < 0 || start < 0 ? "-" : (end - start).ToString();
+
+        /// <summary>
+        /// OSD diagnostics at Warning severity - the app log's field level.
+        /// Transitions and failures only, plus one bounded heartbeat line per
+        /// <see cref="OsdHeartbeatInterval"/> while in focus. The whole OSD
+        /// chain was invisible on guarded boxes (the writer logs at
+        /// Information, the reader debounces into Debug, both filtered), and
+        /// the freeze report (values stop 1-2 s after the game takes the
+        /// foreground) cannot be closed without field evidence. The
+        /// fingerprints separate the faces: heartbeat lines STOP = the tick
+        /// thread is blocked; fingerprint stops CHANGING = the serving path
+        /// froze; fingerprint streams while the render stays frozen = the
+        /// writes land and RTSS rendering is the frozen side; the slot NUMBER
+        /// changes every line = the claimed owner keeps getting dropped.
+        /// </summary>
+        private static void LogOsd(string message)
+        {
+            try { Serilog.Log.Warning("[Overlay] OSD " + message); } catch { }
+        }
+
+        private static string BuildHeartbeat(int slot, HardwareMetricsSnapshot h, FpsMetricsSnapshot f) =>
+            $"in-game slot {slot}: fps {f.Fps} cpu {h.CpuTemperature}C {h.CpuUsage}% {h.CpuPowerWatts}W {h.CpuClockMhz}MHz " +
+            $"gpu {h.GpuTemperature}C {(int)h.GpuUsage}% {h.GpuPowerWatts}W {h.GpuClockMhz}MHz " +
+            $"mem {h.SystemMemoryUsedGb:F1}/{h.SystemMemoryTotalGb:F1}GB";
         private readonly object _rtssOsdLock = new(); // prevents concurrent ticks from System.Timers.Timer thread-pool dispatch
 
         public OverlayOptions CurrentOptions =>
@@ -46,7 +117,8 @@ namespace Uniwill_Control_Utility.Services
             Performance.IFpsMonitoringService fps,
             EcTelemetryService? ecTelemetry = null,
             HydroUIService? hydroUi = null,
-            FlydigiCoolerHidService? flydigi = null)
+            FlydigiCoolerHidService? flydigi = null,
+            ShortcutService? shortcuts = null)
         {
             _settingsStore =
                 settingsStore ??
@@ -66,7 +138,26 @@ namespace Uniwill_Control_Utility.Services
             _ecTelemetry = ecTelemetry;
             _hydroUi = hydroUi;
             _flydigi = flydigi;
+            _shortcuts = shortcuts;
+
+            if (_shortcuts is not null)
+            {
+                // Adding/removing the last shortcut must add/remove the hook
+                // itself: the map lives on the overlay's hook, not beside it.
+                _shortcuts.Changed += () => PostToHookThread(() =>
+                {
+                    if (NeedsHook(_settingsStore.Current))
+                        EnsureHook();
+                    else
+                        RemoveHook();
+                });
+            }
         }
+
+        /// <summary>The hook serves the overlay toggles AND the user shortcut
+        /// map, so it is needed when either consumer exists.</summary>
+        private bool NeedsHook(OverlayOptions options) =>
+            options.Enabled || (_shortcuts?.Bindings.Count ?? 0) > 0;
 
         public Task StartAsync(
             CancellationToken cancellationToken)
@@ -77,21 +168,29 @@ namespace Uniwill_Control_Utility.Services
 
             OverlayOptions options = _settingsStore.Current;
 
-            if (options.Enabled)
+            if (NeedsHook(options))
             {
                 /*
-                 * MouseKeyHook installs WH_KEYBOARD_LL / WH_MOUSE_LL hooks via
-                 * SetWindowsHookEx.  Although low-level hooks don't require a
-                 * message pump on the calling thread, the hook is scoped to the
-                 * desktop of the thread that calls SetWindowsHookEx.  When
-                 * IHostedService.StartAsync fires on a thread-pool thread the
-                 * hook may end up on a different desktop or fail silently, so
-                 * keyboard events never reach the callback.  Installing on the
-                 * UI thread (which is guaranteed to be on WinSta0\Default)
-                 * avoids this problem.
+                 * The global hook goes to its dedicated pumped thread (field-
+                 * proven): installing WH_KEYBOARD_LL on the UI thread stalled
+                 * inside native SetWindowsHookEx during a UAC secure-desktop
+                 * transition, and the frozen dispatcher froze the whole window
+                 * (splash overlay unable to close at 92 %, dashboard never
+                 * rendered). The hook is scoped to the installing thread's
+                 * desktop, and every thread of an interactive-session process is
+                 * on WinSta0\Default, so the dedicated thread keeps the events
+                 * flowing without owning the UI.
+                 *
+                 * The hook also carries the user shortcut map (U-204), so it is
+                 * installed when the overlay is off but shortcuts exist - a
+                 * shortcut silently dying with the overlay toggle was the
+                 * first-draft bug.
                  */
-                RunOnUiThread(EnsureHook);
+                PostToHookThread(EnsureHook);
+            }
 
+            if (options.Enabled)
+            {
                 // Start RTSS OSD timer.
                 StartRtssOsd(options);
             }
@@ -109,7 +208,15 @@ namespace Uniwill_Control_Utility.Services
 
             StopRtssOsd();
 
-            RunOnUiThread(RemoveHook);
+            // Uninstall on the hook thread (the callbacks' delivering thread), then
+            // end its pump. BeginInvoke ordering: the removal runs before shutdown.
+            PostToHookThread(RemoveHook);
+            lock (_hookThreadLock)
+            {
+                _hookDispatcher?.BeginInvokeShutdown(DispatcherPriority.Normal);
+                _hookDispatcher = null;
+                _hookThread = null;
+            }
 
             return Task.CompletedTask;
         }
@@ -123,13 +230,18 @@ namespace Uniwill_Control_Utility.Services
 
             SaveOptionsIfChanged(normalisedOptions);
 
-            RunOnUiThread(() =>
+            // Hook enable/disable belongs to the hook thread; the RTSS timer keeps
+            // the dispatcher it has always run on.
+            PostToHookThread(() =>
             {
-                if (normalisedOptions.Enabled)
+                if (NeedsHook(normalisedOptions))
                     EnsureHook();
                 else
                     RemoveHook();
+            });
 
+            RunOnUiThread(() =>
+            {
                 // Manage RTSS OSD timer based on enabled state.
                 if (normalisedOptions.Enabled)
                     StartRtssOsd(normalisedOptions);
@@ -210,13 +322,55 @@ namespace Uniwill_Control_Utility.Services
         {
             lock (_hookLock)
             {
-                if (_hook is null)
-                    return;
-
-                _hook.KeyDown -= OnGlobalKeyDown;
-                _hook.Dispose();
-                _hook = null;
+                if (_hook is not null)
+                {
+                    _hook.KeyDown -= OnGlobalKeyDown;
+                    _hook.Dispose();
+                    _hook = null;
+                }
             }
+        }
+
+        /// <summary>
+        /// Queues hook work onto the dedicated pumped hook thread, starting it on
+        /// first use. Post (BeginInvoke), never Invoke: the point of the thread is
+        /// that a stalled SetWindowsHookEx cannot block the caller - least of all
+        /// the UI thread. The thread is on the interactive session's window
+        /// station like every thread of this process, so the hook sees the same
+        /// desktop it always did.
+        /// </summary>
+        private void PostToHookThread(Action action)
+        {
+            ArgumentNullException.ThrowIfNull(action);
+
+            Dispatcher dispatcher;
+            lock (_hookThreadLock)
+            {
+                if (_hookDispatcher is null)
+                {
+                    var pumpReady = new ManualResetEventSlim(false);
+                    _hookThread = new Thread(() =>
+                    {
+                        _hookDispatcher = Dispatcher.CurrentDispatcher;
+                        pumpReady.Set();
+                        Dispatcher.Run();
+                    })
+                    {
+                        IsBackground = true,
+                        Name = "UCU Global Hook",
+                    };
+                    _hookThread.SetApartmentState(ApartmentState.STA);
+                    _hookThread.Start();
+                    pumpReady.Wait();
+                }
+
+                dispatcher = _hookDispatcher!;
+            }
+
+            if (dispatcher.CheckAccess())
+                action();
+            else
+                dispatcher.BeginInvoke(action, DispatcherPriority.Input);
         }
 
         private void OnGlobalKeyDown(
@@ -254,7 +408,13 @@ namespace Uniwill_Control_Utility.Services
             {
                 _lastHotkeyUtc = now;
                 ToggleContents();
+                return;
             }
+
+            // User shortcut map (U-204). Matching happens here (hook thread);
+            // the action is queued on the UI dispatcher by the service.
+            if (_shortcuts?.TryHandle(e) == true)
+                _lastHotkeyUtc = now;
         }
 
         private OverlayOptions NormaliseForStorage(
@@ -347,7 +507,24 @@ namespace Uniwill_Control_Utility.Services
 
             StopRtssOsd();
 
-            RunOnUiThread(RemoveHook);
+            // Uninstall on the hook thread if there is one (never start a thread
+            // to tear one down), then end its pump.
+            lock (_hookThreadLock)
+            {
+                if (_hookDispatcher is not null)
+                {
+                    Dispatcher dispatcher = _hookDispatcher;
+                    _hookDispatcher = null;
+                    _hookThread = null;
+
+                    if (dispatcher.CheckAccess())
+                        RemoveHook();
+                    else
+                        dispatcher.BeginInvoke(RemoveHook, DispatcherPriority.Normal);
+
+                    dispatcher.BeginInvokeShutdown(DispatcherPriority.Normal);
+                }
+            }
 
             GC.SuppressFinalize(this);
         }
@@ -417,10 +594,13 @@ namespace Uniwill_Control_Utility.Services
         {
             lock (_rtssOsdLock)
             {
+                Stopwatch sw = Stopwatch.StartNew();
+                long tSettings = -1, tFocus = -1, tEnrich = -1, tWrite = -1;
                 try
                 {
                     FpsMetricsSnapshot fps = _fps.Latest;
                     OverlayOptions options = _settingsStore.Current;
+                    tSettings = sw.ElapsedMilliseconds;
 
                 // Determine whether the target game is currently in focus.
                 // The OSD should only render when the game window is foreground.
@@ -432,10 +612,10 @@ namespace Uniwill_Control_Utility.Services
                 // still shows hardware metrics for hooked processes outside the
                 // game library.
                 bool gameInFocus = false;
+                int foregroundPid = GetForegroundProcessId();
 
                 if (fps.IsAvailable && fps.ProcessId > 0)
                 {
-                    int foregroundPid = GetForegroundProcessId();
                     gameInFocus = foregroundPid == fps.ProcessId;
                 }
                 else
@@ -447,13 +627,14 @@ namespace Uniwill_Control_Utility.Services
                     // FPS > 0, which would make gameInFocus always true when any
                     // game is running. We verify the returned PID matches the
                     // foreground to avoid that.
-                    int foregroundPid = GetForegroundProcessId();
                     if (foregroundPid > 0 && RtssReader.TryRead(foregroundPid, out RtssFpsData fallbackData) && fallbackData.Fps > 0
                         && fallbackData.ProcessId == foregroundPid)
                     {
                         gameInFocus = true;
                     }
                 }
+
+                tFocus = sw.ElapsedMilliseconds;
 
                 // If the game is not in focus, write a single-space OSD to hide
                 // the metrics while keeping the slot claimed. RTSS renders this
@@ -462,11 +643,19 @@ namespace Uniwill_Control_Utility.Services
                 // After hiding, also call Release() to fully clear the slot.
                 if (!gameInFocus)
                 {
+                    if (_rtssOsdWasShowing)
+                    {
+                        LogOsd(
+                            $"focus OFF: foreground pid={foregroundPid}, " +
+                            $"fps-service pid={fps.ProcessId} available={fps.IsAvailable}");
+                    }
+
                     // First write a space so RTSS renders a blank frame, then
                     // release the slot. The two-step approach ensures RTSS sees
                     // the buffer change before the slot goes unowned.
                     RtssOsdWriter.Update(" ");
                     RtssOsdWriter.Release();
+                    tWrite = sw.ElapsedMilliseconds;
                     _rtssOsdWasShowing = false;
                     return;
                 }
@@ -506,22 +695,73 @@ namespace Uniwill_Control_Utility.Services
                     flydigi = new FlydigiSnapshot(fanData.CurrentRpm, model);
                 }
 
+                tEnrich = sw.ElapsedMilliseconds;
+
                 string? osdText = RtssOsdFormatter.Build(hardware, fps, options, hydroUi, flydigi);
-                if (osdText is not null)
+                if (osdText is null)
                 {
-                    bool wrote = RtssOsdWriter.Update(osdText);
-                    if (wrote)
-                        _rtssOsdWasShowing = true;
+                    if (_rtssOsdWasShowing)
+                        LogOsd("formatter produced no text (no rows enabled)");
+                    tWrite = tEnrich;
+                    _rtssOsdWasShowing = false;
+                    return;
+                }
+
+                int slot = RtssOsdWriter.Update(osdText);
+                if (slot >= 0)
+                {
+                    DateTime nowUtc = DateTime.UtcNow;
+                    if (!_rtssOsdWasShowing)
+                    {
+                        LogOsd(
+                            $"focus ON: game pid={foregroundPid}, " +
+                            $"source={(fps.IsAvailable ? "fps-service" : "rtss-fallback")}, slot {slot}, fps {fps.Fps}");
+                        _rtssOsdLastBeatUtc = nowUtc;
+                    }
+                    else if (nowUtc - _rtssOsdLastBeatUtc >= OsdHeartbeatInterval)
+                    {
+                        LogOsd(BuildHeartbeat(slot, hardware, fps));
+                        _rtssOsdLastBeatUtc = nowUtc;
+                    }
+
+                    _rtssOsdWasShowing = true;
                 }
                 else
                 {
+                    if (_rtssOsdWasShowing)
+                        LogOsd("writer failed: no slot/mapping (RTSS gone, slot table full, owner dropped)");
                     _rtssOsdWasShowing = false;
                 }
+
+                tWrite = sw.ElapsedMilliseconds;
             }
             catch (Exception ex)
             {
                 // Transient read failure must not crash the timer loop.
                 try { Serilog.Log.Warning(ex, "[Overlay] RtssOsdTick failed"); } catch { }
+            }
+            finally
+            {
+                // Stage breadcrumbs (field report 2026-10-29: the OSD skips
+                // an update every ~3 ticks). Each stage is timed; a tick over
+                // SlowTickMs names where the time went: fps+settings
+                // (_fps.Latest lock, settings store), focus-detect
+                // (GetForegroundProcessId, RtssReader.TryRead shared memory),
+                // read+enrich (ReadSnapshot, EC fan cache, Hydro UI, Flydigi
+                // HID), format+write (RtssOsdWriter shared memory). If the
+                // stages stay fast while the visible OSD hiccups, the cadence
+                // is RTSS's own render/update side, not this chain.
+                if (sw.ElapsedMilliseconds >= SlowTickMs &&
+                    DateTime.UtcNow - _rtssOsdLastSlowLogUtc >= TimeSpan.FromSeconds(5))
+                {
+                    _rtssOsdLastSlowLogUtc = DateTime.UtcNow;
+                    LogOsd(
+                        $"slow tick {sw.ElapsedMilliseconds}ms: " +
+                        $"fps+settings {Seg(tSettings, 0)}ms, " +
+                        $"focus-detect {Seg(tFocus, tSettings)}ms, " +
+                        $"read+enrich {Seg(tEnrich, tFocus)}ms, " +
+                        $"format+write {Seg(tWrite, tEnrich)}ms");
+                }
             }
             }
         }
@@ -543,110 +783,6 @@ namespace Uniwill_Control_Utility.Services
         private static partial uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 
         #endregion
-
-        private readonly record struct Hotkey(
-            bool Control,
-            bool Alt,
-            bool Shift,
-            Keys Key)
-        {
-            public bool Matches(KeyEventArgs e)
-            {
-                return e.Control == Control &&
-                       e.Alt == Alt &&
-                       e.Shift == Shift &&
-                       e.KeyCode == Key;
-            }
-
-            public static bool TryParse(
-                string? text,
-                out Hotkey hotkey)
-            {
-                hotkey = default;
-
-                if (string.IsNullOrWhiteSpace(text))
-                    return false;
-
-                bool control = false;
-                bool alt = false;
-                bool shift = false;
-                bool hasPrimaryKey = false;
-
-                Keys key = Keys.None;
-
-                string[] tokens = text.Split(
-                    '+',
-                    StringSplitOptions.TrimEntries |
-                    StringSplitOptions.RemoveEmptyEntries);
-
-                foreach (string token in tokens)
-                {
-                    if (token.Equals(
-                            "Ctrl",
-                            StringComparison.OrdinalIgnoreCase) ||
-                        token.Equals(
-                            "Control",
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        control = true;
-                        continue;
-                    }
-
-                    if (token.Equals(
-                            "Alt",
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        alt = true;
-                        continue;
-                    }
-
-                    if (token.Equals(
-                            "Shift",
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        shift = true;
-                        continue;
-                    }
-
-                    if (hasPrimaryKey)
-                        return false;
-
-                    if (!Enum.TryParse(
-                            token,
-                            true,
-                            out key))
-                    {
-                        return false;
-                    }
-
-                    hasPrimaryKey = true;
-                }
-
-                if (!hasPrimaryKey ||
-                    key == Keys.None ||
-                    key is
-                        Keys.ControlKey or
-                        Keys.LControlKey or
-                        Keys.RControlKey or
-                        Keys.Menu or
-                        Keys.LMenu or
-                        Keys.RMenu or
-                        Keys.ShiftKey or
-                        Keys.LShiftKey or
-                        Keys.RShiftKey)
-                {
-                    return false;
-                }
-
-                hotkey = new Hotkey(
-                    control,
-                    alt,
-                    shift,
-                    key);
-
-                return true;
-            }
-        }
 
         /// <summary>Snapshot of Hydro UI pump and fan state for the RTSS OSD formatter.</summary>
         internal readonly record struct HydroUiSnapshot(

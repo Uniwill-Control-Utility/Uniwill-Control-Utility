@@ -1,0 +1,64 @@
+using UCU.Contracts;
+using UCU.Hardware.Ec;
+
+namespace UCU.Engine
+{
+    /// <summary>Battery-domain verbs: telemetry reads and the charging-mode register.</summary>
+    internal static class BatteryVerbs
+    {
+        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate)
+        {
+            add(EngineVerbs.Battery.GetTelemetry, (p, ct) =>
+            {
+                // A null result means the EC block was unreadable; the dashboard keeps
+                // its last known values, which is what the in-process code does today.
+                BatteryTelemetry? telemetry = gate.Acquire().ReadBatteryTelemetry();
+                if (telemetry == null)
+                    return Task.FromResult<object?>(null);
+
+                BatteryTelemetry t = telemetry.Value;
+                return Task.FromResult<object?>(new BatteryTelemetryDto
+                {
+                    IsAcPowered = t.IsAcPowered,
+                    StateOfCharge = t.StateOfCharge,
+                    HealthPercent = t.HealthPercent,
+                    TemperatureC = t.TemperatureC,
+                    CycleCount = t.CycleCount,
+                    PresentVoltageMv = t.PresentVoltageMv,
+                    ChargeRateMa = t.ChargeRateMa,
+                });
+            });
+
+            add(EngineVerbs.Battery.GetTemperature, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().ReadBatteryTemperatureC()));
+
+            add(EngineVerbs.Battery.GetMode, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().GetBatteryMode()));
+
+            add(EngineVerbs.Battery.SetMode, (p, ct) =>
+            {
+                BatteryModeDto dto = EngineSerializer.BindParams<BatteryModeDto>(p);
+                gate.Acquire().SetBatteryMode(dto.Mode);
+                return Task.FromResult<object?>(null);
+            });
+
+            // U-103 status rows. All three are READS: the lab-box field probe
+            // (2026-10-30) refuted the open-revo chassis' explicit threshold
+            // registers on this family, so there is no threshold write verb —
+            // the thresholds are the verified mode's ceiling, derived in the
+            // codec, and the gate/override bytes are surfaced as the EC state
+            // they are. A refused mode write stays InvalidValue (the codec).
+            add(EngineVerbs.Battery.GetGateStatus, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().GetBatteryGateStatus()));
+
+            add(EngineVerbs.Battery.GetThresholds, (p, ct) =>
+            {
+                (int up, int down) = gate.Acquire().GetBatteryThresholds();
+                return Task.FromResult<object?>(new BatteryThresholdsDto { UpPercent = up, DownPercent = down });
+            });
+
+            add(EngineVerbs.Battery.GetPlatformOverride, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().GetBatteryPlatformOverride()));
+        }
+    }
+}

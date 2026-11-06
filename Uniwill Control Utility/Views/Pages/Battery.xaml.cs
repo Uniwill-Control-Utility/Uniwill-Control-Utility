@@ -7,6 +7,8 @@ using System.Windows.Threading;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
+using UCU.Contracts;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -19,7 +21,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         // milliseconds to avoid reading back the stale value before the EC commits.
         private const int ApplyGraceMs = 10000; // 10 seconds
 
-        private readonly UniwillECService? _ecService;
+        private readonly IBatteryCapability? _battery;
+        private readonly IEngineCapability? _engine;
         private readonly DispatcherTimer _refreshTimer = new()
         {
             Interval = TimeSpan.FromSeconds(RefreshIntervalSeconds),
@@ -27,6 +30,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
         private bool _isEcAvailable;
         private bool _isLoaded;
+
+        // The gate/threshold/override verbs are the U-103 additions; an engine
+        // installed before them answers UnsupportedVerb, and the rows hide for
+        // the page's lifetime (the legacy charge-limit path is untouched).
+        private bool _statusRowsSupported = true;
 
         // Delayed refresh timer created after each user change. Tracked as a field
         // so it can be stopped on Page_Unloaded — the NavigationView caches the page,
@@ -44,12 +52,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             _refreshTimer.Tick += OnRefreshTimerTick;
 
-            _ecService = App.GetService<UniwillECService>();
-            if (_ecService is not null)
+            _battery = App.GetService<IBatteryCapability>();
+            _engine = App.GetService<IEngineCapability>();
+            if (_battery is not null && _engine is not null)
             {
                 try
                 {
-                    _isEcAvailable = _ecService.Initialize();
+                    _isEcAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -114,7 +123,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             int currentMode;
             try
             {
-                currentMode = _ecService!.GetBatteryMode();
+                currentMode = _battery!.GetModeAsync().GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -132,7 +141,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 try
                 {
-                    _ecService.SetBatteryMode(savedMode);
+                    _battery!.SetModeAsync(savedMode).GetAwaiter().GetResult();
                     _lastUserApplyTime = DateTime.UtcNow;
                     Debug.WriteLine($"[Battery] Startup: EC mode ({currentMode}) differed from saved ({savedMode}), applied saved");
                 }
@@ -159,7 +168,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                _ecService!.SetBatteryMode(mode);
+                _battery!.SetModeAsync(mode).GetAwaiter().GetResult();
                 Settings.Default.BatteryMode = mode;
                 Settings.Default.Save();
                 _lastUserApplyTime = DateTime.UtcNow;
@@ -201,7 +210,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void RefreshAll()
         {
-            if (_ecService is null) return;
+            if (_battery is null) return;
 
             // Skip syncing the combo box if the user recently changed the setting —
             // the EC may not have committed yet.
@@ -209,7 +218,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                int ecMode = _ecService.GetBatteryMode();
+                int ecMode = _battery!.GetModeAsync().GetAwaiter().GetResult();
                 if (!withinGrace)
                 {
                     // Sync combo box to EC state without triggering SelectionChanged
@@ -230,18 +239,67 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Debug.WriteLine($"[Battery] Failed to read charge limit from EC: {ex.Message}");
             }
 
+            RefreshStatusRows();
             RefreshTelemetry();
+        }
+
+        /// <summary>
+        /// Live state rows (U-103): the charge gate (the EC's own gating bit,
+        /// 0x0742!bit4), the threshold pair the current mode implies (derived —
+        /// this chassis family exposes no threshold registers, field probe
+        /// 2026-10-30), and the platform-override notice (0x0770 != 0xFF).
+        /// Rides the page's 5-second poll. A pre-U-103 engine answers the new
+        /// verbs with UnsupportedVerb; the rows then hide for the session —
+        /// the legacy charging-limit path keeps working untouched.
+        /// </summary>
+        private void RefreshStatusRows()
+        {
+            if (_battery is null || !_statusRowsSupported)
+                return;
+
+            try
+            {
+                bool gateActive = _battery.GetGateStatusAsync().GetAwaiter().GetResult();
+                BatteryThresholdsDto thresholds = _battery.GetThresholdsAsync().GetAwaiter().GetResult();
+                bool overrideActive = _battery.GetPlatformOverrideAsync().GetAwaiter().GetResult();
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    tbChargeGate.Text = gateActive
+                        ? LocalizationService.Get("Active")
+                        : LocalizationService.Get("Idle");
+                    tbChargeThresholds.Text = LocalizationService.Format(
+                        "up to {0} %, restart at {1} %", thresholds.UpPercent, thresholds.DownPercent);
+                    PlatformOverrideNotice.Visibility = overrideActive ? Visibility.Visible : Visibility.Collapsed;
+                });
+            }
+            catch (EngineException ex) when (ex.Code == EngineErrorCode.UnsupportedVerb)
+            {
+                // Engine older than the status verbs: hide the rows, keep the page.
+                _statusRowsSupported = false;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ChargeThresholdsRow.Visibility = Visibility.Collapsed;
+                    ChargeGateRow.Visibility = Visibility.Collapsed;
+                    PlatformOverrideNotice.Visibility = Visibility.Collapsed;
+                });
+                Debug.WriteLine("[Battery] Engine lacks the battery status verbs; status rows hidden");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Battery] Failed to read battery status rows: {ex.Message}");
+            }
         }
 
         private void RefreshTelemetry()
         {
-            if (_ecService is null) return;
+            if (_battery is null) return;
 
             try
             {
-                var telemetry = _ecService.ReadBatteryTelemetry();
+                BatteryTelemetryDto? telemetry = _battery.GetTelemetryAsync().GetAwaiter().GetResult();
                 if (telemetry is not null)
-                    Application.Current.Dispatcher.Invoke(() => UpdateTelemetryUi(telemetry.Value));
+                    Application.Current.Dispatcher.Invoke(() => UpdateTelemetryUi(telemetry));
             }
             catch (Exception ex)
             {
@@ -249,7 +307,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void UpdateTelemetryUi(UniwillECService.BatteryTelemetry telemetry)
+        private void UpdateTelemetryUi(BatteryTelemetryDto telemetry)
         {
             if (telemetry.IsAcPowered)
             {

@@ -11,6 +11,7 @@ using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Settings = Uniwill_Control_Utility.Properties.Settings;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Scripts
 {
@@ -29,7 +30,13 @@ namespace Uniwill_Control_Utility.Scripts
 
         // Optional EC service reference for --ec-* command routing.
         // Set from App.xaml.cs or MainWindowViewModel after DI resolves the service.
-        internal static UniwillECService? EcService { get; set; }
+        internal static IPowerCapability? EcService { get; set; }
+
+        /// <summary>
+        /// Fan capability companion: preset apply writes fan curves too, and the
+        /// capabilities split EC work by domain, so the static wiring carries both.
+        /// </summary>
+        internal static IFanCapability? FanService { get; set; }
 
         public static void Translate(string ryzenAdjString, bool isAutoReapply = false, string? appliedName = null, bool localizeAppliedName = false) =>
             _ = TranslateAsync(ryzenAdjString, isAutoReapply, appliedName, localizeAppliedName);
@@ -53,6 +60,19 @@ namespace Uniwill_Control_Utility.Scripts
                     .ToArray();
 
                 DiagnosticLogger.LogDebug($"Translate string: {normalizedCommands}");
+
+                // The EC verbs in this batch are one pipe connect each. Two facts make
+                // them worth guarding: a connect to the missing pipe of a stopped
+                // engine costs the full 5 s connect timeout, and a wedged EC costs the
+                // engine's 30 s call budget (the client waits up to its 45 s response
+                // budget) - so a preset with seven ec-* writes costs 35 s with the
+                // engine down and minutes with the EC wedged, on the startup path.
+                // Neither state changes part-way through a batch, so: skip the ec-*
+                // commands when the service is not running, and stop sending them at
+                // the first unavailable/timeout. The non-EC commands (SMU, Intel,
+                // NVIDIA, Windows) are app-side and keep running.
+                bool ecBatchStopped = false;
+
                 foreach (string ryzenAdjCommand in ryzenAdjCommands)
                 {
                         try
@@ -69,10 +89,38 @@ namespace Uniwill_Control_Utility.Scripts
                             }
                             else if (ryzenAdjCommandString.Contains("Win-Power"))
                             {
-                                // ignore return value - fire and forget system calls
-                                if (ryzenAdjCommandValueString == WinPowerValueSaver) _ = PowerSetActiveOverlayScheme(PowerSaverPowerSchemeGuid);
-                                else if (ryzenAdjCommandValueString == WinPowerValueBalanced) _ = PowerSetActiveOverlayScheme(BalancedPowerSchemeGuid);
-                                else if (ryzenAdjCommandValueString == WinPowerValueHighPerformance) _ = PowerSetActiveOverlayScheme(HighPerformancePowerSchemeGuid);
+                                // The active overlay scheme is a standard-user
+                                // powrprof act (Settings' power-mode toggle uses
+                                // it) - no elevation to route, so the engine is
+                                // not needed here. What WAS missing is the
+                                // witness: the calls discarded the status code,
+                                // so a failed scheme switch left no trace. Log
+                                // the answer for each apply.
+                                string overlayScheme;
+                                uint overlayStatus;
+
+                                if (ryzenAdjCommandValueString == WinPowerValueSaver)
+                                {
+                                    overlayStatus = PowerSetActiveOverlayScheme(PowerSaverPowerSchemeGuid);
+                                    overlayScheme = "saver";
+                                }
+                                else if (ryzenAdjCommandValueString == WinPowerValueBalanced)
+                                {
+                                    overlayStatus = PowerSetActiveOverlayScheme(BalancedPowerSchemeGuid);
+                                    overlayScheme = "balanced";
+                                }
+                                else if (ryzenAdjCommandValueString == WinPowerValueHighPerformance)
+                                {
+                                    overlayStatus = PowerSetActiveOverlayScheme(HighPerformancePowerSchemeGuid);
+                                    overlayScheme = "high-performance";
+                                }
+                                else
+                                {
+                                    overlayStatus = 0;
+                                    overlayScheme = "none";
+                                }
+
+                                DiagnosticLogger.LogDebug($"Win power overlay -> {overlayScheme}: status=0x{overlayStatus:X}");
                             }
                             else if (ryzenAdjCommandString.Contains("Win-CPU"))
                             {
@@ -92,7 +140,24 @@ namespace Uniwill_Control_Utility.Scripts
                                 {
                                     string[] limits = ryzenAdjCommandValueString.Split(',');
                                     if (limits.Length == 2)
-                                        IntelManagement.changeTDP(int.Parse(limits[0]), int.Parse(limits[1]));
+                                    {
+                                        // Battery envelope: the firmware refuses or
+                                        // penalises requests above its DC ceiling
+                                        // (measured 30-40 W CPU on the 275HX laptop),
+                                        // so clamp the pair and log what changed.
+                                        var envelope = UCU.Core.Power.BatteryPowerPolicy.EnvelopeFor(intelCpu: true);
+                                        var clamped = UCU.Core.Power.BatteryPowerPolicy.ClampCpu(
+                                            int.Parse(limits[0]), int.Parse(limits[1]),
+                                            onBattery: System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                                                       == System.Windows.Forms.PowerLineStatus.Offline,
+                                            cpuCeiling: envelope.CpuWatts);
+                                        if (clamped.Clamped)
+                                        {
+                                            DiagnosticLogger.LogInfo(
+                                                $"[Power] battery envelope: Intel PL clamped {clamped.RequestedPl1}/{clamped.RequestedPl2} W -> {clamped.Pl1}/{clamped.Pl2} W");
+                                        }
+                                        IntelManagement.changeTDP(clamped.Pl1, clamped.Pl2);
+                                    }
                                     else
                                         IntelManagement.changeTDPAll(int.Parse(ryzenAdjCommandValueString));
                                 }
@@ -128,6 +193,19 @@ namespace Uniwill_Control_Utility.Scripts
                                     continue;
                                 }
 
+                                if (ecBatchStopped)
+                                {
+                                    DiagnosticLogger.LogDebug($"EC command skipped: this batch already lost the engine ({ryzenAdjCommandString})");
+                                    continue;
+                                }
+
+                                var engineState = App.GetService<Uniwill_Control_Utility.Services.EngineAvailability>();
+                                if (engineState is not null && !engineState.IsRunning)
+                                {
+                                    DiagnosticLogger.LogDebug($"EC command skipped: the engine service is not running ({ryzenAdjCommandString})");
+                                    continue;
+                                }
+
                                 // On first EC command in a batch, set OVERBOOST profile.
                                 // This replicates the Linux tuxedo_io driver's uw_set_tdp()
                                 // which calls uw_set_performance_profile_v1(PROFILE_OVERBOOST)
@@ -135,19 +213,19 @@ namespace Uniwill_Control_Utility.Scripts
                                 // the EC to raise the power ceiling above the default 55W.
                                 if (ryzenAdjCommandString == "ec-overboost")
                                 {
-                                    EcService.SetOverboostProfile();
+                                    EcService.SetOverboostProfileAsync().GetAwaiter().GetResult();
                                     DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}");
                                     continue;
                                 }
 
                                 int ecValue = Convert.ToInt32(ryzenAdjCommandValueString);
 
-                                if (ryzenAdjCommandString == "ec-pl1") EcService.SetPl1(ecValue);
-                                else if (ryzenAdjCommandString == "ec-pl2") EcService.SetPl2(ecValue);
-                                else if (ryzenAdjCommandString == "ec-pl4") EcService.SetPl4(ecValue);
-                                else if (ryzenAdjCommandString == "ec-pl5") EcService.SetPl5(ecValue);
-                                else if (ryzenAdjCommandString == "ec-tcc-offset") EcService.SetTccOffset(ecValue);
-                                else if (ryzenAdjCommandString == "ec-mode") EcService.SetPerformanceMode(ecValue);
+                                if (ryzenAdjCommandString == "ec-pl1") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl1, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-pl2") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl2, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-pl4") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl4, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-pl5") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl5, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-tcc-offset") EcService.SetTccOffsetAsync(ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-mode") EcService.SetPerformanceModeAsync(ecValue).GetAwaiter().GetResult();
                                 else DiagnosticLogger.LogDebug($"Unknown EC command: {ryzenAdjCommandString}");
 
                                 DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}={ecValue}");
@@ -164,8 +242,13 @@ namespace Uniwill_Control_Utility.Scripts
 
                                 DiagnosticLogger.LogInfo($"SMU sending: {ryzenAdjCommandString} = 0x{ryzenAdjCommandValue:X} ({ryzenAdjCommandValue})");
 
-                                if (ryzenAdjCommandValue <= 0 && !ryzenAdjCommandString.Contains("co")) SMUCommands.applySettings(ryzenAdjCommandString, 0x0);
-                                else SMUCommands.applySettings(ryzenAdjCommandString, ryzenAdjCommandValue);
+                                // Engine SMU verb FIRST (PawnIO's device ACL admits
+                                // System/Administrators, so the app's own driver open
+                                // is access-denied unelevated — the silent death the
+                                // field saw); the app's SMU stack stays as SmuAccess's
+                                // fallback for a machine whose engine is not answering.
+                                if (ryzenAdjCommandValue <= 0 && !ryzenAdjCommandString.Contains("co")) SmuAccess.Execute(ryzenAdjCommandString, 0x0);
+                                else SmuAccess.Execute(ryzenAdjCommandString, ryzenAdjCommandValue);
 
                                 // CRITICAL: 50ms delay between SMU commands. The SMU firmware
                                 // needs time to process each command. Without this delay,
@@ -175,9 +258,27 @@ namespace Uniwill_Control_Utility.Scripts
                                 Thread.Sleep(SmuCommandDelayMs);
                             }
                         }
+                        catch (UCU.Contracts.EngineException ex) when (
+                            ex.Code == UCU.Contracts.EngineErrorCode.HardwareUnavailable
+                            || ex.Code == UCU.Contracts.EngineErrorCode.Timeout
+                            || ex.Code == UCU.Contracts.EngineErrorCode.Busy)
+                        {
+                            // The engine answered "hardware unavailable / busy / too slow".
+                            // For an EC write that will not improve while the batch runs,
+                            // so stop sending EC verbs and keep the app-side ones.
+                            if (ryzenAdjCommand.Contains("ec-", StringComparison.Ordinal))
+                            {
+                                ecBatchStopped = true;
+                                DiagnosticLogger.LogDebug($"EC commands stopped for this batch: engine {ex.Code} at {ryzenAdjCommand}");
+                            }
+                            else
+                            {
+                                LogCommandFailureOnce(ex, ryzenAdjCommand);
+                            }
+                        }
                         catch (Exception ex)
                         {
-                            DiagnosticLogger.LogError(ex, $"Failed to process command: {ryzenAdjCommand}");
+                            LogCommandFailureOnce(ex, ryzenAdjCommand);
                         }
                 }
 
@@ -187,6 +288,27 @@ namespace Uniwill_Control_Utility.Scripts
             {
                 DiagnosticLogger.LogError(ex, "Failed to translate RyzenAdj command string");
             }
+        }
+        /// <summary>
+        /// One stack trace per command name per process. A preset apply sends the
+        /// same command once per core (16x --set-coper on a 16-core part), so a
+        /// genuinely unsupported command used to fill the log with 16 identical
+        /// stacks and hide everything around it (field, 2026-11-02). The first
+        /// occurrence keeps the stack; repeats drop to Debug with the message.
+        /// </summary>
+        private static readonly System.Collections.Generic.HashSet<string> _loggedCommandFailures =
+            new(StringComparer.Ordinal);
+
+        private static void LogCommandFailureOnce(Exception ex, string command)
+        {
+            string key = command.Split('=')[0];
+            if (_loggedCommandFailures.Add(key))
+            {
+                DiagnosticLogger.LogError(ex, $"Failed to process command: {command} (further failures of '{key}' log at Debug)");
+                return;
+            }
+
+            DiagnosticLogger.LogDebug($"Failed again: {command}: {ex.Message}");
         }
         private static void NVIDIA(string command, string value)
         {

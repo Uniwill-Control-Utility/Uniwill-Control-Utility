@@ -17,6 +17,8 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
+using UCU.Contracts;
+using UCU.Contracts.Capabilities;
 using Wpf.Ui.Abstractions.Controls;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
@@ -28,8 +30,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string WmiNamespace = @"root\CIMV2";
         private const string WmiQueryProcessor = "SELECT * FROM Win32_Processor";
         private const string WmiQueryPhysicalMemory = "SELECT * FROM Win32_PhysicalMemory";
-        private const string ScheduledTaskName = "UCU";
-        private const string GuardianTaskName = "UCU Guardian";
+        private const string ScheduledTaskName = "UCU Autostart";
         private const string PresetExtension = ".UCUpresets";
 
         private readonly ILogger<SettingsPage> _logger;
@@ -47,8 +48,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _ramSpeed = 0, _ramType = 0, _ramWidth = 0, _ramSlots = 0;
         private string _ramProducer = "", _ramModel = "";
 
-        private UniwillECService? _ecService;
-
         // Hardware Management card state (Wi-Fi/Bluetooth radios + state-changed listeners)
         private Radio? _wifiRadio;
         private Radio? _btRadio;
@@ -60,126 +59,34 @@ namespace Uniwill_Control_Utility.Views.Pages
         // The checkbox drives two bytes in lockstep (tester-confirmed on Intel NB02):
         // CPUPerformanceAndOverClockMenuSwitch at 111 and MemoryOverClockSwitch at 51.
         // Support is firmware-reported at 110 (Intel NB02 = 1, AMD = 0).
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern uint GetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [Out] byte[] lpBuffer, uint nSize);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [In] byte[] lpValue, uint nSize);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool OpenProcessToken(IntPtr h, uint d, out IntPtr t);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool LookupPrivilegeValue(string? s, string n, ref LUID l);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool AdjustTokenPrivileges(IntPtr t, bool d, ref TP n, uint b, IntPtr p, IntPtr r);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr h);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct LUID { public uint Low; public int High; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct TP { public int Count; public LUID Luid; public uint Attr; }
-
-        private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
-        private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
-
-        private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
-        private const int OffsetMemOcSwitch = 51;
-        private const int OffsetCpuApMenuSupport = 110;
-        private const int OffsetCpuApMenuSwitch = 111;
+        //
+        // The reads, the writes, and the support probe go through NvramAccess: the
+        // engine's device.nvram verbs are the FIRST route (writing firmware
+        // variables demands SeSystemEnvironmentPrivilege, which an unelevated
+        // process can never enable — the direct calls this page used carried were
+        // silently dead in the field: the probe found nothing, the write failed
+        // with access denied, and no prompt ever appeared to explain). The page's
+        // original direct P/Invoke survives in NvramAccess as the fallback for a
+        // machine whose engine is not answering.
 
         private bool _isNvramAvailable;
 
         /// <summary>
-        /// Enables SeSystemEnvironmentPrivilege on the current process token (required for NVRAM access).
+        /// Firmware-reported support byte for the CPU Advanced Performance Menu
+        /// (offset 110). Non-zero on Intel NB02, zero on AMD — gates the
+        /// Settings row. Routed through NvramAccess: the engine probe first,
+        /// the page's own read as the fallback.
         /// </summary>
-        private static void EnableNvramPrivilege()
-        {
-            IntPtr token;
-            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ADJUST_PRIVILEGES, out token))
-            {
-                Debug.WriteLine($"[Settings] OpenProcessToken failed: {Marshal.GetLastWin32Error()}");
-                return;
-            }
-
-            try
-            {
-                var tp = new TP { Count = 1, Attr = SE_PRIVILEGE_ENABLED };
-                if (!LookupPrivilegeValue(null, "SeSystemEnvironmentPrivilege", ref tp.Luid))
-                {
-                    Debug.WriteLine($"[Settings] LookupPrivilegeValue failed: {Marshal.GetLastWin32Error()}");
-                    return;
-                }
-
-                if (!AdjustTokenPrivileges(token, false, ref tp, (uint)Marshal.SizeOf(tp), IntPtr.Zero, IntPtr.Zero))
-                {
-                    Debug.WriteLine($"[Settings] AdjustTokenPrivileges failed: {Marshal.GetLastWin32Error()}");
-                }
-            }
-            finally
-            {
-                CloseHandle(token);
-            }
-        }
+        private static bool CpuApMenuSupported() => NvramAccess.SupportsCpuApMenu();
 
         /// <summary>
-        /// Reads the OemMagicVariable NVRAM buffer, or null when unavailable.
+        /// Writes the Advanced Performance Menu unlock: offsets 111 (CPU menu
+        /// switch) and 51 (memory OC switch) in lockstep. Through the engine
+        /// this is one atomic read-patch-write verb on the device queue,
+        /// verified by re-read; NvramAccess falls back to the page's original
+        /// whole-buffer rewrite for a machine whose engine is not answering.
         /// </summary>
-        private static byte[]? ReadNvramBuffer()
-        {
-            byte[] buf = new byte[4096];
-            uint len = GetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, buf, (uint)buf.Length);
-            if (len == 0 || len > buf.Length)
-                return null;
-            var result = new byte[len];
-            Array.Copy(buf, result, len);
-            return result;
-        }
-
-        /// <summary>
-        /// Firmware-reported support byte for the CPU Advanced Performance Menu (offset 110).
-        /// Non-zero on Intel NB02, zero on AMD — gates the Settings row.
-        /// </summary>
-        private static bool CpuApMenuSupported()
-        {
-            var nvram = ReadNvramBuffer();
-            return nvram != null && nvram.Length > OffsetCpuApMenuSupport && nvram[OffsetCpuApMenuSupport] != 0;
-        }
-
-        /// <summary>
-        /// Writes the Advanced Performance Menu unlock: sets offsets 111 (CPU menu switch)
-        /// and 51 (memory OC switch) to the same boolean, whole-buffer rewrite.
-        /// </summary>
-        private static bool WriteCpuApMenuUnlock(bool enabled)
-        {
-            var nvram = ReadNvramBuffer();
-            if (nvram == null || nvram.Length <= OffsetCpuApMenuSwitch)
-            {
-                Debug.WriteLine($"[Settings] NVRAM OemMagicVariable unavailable for AP menu write");
-                return false;
-            }
-
-            var modified = (byte[])nvram.Clone();
-            modified[OffsetCpuApMenuSwitch] = (byte)(enabled ? 1 : 0);
-            modified[OffsetMemOcSwitch] = (byte)(enabled ? 1 : 0);
-
-            if (!SetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, modified, (uint)modified.Length))
-            {
-                Debug.WriteLine($"[Settings] NVRAM AP menu write failed: {Marshal.GetLastWin32Error()}");
-                return false;
-            }
-
-            Debug.WriteLine($"[Settings] NVRAM AP menu switch set to {(enabled ? 1 : 0)} at offsets {OffsetCpuApMenuSwitch}/{OffsetMemOcSwitch}");
-            return true;
-        }
+        private static bool WriteCpuApMenuUnlock(bool enabled) => NvramAccess.SetCpuApMenuUnlock(enabled);
 
         #endregion
 
@@ -191,11 +98,23 @@ namespace Uniwill_Control_Utility.Views.Pages
         public SettingsPage(
             ViewModels.SettingsViewModel viewModel,
             ViewModels.MainWindowViewModel mainWindowViewModel,
-            ILogger<SettingsPage> logger)
+            ILogger<SettingsPage> logger,
+            UCU.Contracts.Capabilities.IDeviceCapability? devices = null)
         {
             ViewModel = viewModel;
             _mainWindowViewModel = mainWindowViewModel;
             _logger = logger;
+
+            // The webcam/touchpad rows actuate through the engine's device
+            // capability (no consent prompt), and the AP-menu row's NVRAM
+            // reads/writes route through it for the privilege it cannot grant
+            // itself; App phase 1 wires the same singleton, this keeps the page
+            // self-sufficient whatever construction order is.
+            if (devices != null)
+            {
+                HardwareManagement.Devices = devices;
+                NvramAccess.Devices = devices;
+            }
 
             InitializeComponent();
 
@@ -203,8 +122,32 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxLanguage.SelectedItem = LocalizationService.SupportedLanguages.First(language => language.CultureName == LocalizationService.CurrentCultureName);
             _languageSelectionReady = true;
 
-            cbStartBoot.IsChecked = Settings.Default.StartOnBoot;
-            nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;
+            // Each actuating row's belief starts as the state its toggle was
+            // CONSTRUCTED with (the XAML initial value), so "unknown" can never
+            // read as user intent. Field-proven 2026-10-30 on p45: the webcam
+            // toggle's XAML IsChecked="True" queues a raise that lands in the
+            // page's first dispatcher pass - with _webcamOn still null,
+            // "IsChecked=true != null" read as intent and SetWebcamAsync ran
+            // elevated PowerShell 1 ms before the page's own status query.
+            _wifiOn = cbWifiToggle.IsChecked;
+            _bluetoothOn = cbBluetoothToggle.IsChecked;
+            _webcamOn = cbWebcamToggle.IsChecked;
+            _touchpadOn = cbTouchpadToggle.IsChecked;
+            _startOnBoot = cbStartBoot.IsChecked;
+            _powerBoost = cbPowerBoostMode.IsChecked;
+            _flydigiEnabled = cbHideFlydigi.IsChecked;
+            _apMenuUnlocked = cbCpuAdvancedPerformanceMenu.IsChecked;
+
+            // Every write below REFLECTS the saved settings into the toggles.
+            // For each row that ACTUATES, the reflection writer moves the belief
+            // with the toggle, so the Checked/Unchecked event it raises - which
+            // WPF-UI's ToggleSwitch delivers in a LATER dispatcher pass, not
+            // synchronously - sees equality: the scheduled task is not
+            // re-registered (or unregistered), the CPU Advanced Performance
+            // Menu does not write NVRAM, the Flydigi services are not
+            // resumed/suspended, and the touchpad admin flow does not run.
+            ReflectToggleState(cbStartBoot, Settings.Default.StartOnBoot, ref _startOnBoot);
+            ReflectStartupDelay(Settings.Default.StartupDelaySeconds);
             bool bootEnabled = Settings.Default.StartOnBoot;
             StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
             StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
@@ -214,10 +157,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAutoUpdate.IsChecked = Settings.Default.AutoUpdateApply;
-            cbGuardian.IsChecked = Settings.Default.GuardianEnabled;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
-            cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
-            cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
+            ReflectToggleState(cbPowerBoostMode, Settings.Default.EnablePowerBoostMode, ref _powerBoost);
+            ReflectToggleState(cbHideFlydigi, Settings.Default.EnableFlydigi, ref _flydigiEnabled);
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
             // CPU voltage control (Curve Optimizer) is AMD-only — hide the row on Intel scenarios
             bool cpuVoltageRowVisible = Family.TYPE != Family.ProcessorType.Intel;
@@ -230,12 +172,26 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
             cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
             cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
-            cbCpuAdvancedPerformanceMenu.IsChecked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
-            EnableNvramPrivilege();
+            ReflectToggleState(cbCpuAdvancedPerformanceMenu, Settings.Default.EnableCpuAdvancedPerformanceMenu, ref _apMenuUnlocked);
+            // The touchpad row is persisted, so its saved state is reflected too;
+            // the admin flow runs only when the user moves the toggle.
+            ReflectToggleState(cbTouchpadToggle, Settings.Default.TouchpadEnabled, ref _touchpadOn);
+            // The AP-menu gate probes NVRAM through the engine (the page
+            // constructor runs on the UI thread; the support probe is one pipe
+            // call, and the route's own fallback is local). The token privilege
+            // the old direct probe adjusted is the engine's to enable.
             bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
             _isNvramAvailable = apMenuSupported;
             ApMenuDivider.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
             ApMenuRow.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
+            // Hardware-management EC rows (U-108): the Windows-key lock, Fn-key
+            // lock and AC power recovery have NO app setting — the state lives
+            // in the firmware, so the rows reflect the EC's truth (the same
+            // one-pipe-call-in-the-constructor pattern as the AP-menu probe
+            // above) and stay hidden when the engine has no truth to report:
+            // a pre-U-108 engine answers UnsupportedVerb, an EC-less engine
+            // answers HardwareUnavailable, a failed read shows no toggle.
+            InitDeviceSwitchRows();
             _featureNavigationControlsReady = true;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
@@ -395,6 +351,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbStartBoot, ref _startOnBoot, "start on boot"))
+                return;
+
             StartupDelayDivider.Visibility = Visibility.Visible;
             StartupDelayRow.Visibility = Visibility.Visible;
             UpdateScheduledTask();
@@ -405,10 +364,22 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbStartBoot, ref _startOnBoot, "start on boot"))
+                return;
+
             StartupDelayDivider.Visibility = Visibility.Collapsed;
             StartupDelayRow.Visibility = Visibility.Collapsed;
 
-            Services.ScheduledTaskService.Unregister(ScheduledTaskName);
+            try
+            {
+                Services.ScheduledTaskService.Unregister(ScheduledTaskName);
+            }
+            catch (Exception ex)
+            {
+                // Same refusal as the register path: a startup entry this user
+                // cannot write must not take the page down.
+                _logger.LogWarning(ex, "[Settings] could not unregister the '{Task}' startup task", ScheduledTaskName);
+            }
 
             Settings.Default.StartOnBoot = false;
             Settings.Default.Save();
@@ -420,13 +391,40 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void UpdateScheduledTask()
         {
             int delaySeconds = (int)(nbStartupDelay.Value ?? 0);
-            Services.ScheduledTaskService.Register(ScheduledTaskName, "Start UCU", "", TimeSpan.FromSeconds(delaySeconds));
+
+            try
+            {
+                Services.ScheduledTaskService.Register(ScheduledTaskName, "Start UCU", "", TimeSpan.FromSeconds(delaySeconds));
+            }
+            catch (Exception ex)
+            {
+                // Field, 2026-11-06: an unelevated app cannot register a scheduled
+                // task (Access Denied from the Task Scheduler service), and this
+                // exception used to escape a ValueChanged handler and take the
+                // whole Settings page down with an error dialog. The row reports
+                // the refusal in the log; the page stays usable.
+                _logger.LogWarning(ex, "[Settings] could not register the '{Task}' startup task", ScheduledTaskName);
+            }
         }
 
         private void nbStartupDelay_ValueChanged(object sender, RoutedEventArgs e)
         {
             int seconds = (int)(nbStartupDelay.Value ?? 0);
 
+            // STATE EQUALITY, the same rule the toggles use: the page writes the
+            // saved delay into the box on load (ReflectStartupDelay), and that
+            // assignment raises ValueChanged. Acting on it re-registered the
+            // startup task merely because Settings was opened - and on a machine
+            // that denies the write that was the 2026-11-06 crash. A belief of
+            // null means "never observed", which is never user intent either.
+            if (!_startupDelay.HasValue || seconds == _startupDelay.Value)
+            {
+                _logger.LogDebug("[Settings] startup delay reflection, not intent: {Seconds}s belief={Belief}",
+                    seconds, _startupDelay);
+                return;
+            }
+
+            _startupDelay = seconds;
             Settings.Default.StartupDelaySeconds = seconds;
             Settings.Default.Save();
 
@@ -509,43 +507,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-        private void cbGuardian_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.GuardianEnabled = true;
-            Settings.Default.Save();
-
-            try
-            {
-                // 30s logon delay: the guardian starts after the (possibly
-                // delayed) main app task and keeps it alive.
-                Services.ScheduledTaskService.Register(GuardianTaskName,
-                    "Keep UCU running (crash guardian)", string.Empty, TimeSpan.FromSeconds(30), App.GuardianExePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to register the guardian scheduled task");
-            }
-
-            // Spawn the guardian immediately — the startup respawn pass only
-            // runs at app launch, so without this the toggle needs a restart
-            // before anything is actually watching.
-            App.EnsureGuardianRunning();
-        }
-
-        private void cbGuardian_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.GuardianEnabled = false;
-            Settings.Default.Save();
-
-            try
-            {
-                Services.ScheduledTaskService.Unregister(GuardianTaskName);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to remove the guardian scheduled task");
-            }
-        }
 
         private void cbAdaptive_Checked(object sender, RoutedEventArgs e)
         {
@@ -561,6 +522,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
       private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbPowerBoostMode, ref _powerBoost, "PowerBoost mode"))
+                return;
+
             Settings.Default.EnablePowerBoostMode = true;
             Settings.Default.Save();
 
@@ -572,6 +536,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbPowerBoostMode, ref _powerBoost, "PowerBoost mode"))
+                return;
+
             Settings.Default.EnablePowerBoostMode = false;
             Settings.Default.Save();
 
@@ -593,6 +560,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbCpuAdvancedPerformanceMenu_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbCpuAdvancedPerformanceMenu, ref _apMenuUnlocked, "CPU Advanced Performance Menu"))
+                return;
+
             Settings.Default.EnableCpuAdvancedPerformanceMenu = true;
             Settings.Default.Save();
             if (_isNvramAvailable && WriteCpuApMenuUnlock(true))
@@ -601,6 +571,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbCpuAdvancedPerformanceMenu_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbCpuAdvancedPerformanceMenu, ref _apMenuUnlocked, "CPU Advanced Performance Menu"))
+                return;
+
             Settings.Default.EnableCpuAdvancedPerformanceMenu = false;
             Settings.Default.Save();
             if (_isNvramAvailable && WriteCpuApMenuUnlock(false))
@@ -609,38 +582,180 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region Hardware Management (Device Manager-style toggles)
 
+        /// <summary>
+        /// The state the page BELIEVES each device row is in, as opposed to what
+        /// its toggle currently displays. A Checked/Unchecked event is the user
+        /// asking for a change only when the two differ; a write that REFLECTS
+        /// observed state (the constructor's saved-settings init, the load-time
+        /// hardware sync, a radio StateChanged event) moves the belief together
+        /// with the toggle, so its event sees equality and no actuation follows.
+        /// Each belief is initialized to the state its toggle was constructed
+        /// with, and a belief that is still null (never observed) is never intent,
+        /// because WPF-UI's ToggleSwitch applies its XAML IsChecked value during
+        /// the TEMPLATE pass and raises the event from there.
+        ///
+        /// This replaces a temporal guard (a flag set around the write), which
+        /// leaked: WPF-UI's ToggleSwitch raises Checked/Unchecked in a LATER
+        /// dispatcher pass, after the flag had been released, so the field
+        /// report's PowerShell UAC prompt survived that fix - measured 2026-10-30
+        /// on the staged pack: an elevated `Enable-PnpDevice` webcam command ran
+        /// 23 s after launch with NO navigation at all (the page's Loaded runs
+        /// when the provider materialises it), 650 ms before its own status
+        /// re-query. The same class actuates the touchpad admin flow, a saved
+        /// "start on boot" reflection (re-registers - or UNREGISTERS - the
+        /// scheduled task) and the CPU Advanced Performance Menu NVRAM write.
+        /// </summary>
+        private bool? _wifiOn;
+        private bool? _bluetoothOn;
+        private bool? _webcamOn;
+        private bool? _touchpadOn;
+        private bool? _startOnBoot;
+        private int? _startupDelay;
+        private bool? _apMenuUnlocked;
+        private bool? _powerBoost;
+        private bool? _flydigiEnabled;
+
+        // Hardware-management EC truth rows (U-108). Same belief discipline:
+        // the belief starts from the EC's READ truth (never from the XAML
+        // value — these rows have no saved setting), and the actuation
+        // reflects the OBSERVED state the engine reports, because the
+        // firmware owns the outcome (the win-lock trigger is a toggle whose
+        // fire can be swallowed by the firmware's debounce; the EC register
+        // is the only word).
+        private bool? _winLockOn;
+        private bool? _fnLockOn;
+        private bool? _acRecoveryOn;
+
+        private IKeyboardCapability? _keyboard;
+        private IPowerCapability? _power;
+        private IEngineCapability? _engineCaps;
+
+        /// <summary>
+        /// Write a reflected state into a toggle, moving the row's belief with it
+        /// so the event that write raises is recognized as a reflection.
+        /// </summary>
+        private void ReflectToggleState(Wpf.Ui.Controls.ToggleSwitch toggle, bool? on, ref bool? belief)
+        {
+            belief = on;
+
+            if (toggle is not null)
+                toggle.IsChecked = on;
+        }
+
+        /// <summary>
+        /// The NumberBox half of the same rule. Writing the saved delay into the
+        /// box raises ValueChanged, and that event must not re-register the
+        /// startup task. The belief is read back after the write because the box
+        /// coerces to its Minimum/Maximum: a coerced value is still a reflection,
+        /// not a user edit.
+        /// </summary>
+        private void ReflectStartupDelay(int seconds)
+        {
+            _startupDelay = seconds;
+
+            if (nbStartupDelay is not null)
+            {
+                nbStartupDelay.Value = seconds;
+                _startupDelay = (int)(nbStartupDelay.Value ?? seconds);
+            }
+        }
+
+        /// <summary>
+        /// The actuation rule, in one place: a Checked/Unchecked event carries
+        /// user intent only when the toggle's state differs from what the page
+        /// believes the device is in. On intent the belief moves to the commanded
+        /// state first (so a re-raised event is not a second device operation)
+        /// and the actuation is logged; a refusal is logged at Debug. Both
+        /// breadcrumbs exist because this defect class hides in dispatcher timing:
+        /// the field reports named no row, and the elevated PowerShell command
+        /// line was the only witness.
+        /// </summary>
+        private bool UserIntent(Wpf.Ui.Controls.ToggleSwitch? toggle, ref bool? belief, string row)
+        {
+            if (toggle is null)
+                return false;
+
+            // "Unknown" is never intent. The page can only have been asked for a
+            // change it knows the current state of: a row whose belief is still
+            // null has never been observed, so nothing moved. Field-proven 2026-10-30
+            // (p48, Information severity): at startup all four device rows logged
+            // "toggle=true belief=null" - WPF-UI's ToggleSwitch applies the XAML
+            // IsChecked="True" during its TEMPLATE pass and raises the event from
+            // there, long after the constructor initialized the belief from the
+            // (then null) value, and the comparison read that as user intent:
+            // Wi-Fi, Bluetooth, webcam and touchpad all actuated on app start, the
+            // webcam through elevated PowerShell and the touchpad through the
+            // elevated admin flow.
+            bool intent = belief.HasValue && toggle.IsChecked != belief;
+
+            if (intent)
+            {
+                _logger.LogInformation("[Settings] {Row} actuating: toggle={Toggle} belief={Belief}",
+                    row, toggle.IsChecked, belief);
+                belief = toggle.IsChecked;
+            }
+            else
+            {
+                _logger.LogDebug("[Settings] {Row} reflection, not intent: toggle={Toggle} belief={Belief}",
+                    row, toggle.IsChecked, belief);
+            }
+
+            return intent;
+        }
+
         private void cbWifiToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbWifiToggle, ref _wifiOn, "Wi-Fi"))
+                return;
+
             _ = HardwareManagement.SetWifiAsync(true);
         }
 
         private void cbWifiToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbWifiToggle, ref _wifiOn, "Wi-Fi"))
+                return;
+
             _ = HardwareManagement.SetWifiAsync(false);
         }
 
         private void cbBluetoothToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbBluetoothToggle, ref _bluetoothOn, "Bluetooth"))
+                return;
+
             _ = HardwareManagement.SetBluetoothAsync(true);
         }
 
         private void cbBluetoothToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbBluetoothToggle, ref _bluetoothOn, "Bluetooth"))
+                return;
+
             _ = HardwareManagement.SetBluetoothAsync(false);
         }
 
         private void cbWebcamToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbWebcamToggle, ref _webcamOn, "webcam"))
+                return;
+
             _ = HardwareManagement.SetWebcamAsync(true);
         }
 
         private void cbWebcamToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbWebcamToggle, ref _webcamOn, "webcam"))
+                return;
+
             _ = HardwareManagement.SetWebcamAsync(false);
         }
 
         private void cbTouchpadToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbTouchpadToggle, ref _touchpadOn, "touchpad"))
+                return;
+
             Settings.Default.TouchpadEnabled = true;
             Settings.Default.Save();
             _ = HardwareManagement.SetTouchpadAsync(true);
@@ -648,10 +763,164 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbTouchpadToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbTouchpadToggle, ref _touchpadOn, "touchpad"))
+                return;
+
             Settings.Default.TouchpadEnabled = false;
             Settings.Default.Save();
             _ = HardwareManagement.SetTouchpadAsync(false);
         }
+
+        #region Hardware-management EC switch rows (U-108)
+
+        /// <summary>
+        /// Probes the three EC truth rows at construction, one pipe call each
+        /// behind the EC-availability gate (the AP-menu row above established
+        /// the synchronous-probe shape). A row is shown ONLY when its truth
+        /// read succeeded; UnsupportedVerb (an engine installed before the
+        /// switch verbs), HardwareUnavailable and any read failure leave the
+        /// row collapsed — the page never shows a toggle it cannot back with
+        /// the firmware's word.
+        /// </summary>
+        private void InitDeviceSwitchRows()
+        {
+            _keyboard = App.GetService<IKeyboardCapability>();
+            _power = App.GetService<IPowerCapability>();
+            _engineCaps = App.GetService<IEngineCapability>();
+
+            bool ecAvailable = false;
+            if (_keyboard is not null && _power is not null && _engineCaps is not null)
+            {
+                try
+                {
+                    ecAvailable = _engineCaps.IsHardwareAvailableAsync().GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[Settings] EC availability probe failed for the device-switch rows");
+                }
+            }
+
+            if (!ecAvailable)
+                return;
+
+            ReadSwitchTruth(() => _keyboard!.GetWinLockAsync(), WinLockRow, WinLockDivider,
+                cbWinLockToggle, ref _winLockOn, "Windows-key lock");
+            ReadSwitchTruth(() => _keyboard!.GetFnLockAsync(), FnLockRow, FnLockDivider,
+                cbFnLockToggle, ref _fnLockOn, "Fn-key lock");
+            ReadSwitchTruth(() => _power!.GetAcRecoveryAsync(), AcRecoveryRow, AcRecoveryDivider,
+                cbAcRecoveryToggle, ref _acRecoveryOn, "AC power recovery");
+        }
+
+        private void ReadSwitchTruth(Func<System.Threading.Tasks.Task<bool>> read, UIElement row,
+            System.Windows.Controls.Border divider, Wpf.Ui.Controls.ToggleSwitch toggle, ref bool? belief, string rowName)
+        {
+            try
+            {
+                bool truth = read().GetAwaiter().GetResult();
+
+                row.Visibility = Visibility.Visible;
+                divider.Visibility = Visibility.Visible;
+                ReflectToggleState(toggle, truth, ref belief);
+            }
+            catch (EngineException ex) when (ex.Code == EngineErrorCode.UnsupportedVerb)
+            {
+                _logger.LogInformation("[Settings] {Row} hidden: the installed engine predates the switch verbs", rowName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[Settings] {Row} hidden: the EC truth could not be read", rowName);
+            }
+        }
+
+        private void HideDeviceSwitchRow(UIElement row, System.Windows.Controls.Border divider)
+        {
+            row.Visibility = Visibility.Collapsed;
+            divider.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Commands one EC switch and reflects the OBSERVED state: the SET
+        /// verbs answer with what the EC reports after the act, not with the
+        /// request (the win-lock trigger is a toggle — the engine fires it
+        /// once on truth mismatch, so a swallowed fire means the lock did
+        /// not move and the toggle must show that). A failed actuation
+        /// reverts the toggle to the complement of the command: the page's
+        /// last observed truth.
+        /// </summary>
+        private async System.Threading.Tasks.Task ActuateSwitchAsync(bool commanded,
+            Func<System.Threading.Tasks.Task<bool>> actuate,
+            System.Action<bool> reflect, System.Action hide, string rowName)
+        {
+            bool observed;
+            try
+            {
+                observed = await actuate();
+            }
+            catch (EngineException ex) when (ex.Code == EngineErrorCode.UnsupportedVerb)
+            {
+                _logger.LogInformation("[Settings] {Row} hidden: the engine no longer answers the switch verb", rowName);
+                hide();
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] {Row} actuation failed; reverting to the last observed state", rowName);
+                observed = !commanded;
+            }
+
+            await Dispatcher.InvokeAsync(() => reflect(observed));
+        }
+
+        private void cbWinLockToggle_Checked(object sender, RoutedEventArgs e) => ActuateWinLock(true);
+
+        private void cbWinLockToggle_Unchecked(object sender, RoutedEventArgs e) => ActuateWinLock(false);
+
+        private void ActuateWinLock(bool locked)
+        {
+            if (!UserIntent(cbWinLockToggle, ref _winLockOn, "Windows-key lock"))
+                return;
+
+            _ = ActuateSwitchAsync(locked,
+                () => _keyboard!.SetWinLockAsync(locked),
+                observed => ReflectToggleState(cbWinLockToggle, observed, ref _winLockOn),
+                () => HideDeviceSwitchRow(WinLockRow, WinLockDivider),
+                "Windows-key lock");
+        }
+
+        private void cbFnLockToggle_Checked(object sender, RoutedEventArgs e) => ActuateFnLock(true);
+
+        private void cbFnLockToggle_Unchecked(object sender, RoutedEventArgs e) => ActuateFnLock(false);
+
+        private void ActuateFnLock(bool locked)
+        {
+            if (!UserIntent(cbFnLockToggle, ref _fnLockOn, "Fn-key lock"))
+                return;
+
+            _ = ActuateSwitchAsync(locked,
+                () => _keyboard!.SetFnLockAsync(locked),
+                observed => ReflectToggleState(cbFnLockToggle, observed, ref _fnLockOn),
+                () => HideDeviceSwitchRow(FnLockRow, FnLockDivider),
+                "Fn-key lock");
+        }
+
+        private void cbAcRecoveryToggle_Checked(object sender, RoutedEventArgs e) => ActuateAcRecovery(true);
+
+        private void cbAcRecoveryToggle_Unchecked(object sender, RoutedEventArgs e) => ActuateAcRecovery(false);
+
+        private void ActuateAcRecovery(bool enabled)
+        {
+            if (!UserIntent(cbAcRecoveryToggle, ref _acRecoveryOn, "AC power recovery"))
+                return;
+
+            _ = ActuateSwitchAsync(enabled,
+                () => _power!.SetAcRecoveryAsync(enabled),
+                observed => ReflectToggleState(cbAcRecoveryToggle, observed, ref _acRecoveryOn),
+                () => HideDeviceSwitchRow(AcRecoveryRow, AcRecoveryDivider),
+                "AC power recovery");
+        }
+
+        #endregion
 
         /// <summary>
         /// Pulls the live Wi-Fi/Bluetooth/webcam states (and the persisted touchpad state)
@@ -672,13 +941,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 await this.Dispatcher.InvokeAsync(() =>
                 {
-                    if (wifiOn != null)
-                        cbWifiToggle.IsChecked = wifiOn;
-                    if (btOn != null)
-                        cbBluetoothToggle.IsChecked = btOn;
-                    if (camOn != null)
-                        cbWebcamToggle.IsChecked = camOn;
-                    cbTouchpadToggle.IsChecked = touchpadOn;
+                    // Reflection, never actuation: the state the page observes
+                    // becomes the state it believes, so the event the write
+                    // raises (in a later dispatcher pass) sees equality.
+                    ReflectToggleState(cbWifiToggle, wifiOn, ref _wifiOn);
+                    ReflectToggleState(cbBluetoothToggle, btOn, ref _bluetoothOn);
+                    ReflectToggleState(cbWebcamToggle, camOn, ref _webcamOn);
+                    ReflectToggleState(cbTouchpadToggle, touchpadOn, ref _touchpadOn);
 
                     AttachRadioStateListeners();
                 });
@@ -710,7 +979,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _ = this.Dispatcher.InvokeAsync(() =>
             {
-                cbWifiToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+                // The device moved externally (Settings app, Fn key): reflect it,
+                // do not actuate the radio back.
+                ReflectToggleState(cbWifiToggle, HardwareManagementRadioIsOn(sender), ref _wifiOn);
             });
         }
 
@@ -718,7 +989,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _ = this.Dispatcher.InvokeAsync(() =>
             {
-                cbBluetoothToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+                ReflectToggleState(cbBluetoothToggle, HardwareManagementRadioIsOn(sender), ref _bluetoothOn);
             });
         }
 
@@ -726,6 +997,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbHideFlydigi, ref _flydigiEnabled, "Flydigi enabled"))
+                return;
+
             Settings.Default.EnableFlydigi = true;
             Settings.Default.Save();
 
@@ -749,6 +1023,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (!UserIntent(cbHideFlydigi, ref _flydigiEnabled, "Flydigi enabled"))
+                return;
+
             Settings.Default.EnableFlydigi = false;
             Settings.Default.Save();
 
@@ -888,26 +1165,61 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// Adjusts the main window height based on whether Hydro UI and Flydigi are both disabled.
-        /// When both are off, reduces height from 1080 to 907.
+        /// Adjusts the main window height with the same rule the window itself
+        /// uses at Loaded: 907 when both Hydro UI and Flydigi are unavailable
+        /// (disabled, or their device is not connected), otherwise 1080.
         /// </summary>
         private void AdjustMainWindowHeight()
         {
-            var mainWindow = Application.Current.MainWindow;
-            if (mainWindow is null)
-                return;
-
-            bool hydroDisabled = !Settings.Default.EnableHydroUiNavigation;
-            bool flydigiDisabled = !Settings.Default.EnableFlydigi;
-            mainWindow.Height = (hydroDisabled && flydigiDisabled) ? 907 : 1080;
+            if (Application.Current.MainWindow is Views.Windows.MainWindow mainWindow)
+                mainWindow.ApplyPreferredHeight();
         }
 
        #endregion
 
         private async void UiPage_Loaded(object sender, RoutedEventArgs e)
         {
+            _ = RefreshOemCardVisibilityAsync();
             await LoadSystemInfoAsync();
             await SyncHardwareManagementStates();
+        }
+
+        /// <summary>
+        /// Shows the OEM takeover card only where the OEM stack exists. The engine
+        /// reports how many catalog services are registered and how many
+        /// publisher-verified OEM processes are alive; zero of both means there is
+        /// nothing to pause or restore - a machine that never had the vendor stack,
+        /// or had it uninstalled (field, 2026-11-06: the card stayed after XMG CC was
+        /// removed and %ProgramFiles%\OEM was empty). Deliberately not the policy
+        /// State: an orphaned journal from a pause performed before the uninstall
+        /// keeps that at Stale, which would keep a dead card on screen.
+        ///
+        /// An unknown answer keeps the card: the engine being offline or a failed
+        /// read must not hide a working affordance on every transient outage.
+        /// </summary>
+        private async System.Threading.Tasks.Task RefreshOemCardVisibilityAsync()
+        {
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            if (_oemTakeover is null)
+            {
+                await Dispatcher.InvokeAsync(() => OemTakeoverCard.Visibility = Visibility.Visible);
+                return;
+            }
+
+            try
+            {
+                Services.OemOverview overview = await _oemTakeover.GetOverviewAsync();
+                bool absent = overview.EngineReachable
+                    && overview.ServicesInstalled == 0
+                    && overview.OemProcessesRunning == 0;
+                await Dispatcher.InvokeAsync(() =>
+                    OemTakeoverCard.Visibility = absent ? Visibility.Collapsed : Visibility.Visible);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[Settings] OEM takeover presence read failed");
+                await Dispatcher.InvokeAsync(() => OemTakeoverCard.Visibility = Visibility.Visible);
+            }
         }
 
         private async System.Threading.Tasks.Task LoadSystemInfoAsync()
@@ -1104,6 +1416,188 @@ namespace Uniwill_Control_Utility.Views.Pages
             PresetBackupStatus.Severity = severity;
             PresetBackupStatus.IsOpen = true;
         }
+
+        #region OEM takeover (story U-203)
+
+        private Services.OemTakeoverService? _oemTakeover;
+        private bool _oemOverviewLoaded;
+
+        /// <summary>Lazy first read: the status probe walks services, tasks
+        /// and the user registry scopes, so it runs when the card opens, not
+        /// at page construction (the Settings page stays a snappy first
+        /// frame; HardwareManagement's gated rows set the precedent).</summary>
+        private void OemTakeoverCard_Expanded(object sender, RoutedEventArgs e)
+        {
+            if (_oemOverviewLoaded)
+                return;
+
+            _oemOverviewLoaded = true;
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            _ = RefreshOemOverviewAsync();
+        }
+
+        private async System.Threading.Tasks.Task RefreshOemOverviewAsync()
+        {
+            if (_oemTakeover is null)
+                return;
+
+            Services.OemOverview overview;
+            try
+            {
+                overview = await _oemTakeover.GetOverviewAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[Settings] OEM takeover status read failed");
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                tbOemStatus.Text = LocalizationService.Format("Status: {0}", OemStateLabel(overview));
+
+                tbOemStatusDetail.Text = LocalizationService.Format(
+                    "Services running: {0} of {1} · OEM processes: {2} · journal: {3} · autostart neutralized: {4}",
+                    overview.ServicesRunning, overview.ServicesInstalled,
+                    overview.OemProcessesRunning, overview.JournalCount, overview.AutostartNeutralized);
+
+                if (overview.SquatSuspects.Count > 0)
+                {
+                    var lines = new List<string>();
+                    int shown = Math.Min(overview.SquatSuspects.Count, 6);
+                    lines.AddRange(overview.SquatSuspects.Take(shown));
+                    if (overview.SquatSuspects.Count > shown)
+                        lines.Add(LocalizationService.Format("… and {0} more", overview.SquatSuspects.Count - shown));
+
+                    tbOemSuspects.Text = LocalizationService.Format(
+                        "Name-squat suspects the hardening gate refused ({0}) — never touched:", overview.SquatSuspects.Count)
+                        + "\n" + string.Join("\n", lines);
+                    tbOemSuspects.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    tbOemSuspects.Visibility = Visibility.Collapsed;
+                }
+
+                if (overview.Journal.Count > 0)
+                {
+                    icOemJournal.ItemsSource = overview.Journal;
+                    OemJournalSection.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    icOemJournal.ItemsSource = null;
+                    OemJournalSection.Visibility = Visibility.Collapsed;
+                }
+            });
+        }
+
+        private static string OemStateLabel(Services.OemOverview overview)
+        {
+            if (!overview.EngineReachable)
+                return LocalizationService.Get("Engine offline");
+
+            return overview.State switch
+            {
+                "NotInstalled" => LocalizationService.Get("Not installed"),
+                "Paused" => LocalizationService.Get("Paused"),
+                "PartiallyPaused" => LocalizationService.Get("Partially paused"),
+                "Stale" => LocalizationService.Get("Stale"),
+                "Busy" => LocalizationService.Get("Working…"),
+                _ => LocalizationService.Get("Active"),
+            };
+        }
+
+        private async void btnOemPause_Click(object sender, RoutedEventArgs e)
+        {
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            if (_oemTakeover is null)
+                return;
+
+            SetOemBusy(true);
+            try
+            {
+                Services.OemMergeReport report = await _oemTakeover.PauseAsync();
+
+                string title = LocalizationService.Get("OEM Control Center");
+                string body = report.State == "Busy"
+                    ? LocalizationService.Get("A takeover action is already running.")
+                    : !report.EngineReachable
+                        ? LocalizationService.Get("The engine service is not running; the machine scope (services, tasks, machine run keys) was not paused.")
+                        : report.MutationsApplied == 0
+                            ? LocalizationService.Get("Nothing to pause: the OEM Control Center stack is not installed on this machine.")
+                            : LocalizationService.Format("Paused the OEM Control Center stack ({0} mutations applied).", report.MutationsApplied);
+
+                ToastNotification.ShowToastNotification(title, AppendOemFailures(body, report));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] OEM takeover pause failed");
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"),
+                    LocalizationService.Get("The pause action failed; see the log."));
+            }
+            finally
+            {
+                await RefreshOemOverviewAsync();
+                _ = Dispatcher.InvokeAsync(() => SetOemBusy(false));
+            }
+        }
+
+        private async void btnOemRestore_Click(object sender, RoutedEventArgs e)
+        {
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            if (_oemTakeover is null)
+                return;
+
+            SetOemBusy(true);
+            try
+            {
+                Services.OemMergeReport report = await _oemTakeover.ResumeAsync();
+
+                string title = LocalizationService.Get("OEM Control Center");
+                string body = report.State == "Busy"
+                    ? LocalizationService.Get("A takeover action is already running.")
+                    : report.MutationsApplied == 0
+                        ? LocalizationService.Get("Nothing to restore: no paused OEM takeover mutations on this machine.")
+                        : LocalizationService.Format("Restored the OEM Control Center stack ({0} journal entries reversed).", report.MutationsApplied);
+
+                if (!report.EngineReachable && report.State != "Busy")
+                    body += "\n" + LocalizationService.Get("The engine service is not running; the machine scope was not restored.");
+
+                ToastNotification.ShowToastNotification(title, AppendOemFailures(body, report));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] OEM takeover restore failed");
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"),
+                    LocalizationService.Get("The restore action failed; see the log."));
+            }
+            finally
+            {
+                await RefreshOemOverviewAsync();
+                _ = Dispatcher.InvokeAsync(() => SetOemBusy(false));
+            }
+        }
+
+        /// <summary>Appends the failing action lines to an outcome toast: the
+        /// card's journal shows mutations, not results, and a silent failure
+        /// (the field's restore that left GCUBridge down) is exactly what the
+        /// user cannot act on.</summary>
+        private static string AppendOemFailures(string body, Services.OemMergeReport report)
+        {
+            IReadOnlyList<string> failures = Services.OemTakeoverService.Failures(report);
+            return failures.Count == 0 ? body : body + "\n" + string.Join("\n", failures);
+        }
+
+        private void SetOemBusy(bool isBusy)
+        {
+            btnOemPause.IsEnabled = !isBusy;
+            btnOemRestore.IsEnabled = !isBusy;
+        }
+
+        #endregion
 
      }
 }

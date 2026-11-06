@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The engine service: the only process that loads UCU.Hardware, and the only
+       process that needs privilege. Installed as the Windows service "UCUEngine"
+       (LocalSystem), it exposes the EC operations over a named pipe so the UI process
+       can start unelevated.
+       Exe name has spaces on purpose: it sits beside "Uniwill Control Utility.exe" in
+       the install layout, so the pair reads as one product in a folder listing. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10.0</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>Uniwill Control Utility Engine</AssemblyName>
+    <RootNamespace>UCU.Engine</RootNamespace>
+    <!-- Task Manager labels a process with the exe's FileDescription, while the
+         Services tab shows the SCM DisplayName ("UCU Engine"): the title and
+         product carry the service label so the two tabs read the same. The file
+         name stays "Uniwill Control Utility Engine.exe" - it is the identity the
+         installer, the MSI File row and the supervisor's FindAppExe resolve. -->
+    <AssemblyTitle>UCU Engine</AssemblyTitle>
+    <Product>UCU Engine</Product>
+    <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+    <!-- Version: Directory.Build.props, the single source of truth. -->
+    <ApplicationIcon>..\Uniwill Control Utility\favicon.ico</ApplicationIcon>
+    <!-- The SCM service name (the stable identity used by sc.exe and the app).
+         The user-facing label in services.msc is the DisplayName in
+         EngineInstaller, and the assembly title/product above match it. -->
+    <EngineServiceName>UCUEngine</EngineServiceName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.9" />
+    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <!-- The logon autostart entry: the service owns it because the Task Scheduler
+         refuses task creation to the unelevated app (see AutostartTask). -->
+    <PackageReference Include="TaskScheduler" Version="2.12.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+    <ProjectReference Include="..\UCU.Contracts\UCU.Contracts.csproj" />
+    <ProjectReference Include="..\UCU.Hardware\UCU.Hardware.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- In-process host tests drive the pipe server with a fake EC transport. -->
+    <InternalsVisibleTo Include="UCU.Engine.Tests" />
+  </ItemGroup>
+
+</Project>

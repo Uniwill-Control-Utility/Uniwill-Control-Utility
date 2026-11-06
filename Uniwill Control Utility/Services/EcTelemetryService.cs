@@ -1,35 +1,89 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using UCU.Contracts.Capabilities;
+using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Services
 {
-    public readonly record struct EcFanDutySnapshot(
-        int CpuFanDuty,
-        int GpuFanDuty)
+    /// <summary>
+    /// The embedded controller's CPU temperature, as the app is allowed to read it: a
+    /// cached, non-blocking read of the engine's <c>telemetry.get_cpu_temperature</c>
+    /// verb (EC register 0x043E - the same sensor the EC's own fan curve runs on).
+    ///
+    /// This is the fallback sensor source for the app's CPU temperature. The primary
+    /// source is LibreHardwareMonitor reading the CPU's MSR-derived sensors, which needs
+    /// the PawnIO kernel driver, and PawnIO's device ACL is System + Administrators
+    /// (its INF ships D:P(A;;GA;;;SY)(A;;GA;;;BA)), so the asInvoker app installed
+    /// per-machine gets access denied and no CPU sensor at all. The EC reading needs no
+    /// privilege: the LocalSystem engine opens the EC driver and the pipe DACL admits the
+    /// interactive user.
+    /// </summary>
+    public interface IEcCpuTemperatureSource
     {
-        public static EcFanDutySnapshot Empty { get; } = new();
+        /// <summary>EC CPU temperature in degrees Celsius; 0 when unavailable.</summary>
+        int ReadCpuTemperature();
+    }
 
-        public int CpuFanPercent => DutyToPercent(CpuFanDuty);
-        public int GpuFanPercent => DutyToPercent(GpuFanDuty);
-
-        private static int DutyToPercent(int duty) =>
-            (int)Math.Round(Math.Clamp(duty, 0, 200) * 100.0 / 200.0);
+    /// <summary>
+    /// The engine's kernel-side sensor readings (CPU Ring0 package power and core
+    /// clock via the sensor driver, DIMM SPD speed/temps via the SMBus), cached
+    /// and non-blocking. These are the fields the in-process probe cannot read
+    /// unelevated: the sensor drivers' device ACLs admit System + Administrators
+    /// (PawnIO's INF ships D:P(A;;GA;;;SY)(A;;GA;;;BA)), so an asInvoker app
+    /// installed per-machine gets access denied - the LocalSystem engine opens
+    /// them through the same RPC channel as the EC reads.
+    ///
+    /// Implementations answer <see cref="EngineMetricsSnapshot.Empty"/> for
+    /// anything that is not fresh: an open probe, a recent probe cycle, and a
+    /// live RPC chain, or no reading at all. Frozen numbers are worse than
+    /// "--" (field audit 2026-10-29: a wedged engine probe loop, which
+    /// deliberately runs outside the engine watchdog, kept serving its last
+    /// reading as if live; the app's stale-while-revalidate cache keeps the
+    /// last DTO forever when the engine dies, age-stamp included).
+    /// </summary>
+    public interface IEcEngineMetricsSource
+    {
+        EngineMetricsSnapshot ReadEngineMetrics();
     }
 
     /// <summary>
     /// Shares one demand-driven EC telemetry sample between UI consumers. Reads
     /// return immediately while stale data is refreshed on a worker thread.
     ///
-    /// If EC reads fail (driver handle lost, EC unresponsive), the service attempts
-    /// to reconnect automatically and logs the failure. Consecutive failures are
-    /// tracked so the UI can detect a persistent loss of EC access.
+    /// If EC reads fail (engine not running, driver handle lost, EC unresponsive), the
+    /// service attempts to recover on the next refresh and logs the failure.
+    /// Consecutive failures are tracked so the UI can detect a persistent loss of EC
+    /// access. Availability is re-checked on every refresh, never cached: the shipped
+    /// app starts alongside the engine service, and a startup probe that raced the
+    /// service starting must not latch the UI into a permanently degraded state.
     /// </summary>
-    public sealed class EcTelemetryService : IDisposable
+    public sealed class EcTelemetryService : IDisposable, IEcCpuTemperatureSource, IEcEngineMetricsSource
     {
         private static readonly TimeSpan DefaultMaxAge = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// The engine's sensor cache ages slower than the EC reads: the snapshot
+        /// feeds power/clock/SPD cards, not a fan PID loop, and the engine's probe
+        /// cycle is 5 s - refreshing a 5-second-old cache every UI tick would buy
+        /// nothing and double the pipe traffic.
+        /// </summary>
+        private static readonly TimeSpan MetricsMaxAge = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The whole chain's freshness budget for the engine sensor readings:
+        /// the engine's probe cycle is 5 s, so an entry older than ~6 cycles is
+        /// a wedged probe loop (engine side) or a dead RPC chain whose
+        /// stale-while-revalidate entry must never be repainted as live. Both
+        /// failure faces the same frozen-number defect (field audit 2026-10-29),
+        /// and both end in Empty, which the UI renders "--".
+        /// </summary>
+        private static readonly TimeSpan MetricsFreshBudget = TimeSpan.FromSeconds(30);
+
         private readonly StaleWhileRevalidateCache<EcFanDutySnapshot> _fanDutyCache;
         private readonly StaleWhileRevalidateCache<int> _mainFanRpmCache;
+        private readonly StaleWhileRevalidateCache<int> _cpuTemperatureCache;
+        private readonly StaleWhileRevalidateCache<EngineMetricsSnapshot> _engineMetricsCache;
 
         // Consecutive failure counter — reset on success, incremented on failure.
         // Exposed so callers can detect persistent EC access loss.
@@ -41,16 +95,18 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public int ConsecutiveFailures => Volatile.Read(ref _consecutiveFailures);
 
-        public EcTelemetryService(UniwillECService ecService)
-            : this(CreateCaptures(ecService), DefaultMaxAge)
+        public EcTelemetryService(IEcTelemetryCapability telemetry, IEngineCapability engine)
+            : this(CreateCaptures(telemetry, engine), DefaultMaxAge)
         {
         }
 
         internal EcTelemetryService(
-            Func<EcFanDutySnapshot> fanDutyCapture,
-            Func<int> mainFanRpmCapture,
+            Func<Task<EcFanDutySnapshot>> fanDutyCapture,
+            Func<Task<int>> mainFanRpmCapture,
             TimeSpan maxAge,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            Func<Task<int>>? cpuTemperatureCapture = null,
+            Func<Task<EngineMetricsSnapshot>>? engineMetricsCapture = null)
         {
             ArgumentNullException.ThrowIfNull(fanDutyCapture);
             ArgumentNullException.ThrowIfNull(mainFanRpmCapture);
@@ -65,12 +121,37 @@ namespace Uniwill_Control_Utility.Services
             _mainFanRpmCache = CreateCache(0, mainFanRpmCapture, maxAge, timeProvider,
                 onRefreshError: ex => OnRefreshFailed(ex, "Main fan RPM"),
                 onRefreshSuccess: () => OnRefreshSucceeded());
+            // A caller with no EC source passes null: the read then answers 0, which is
+            // the "unavailable" value every consumer already understands.
+            _cpuTemperatureCache = CreateCache(0, cpuTemperatureCapture ?? ZeroCapture, maxAge, timeProvider,
+                onRefreshError: ex => OnRefreshFailed(ex, "CPU temperature (EC)"),
+                onRefreshSuccess: () => OnRefreshSucceeded());
+
+            // Engine sensor snapshot: null capture (no engine capability at all)
+            // keeps every field 0, i.e. the pre-engine dashboard, unchanged.
+            _engineMetricsCache = CreateCache(
+                EngineMetricsSnapshot.Empty,
+                engineMetricsCapture ?? EmptyMetricsCapture,
+                MetricsMaxAge,
+                timeProvider,
+                onRefreshError: ex => OnRefreshFailed(ex, "Engine metrics"),
+                onRefreshSuccess: () => OnRefreshSucceeded());
         }
 
+        private static Task<int> ZeroCapture() => Task.FromResult(0);
+
+        private static Task<EngineMetricsSnapshot> EmptyMetricsCapture() => Task.FromResult(EngineMetricsSnapshot.Empty);
+
         private EcTelemetryService(
-            (Func<EcFanDutySnapshot> fanDuty, Func<int> mainFanRpm) captures,
+            (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm, Func<Task<int>> cpuTemperature,
+                Func<Task<EngineMetricsSnapshot>> engineMetrics) captures,
             TimeSpan maxAge)
-            : this(captures.fanDuty, captures.mainFanRpm, maxAge)
+            : this(
+                captures.fanDuty,
+                captures.mainFanRpm,
+                maxAge,
+                cpuTemperatureCapture: captures.cpuTemperature,
+                engineMetricsCapture: captures.engineMetrics)
         {
         }
 
@@ -105,15 +186,47 @@ namespace Uniwill_Control_Utility.Services
 
         internal int ReadMainFanRpm() => _mainFanRpmCache.Read();
 
+        /// <summary>
+        /// The EC's CPU temperature (degrees Celsius), 0 when the EC cannot answer. Cached
+        /// and non-blocking like the other reads; it is the app's CPU-temperature fallback
+        /// when the in-process MSR sensor path is unavailable (see
+        /// <see cref="IEcCpuTemperatureSource"/>).
+        /// </summary>
+        public int ReadCpuTemperature() => _cpuTemperatureCache.Read();
+
+        /// <summary>
+        /// The engine's kernel-side sensor readings (CPU Ring0 power/clocks, DIMM SPD).
+        /// Cached and non-blocking like the other reads; freshness-gated per
+        /// <see cref="IEcEngineMetricsSource"/>: an entry the cache has not
+        /// refreshed within <see cref="MetricsFreshBudget"/> (dead engine), or a
+        /// reading the engine stamped older than the budget (wedged probe loop),
+        /// answers Empty so the UI shows "--" instead of frozen numbers.
+        /// </summary>
+        public EngineMetricsSnapshot ReadEngineMetrics()
+        {
+            EngineMetricsSnapshot entry = _engineMetricsCache.Read();
+
+            if (!entry.ProbeOpen
+                || _engineMetricsCache.Age > MetricsFreshBudget
+                || entry.ReadingAgeSeconds > (int)MetricsFreshBudget.TotalSeconds)
+            {
+                return EngineMetricsSnapshot.Empty;
+            }
+
+            return entry;
+        }
+
         public void Dispose()
         {
             _fanDutyCache.Dispose();
             _mainFanRpmCache.Dispose();
+            _cpuTemperatureCache.Dispose();
+            _engineMetricsCache.Dispose();
         }
 
         private static StaleWhileRevalidateCache<T> CreateCache<T>(
             T initialValue,
-            Func<T> capture,
+            Func<Task<T>> capture,
             TimeSpan maxAge,
             TimeProvider? timeProvider,
             Action<Exception>? onRefreshError = null,
@@ -122,51 +235,97 @@ namespace Uniwill_Control_Utility.Services
             return new StaleWhileRevalidateCache<T>(
                 initialValue,
                 maxAge,
-                _ => Task.FromResult(capture()),
+                _ => capture(),
                 timeProvider,
                 onRefreshError,
                 onRefreshSuccess);
         }
 
-        private static (Func<EcFanDutySnapshot> fanDuty, Func<int> mainFanRpm)
-            CreateCaptures(UniwillECService ecService)
+        private static (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm,
+            Func<Task<int>> cpuTemperature, Func<Task<EngineMetricsSnapshot>> engineMetrics) CreateCaptures(
+            IEcTelemetryCapability telemetry, IEngineCapability engine)
         {
-            ArgumentNullException.ThrowIfNull(ecService);
-            var available = new Lazy<bool>(
-                ecService.Initialize,
-                System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
+            ArgumentNullException.ThrowIfNull(telemetry);
+            ArgumentNullException.ThrowIfNull(engine);
 
             return (
-                () =>
+                async () =>
                 {
-                    if (!available.Value)
+                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
                         return EcFanDutySnapshot.Empty;
 
                     try
                     {
-                        return ecService.ReadFanDutyTelemetry();
+                        UCU.Contracts.FanDutySnapshotDto dto = await telemetry.GetFanDutyAsync().ConfigureAwait(false);
+                        return new EcFanDutySnapshot(dto.CpuFanDuty, dto.GpuFanDuty);
                     }
                     catch (Exception ex)
                     {
-                        // Log and attempt reconnect on the next call. Re-throw so the
+                        // Log and attempt recovery on the next refresh. Re-throw so the
                         // cache error handler counts this as a failure.
                         try { Serilog.Log.Debug(ex, "[EC] Fan duty telemetry read threw"); }
                         catch { /* Serilog may not be ready */ }
                         throw;
                     }
                 },
-                () =>
+                async () =>
                 {
-                    if (!available.Value)
+                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
                         return 0;
 
                     try
                     {
-                        return ecService.GetMainFanRpm();
+                        return await telemetry.GetMainFanRpmAsync().ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
                         try { Serilog.Log.Debug(ex, "[EC] Main fan RPM read threw"); }
+                        catch { /* Serilog may not be ready */ }
+                        throw;
+                    }
+                },
+                async () =>
+                {
+                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
+                        return 0;
+
+                    try
+                    {
+                        return await telemetry.GetCpuTemperatureAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Serilog.Log.Debug(ex, "[EC] CPU temperature read threw"); }
+                        catch { /* Serilog may not be ready */ }
+                        throw;
+                    }
+                },
+                async () =>
+                {
+                    // Deliberately NOT gated on IsHardwareAvailableAsync: that
+                    // probe is the EC driver, and the sensor snapshot needs no
+                    // EC - the two hardware stacks are independent, and a machine
+                    // whose EC is unavailable must still get its power/clock/SPD
+                    // numbers.
+                    try
+                    {
+                        UCU.Contracts.MetricsSnapshotDto dto =
+                            await telemetry.GetMetricsSnapshotAsync().ConfigureAwait(false);
+
+                        return new EngineMetricsSnapshot
+                        {
+                            CpuPowerWatts = dto.CpuPowerWatts,
+                            CpuClockMhz = dto.CpuClockMhz,
+                            MemorySpeedMts = dto.MemorySpeedMts,
+                            MemoryTemperature0 = dto.MemoryTemperature0,
+                            MemoryTemperature1 = dto.MemoryTemperature1,
+                            ProbeOpen = dto.ProbeOpen,
+                            ReadingAgeSeconds = dto.ReadingAgeSeconds,
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Serilog.Log.Debug(ex, "[EC] Engine metrics read threw"); }
                         catch { /* Serilog may not be ready */ }
                         throw;
                     }

@@ -38,6 +38,7 @@ Statements labelled **Current state** describe observed code and repository cont
 
 - [Device communication protocols](protocols/device-communication-protocols.md)
 - [Uniwill EC fan control](protocols/uniwill-ec-fan-control.md)
+- [Uniwill EC battery charge control](protocols/uniwill-ec-battery-control.md)
 - [ITE 8291 keyboard HID protocol](protocols/ite-8291-keyboard-hid-protocol.md)
 - [MiniLED local dimming](protocols/miniled-local-dimming.md)
 - [NVIDIA GPU power control](protocols/nvidia-gpu-power-control.md)

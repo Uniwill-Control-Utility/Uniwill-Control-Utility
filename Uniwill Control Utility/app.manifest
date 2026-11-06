@@ -16,7 +16,11 @@
             Remove this element if your application requires this virtualization for backwards
             compatibility.
         -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- The product launches unelevated by design: privileged EC work runs in
+             the LocalSystem UCUEngine service, reached over the ACL'd named pipe.
+             Feature code that still needs admin (NVRAM writes, PawnIO installs)
+             elevates per-operation, not per-process. -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure domain logic: semantic value -> EC raw encodings, validation rules and
+       supervision policy. Deliberately free of I/O, P/Invoke, Windows APIs,
+       serialization and threading primitives so it is unit-testable everywhere and
+       can be referenced by the app, the engine service and the test suites. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10.0</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>UCU.Core</AssemblyName>
+    <RootNamespace>UCU.Core</RootNamespace>
+    <!-- Version: Directory.Build.props, the single source of truth. -->
+    <Copyright>c 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+    <SignAssembly>False</SignAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Codecs keep their behavior pinned by the suites below. -->
+    <InternalsVisibleTo Include="UCU.Core.Tests" />
+  </ItemGroup>
+
+  <!-- EC registry codegen (U-109): Ec\Registry\EcAddresses.json is the single source of
+       truth for EC addresses, register encodings, address regions and driver IOCTLs;
+       tools\EcRegistryGen emits Ec\Generated\EcAddresses.g.cs from it. The artifact is
+       committed, so the compiler always sees it (Compile items are globbed before this
+       target runs) and a clone builds without running the generator; this target only
+       refreshes it when the registry is newer than the artifact. The Core suite pins
+       that the committed artifact equals the generator's output, so a stale artifact
+       fails a test rather than a release. -->
+  <PropertyGroup>
+    <EcRegistryFile>$(MSBuildProjectDirectory)\Ec\Registry\EcAddresses.json</EcRegistryFile>
+    <EcVaultGeneratedFile>$(MSBuildProjectDirectory)\Ec\Generated\EcAddresses.g.cs</EcVaultGeneratedFile>
+    <EcRegistryGeneratorProject>$(MSBuildProjectDirectory)\..\tools\EcRegistryGen\EcRegistryGen.csproj</EcRegistryGeneratorProject>
+  </PropertyGroup>
+
+  <Target Name="GenerateEcVault"
+          BeforeTargets="CoreCompile"
+          Condition="Exists('$(EcRegistryFile)') AND Exists('$(EcRegistryGeneratorProject)')"
+          Inputs="$(EcRegistryFile)"
+          Outputs="$(EcVaultGeneratedFile)">
+    <MSBuild Projects="$(EcRegistryGeneratorProject)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
+    <Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; run --project &quot;$(EcRegistryGeneratorProject)&quot; --no-build --configuration $(Configuration) -- &quot;$(EcRegistryFile)&quot; &quot;$(EcVaultGeneratedFile)&quot;" />
+  </Target>
+
+</Project>

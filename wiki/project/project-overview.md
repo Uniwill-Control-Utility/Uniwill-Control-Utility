@@ -57,6 +57,6 @@ Source comments and protocol documents reference UXTU, PawnIO/ZenStates, THRM, w
 
 ## Repository identity transition
 
-The clone origin is the `Uniwill-Control-Utility/Uniwill-Control-Utility` organization repository. Some runtime and README links still point to `jgudec/Uniwill-Control-Utility`, including update checks and release links. Release ownership must be decided before publication or reliance on automatic update discovery.
+The clone origin is the `Uniwill-Control-Utility/Uniwill-Control-Utility` organization repository, and every reference points there: the update feed (`VelopackUpdateService.GitHubFeedUrl`), the Add/Remove Programs project links (authored by `build\msi-edit\MsiEdit.cs`), the README and the dashboard wiki link. The old `jgudec/...` path survives only in git history.
 
 [Back to documentation index](../README.md)

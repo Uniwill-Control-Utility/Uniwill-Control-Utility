@@ -14,7 +14,7 @@ flowchart TB
 
     UserConfig --> Prefs[General preferences and active state]
     Roaming --> Devices[Fan, keyboard, Flydigi, Hydro settings]
-    Local --> Curves[Custom presets, V-F data, overlay]
+    Local --> Curves[Custom presets, V-F data, overlay, logs]
     Install --> Legacy[Legacy presets and adaptivePresets.json]
 ```
 
@@ -58,8 +58,19 @@ Most of these stores return defaults when files are absent or unreadable. Writes
 | `vf_presets.json` | `VfCurvePresetStore` | V-F curve preset slots. |
 | `vf_stock.json` | `VfStockCurveStore` | Captured stock V-F points. |
 | `overlay.json` | `OverlaySettingsStore` | Overlay visibility, metrics, refresh, scale, opacity, placement and hotkeys. |
+| `shortcuts.json` | `ShortcutStore` | User shortcut map (U-204): chord -> vetted action. The record is the file; the store sanitises on load (unparseable chord, duplicate chord first-wins, missing payload, 32-row cap) and quarantines a corrupt file to `.bak`. |
+| `oem-takeover-journal.json` | `Services/OemTakeoverService` | User-scope takeover journal (U-203): HKCU Run renames, UWP AppModel `State`, StartupApproved flag bytes - "mutations not yet undone". Merged with the engine journal for the UI. |
+| `icc/` | `Scripts/Misc/Display` | Imported ICC profiles (U-205), validated before they land here and offered next to Windows' own set. Per-user because the spool folder needs administrator rights. |
+| `logs/ucu_log<yyyyMMdd>.txt` | `App` (Serilog file sink) | Structured diagnostic log; daily rolling, 8 MiB per file. Written per user because a per-machine install cannot write its own directory; an unwritable folder degrades logging to the console rather than failing startup. |
 
 `CustomPresetStore.MigrateLegacyFile` copies the earlier `custom_presets.json` representation into the Normal-mode store when needed.
+
+## `%ProgramData%/UCU` (engine service)
+
+| File | Owner | Content |
+| --- | --- | --- |
+| `engine/engine<yyyyMMdd>.log` | Engine (Serilog) | Service-side log: EC init/handshake, dispatcher faults, `[Oem]` pause/resume action lines, RTSS/session routes. Written as LocalSystem because a support case may exist on a machine where the user never started the app. |
+| `engine/oem-takeover-journal.json` | `UCU.Hardware/Takeover/OemTakeoverService` | Machine-scope takeover journal (U-203): HKLM Run renames, service start-type parkings (with the `|running` flag), task disables - the reversible record the restore consumes. |
 
 ## Application directory
 
@@ -72,9 +83,8 @@ The executable directory is stored in `Settings.Default.Path`. Current/legacy fi
 | `amdDtCpuPresets.json` | Legacy custom AMD desktop store retained by backup/import. |
 | `intelPresets.json` | Legacy custom Intel store retained by backup/import. |
 | `bs2pro_settings.json` | Legacy/application-directory preset data included in backup/import. |
-| `logs/ucu_log.txt` | Current structured diagnostic log; daily rolling, 8 MiB per file limit. |
 
-Because the application runs elevated and uses its install directory for active data, portable ZIP extraction is the least surprising deployment model. Installing below a protected directory changes file ownership and backup expectations.
+Adaptive presets resolve through `Settings.Default.Path`, whose default is empty, so the file is relative to the working directory - the application directory. A per-machine (MSI) install runs the app unelevated from Program Files, where that user has no write access, so this path needs a per-user default; the portable ZIP remains the layout where the current behaviour is least surprising. The engine service is what makes the per-machine install viable: the privileged EC work moved out of the app.
 
 ## Packaged read-only data
 

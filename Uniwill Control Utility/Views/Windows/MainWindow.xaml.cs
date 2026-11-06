@@ -41,6 +41,8 @@ using static Uniwill_Control_Utility.Scripts.Game_Manager;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.Forms.MessageBox;
 using Settings = Uniwill_Control_Utility.Properties.Settings;
+using UCU.Contracts.Capabilities;
+using UCU.Core.Supervision;
 
 namespace Uniwill_Control_Utility.Views.Windows
 {
@@ -56,7 +58,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
         private readonly TrayWidgetController _trayWidget;
-        // Debounce for the tray-icon left click — the shell can send the LBUTTONDOWN
+        // Debounce for the tray-icon left click â€” the shell can send the LBUTTONDOWN
         // message twice per click (press + release).
         private DateTime _lastTrayIconClick;
         public static bool IsPageSelected(Type pageType) =>
@@ -83,6 +85,13 @@ namespace Uniwill_Control_Utility.Views.Windows
             var updateService = App.GetService<VelopackUpdateService>();
             if (updateService is not null)
                 updateService.StateChanged += OnUpdateStateChanged;
+
+            // Title-bar OEM warning chip (U-203): lights up while the OEM
+            // Control Center stack is live, i.e. while it can override this
+            // app's fan and power writes. The Settings card stays the full
+            // view; this chip is the discoverable path to it.
+            _oemTakeover = App.GetService<Services.OemTakeoverService>();
+            _ = RefreshOemWarningAsync();
 
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
 
@@ -115,7 +124,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // the first left-click until a right-click forced the focus change.
             if (this.WindowState != WindowState.Minimized && this.IsVisible)
             {
-                // Open but not in focus (another window owns the desktop) — the click
+                // Open but not in focus (another window owns the desktop) â€” the click
                 // brings the main window back to the front instead of doing nothing.
                 if (!this.IsActive)
                 {
@@ -143,7 +152,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
 
             // Minimize first so the tray-icon left-click guard sees a minimized window,
-            // then show the mini-tray near the tray icon — the cursor sits on the title
+            // then show the mini-tray near the tray icon â€” the cursor sits on the title
             // bar here, so anchoring on it would drop the tray at the button's axis.
             this.WindowState = WindowState.Minimized;
             _ = _trayWidget.ToggleAsync();
@@ -152,7 +161,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
         {
             // The tray ContextMenu lives outside the window's visual tree, so the
-            // Loaded/SetCulture localization passes never reach it — refresh it on
+            // Loaded/SetCulture localization passes never reach it â€” refresh it on
             // every open (the deferred dispatch also covers items added below).
             LocalizationService.RefreshElement(cmTrayMenu);
 
@@ -294,6 +303,127 @@ namespace Uniwill_Control_Utility.Views.Windows
                 : Visibility.Collapsed;
         }
 
+        // ---- OEM takeover warning chip (U-203) --------------------------------
+
+        private Services.OemTakeoverService? _oemTakeover;
+        private DateTime _oemLastProbeUtc = DateTime.MinValue;
+        private bool _oemProbeBusy;
+        private bool _oemWarnDismissed;
+
+        /// <summary>
+        /// Probes the merged takeover state and lights the warning chip while
+        /// the OEM stack is live. Throttled (Misc tick, 60 s) because the probe
+        /// walks services, processes, tasks and both registry scopes; the chip
+        /// is a status indicator, not a live meter.
+        /// </summary>
+        private async System.Threading.Tasks.Task RefreshOemWarningAsync()
+        {
+            Services.OemTakeoverService? service = _oemTakeover;
+            if (service is null || _oemProbeBusy)
+                return;
+
+            _oemProbeBusy = true;
+            try
+            {
+                Services.OemOverview overview = await service.GetOverviewAsync();
+                _oemLastProbeUtc = DateTime.UtcNow;
+
+                bool warn = Services.OemTakeoverService.ShouldWarn(overview) && !_oemWarnDismissed;
+
+                OemWarningCard.Visibility = warn ? Visibility.Visible : Visibility.Collapsed;
+                if (!warn)
+                    OemWarnPopup.IsOpen = false;
+
+                OemWarnDetail.Text = LocalizationService.Format(
+                    "Services running: {0} of {1} Â· OEM processes: {2} Â· journal: {3} Â· autostart neutralized: {4}",
+                    overview.ServicesRunning, overview.ServicesInstalled,
+                    overview.OemProcessesRunning, overview.JournalCount, overview.AutostartNeutralized);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "OEM takeover warning probe failed");
+            }
+            finally
+            {
+                _oemProbeBusy = false;
+            }
+        }
+
+        private void OemWarningCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (OemWarningCard.Visibility == Visibility.Visible)
+                OemWarnPopup.IsOpen = true;
+        }
+
+        private static string AppendOemFailures(string body, Services.OemMergeReport report)
+        {
+            IReadOnlyList<string> failures = Services.OemTakeoverService.Failures(report);
+            return failures.Count == 0 ? body : body + "\n" + string.Join("\n", failures);
+        }
+
+        private void OemWarnNotNow_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            // Session-only dismissal: the next launch re-checks, so a machine
+            // whose stack came back after a reboot is warned again.
+            _oemWarnDismissed = true;
+            OemWarnPopup.IsOpen = false;
+            OemWarningCard.Visibility = Visibility.Collapsed;
+        }
+
+        private void OemWarnSettings_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            OemWarnPopup.IsOpen = false;
+            _navigationService.Navigate(typeof(Views.Pages.SettingsPage));
+        }
+
+        private async void OemWarnPause_Click(object sender, System.Windows.RoutedEventArgs e)        {
+            Services.OemTakeoverService? service = _oemTakeover;
+            if (service is null)
+                return;
+
+            OemWarnPauseButton.IsEnabled = false;
+            try
+            {
+                Services.OemMergeReport report = await service.PauseAsync();
+                OemWarnPopup.IsOpen = false;
+
+                // The action just measured the claim: if the engine answered and
+                // paused nothing, there is nothing live to fight us, and leaving
+                // the chip up would keep asserting the opposite of what the
+                // button reported (field, 2026-11-02). Dismiss for the session;
+                // the next launch re-probes, so a stack that comes back re-warns.
+                if (report.EngineReachable && report.State != "Busy" && report.MutationsApplied == 0)
+                {
+                    _oemWarnDismissed = true;
+                    DiagnosticLogger.LogInfo(
+                        "[OEM] pause found nothing to do - the title-bar warning is dismissed for this session");
+                }
+
+                string body = report.State == "Busy"
+                    ? LocalizationService.Get("A takeover action is already running.")
+                    : !report.EngineReachable
+                        ? LocalizationService.Get("The engine service is not running; the machine scope (services, tasks, machine run keys) was not paused.")
+                        : report.MutationsApplied == 0
+                            ? LocalizationService.Get("Nothing to pause: the OEM Control Center stack is not installed on this machine.")
+                            : LocalizationService.Format("Paused the OEM Control Center stack ({0} mutations applied).", report.MutationsApplied);
+
+                Uniwill_Control_Utility.Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"), AppendOemFailures(body, report));
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "OEM takeover pause from the title bar failed");
+                Uniwill_Control_Utility.Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"),
+                    LocalizationService.Get("The pause action failed; see the log."));
+            }
+            finally
+            {
+                OemWarnPauseButton.IsEnabled = true;
+                await RefreshOemWarningAsync();
+            }
+        }
+
         private void UpdateRestartButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             // Applies the staged package and relaunches the app (terminates us).
@@ -329,101 +459,129 @@ namespace Uniwill_Control_Utility.Views.Windows
                 {
                     await Task.Run(() => GetBatteryStatus());
 
+                    // Route through the arbiter as BootRestore: the startup restore is
+                    // never suppressed, and taking the arbiter's gate here marks the
+                    // pipeline busy so a startup automation edge queues behind it
+                    // instead of racing it.
                     string profileName = Settings.Default.presetProfile;
-                    await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+                    var bootArbiter = App.GetService<PresetArbiter>();
+                    if (bootArbiter is not null)
+                        await bootArbiter.RequestAsync(PresetIntentSource.BootRestore, profileName);
+                    else
+                        await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
                     ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", profileName), accent: profileName);
                     return;
                 }
 
-                if (Settings.Default.ApplyOnStart)
+                // Every preset re-applies at startup now (the "Apply on startup"
+                // option is gone): a relaunch must never leave the EC running the
+                // previous session's values while the UI claims the saved preset.
+                //
+                // Custom presets arrive in two key shapes: the legacy "Custom"
+                // (meaning "the saved slot") and the keyed "Custom 3" the slot
+                // radio buttons write. Only the legacy key used to be handled, so
+                // a saved keyed preset was never re-applied at all - the EC kept
+                // the previous session's values while the UI showed the preset.
+                (int keyedSlot, Models.PresetMode keyedMode) =
+                    PresetProfileApplier.TryParseCustomSlotExtended(Settings.Default.presetProfile);
+                if (keyedSlot >= 0 || Settings.Default.presetProfile == "Custom")
                 {
-                    // If the last selected profile was Custom, apply from CustomPresetStore.
-                    if (Settings.Default.presetProfile == "Custom")
-                    {
-                        await Task.Run(() => GetBatteryStatus());
+                    await Task.Run(() => GetBatteryStatus());
 
-                        // Determine active preset mode based on current Power boost mode setting
-                        Models.PresetMode mode = Settings.Default.EnablePowerBoostMode
-                            ? Models.PresetMode.Boost
-                            : Models.PresetMode.Normal;
-                        var presets = Models.CustomPresetStore.Load(mode);
-                        // Use the saved slot for the active mode, fall back to first slot with data.
-                        int slot = mode == Models.PresetMode.Boost
+                    // Keyed presets name their slot and mode; the legacy key falls
+                    // back to the saved slot and the power-boost mode setting.
+                    Models.PresetMode mode = keyedSlot >= 0
+                        ? keyedMode
+                        : (Settings.Default.EnablePowerBoostMode ? Models.PresetMode.Boost : Models.PresetMode.Normal);
+                    var presets = Models.CustomPresetStore.Load(mode);
+                    int slot = keyedSlot >= 0
+                        ? keyedSlot
+                        : (mode == Models.PresetMode.Boost
                             ? Settings.Default.customPresetSlotBoost
-                            : Settings.Default.customPresetSlot;
-                        if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
+                            : Settings.Default.customPresetSlot);
+                    if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
+                    {
+                        // Fallback: find first slot with saved data.
+                        slot = 0;
+                        for (int i = 0; i < presets.Length; i++)
                         {
-                            // Fallback: find first slot with saved data.
-                            slot = 0;
-                            for (int i = 0; i < presets.Length; i++)
+                            if (presets[i].HasChanges)
                             {
-                                if (presets[i].HasChanges)
-                                {
-                                    slot = i;
-                                    break;
-                                }
+                                slot = i;
+                                break;
                             }
                         }
-
-                        var p = presets[slot];
-                        if (p.HasChanges)
-                        {
-                            // Build command string from the preset values
-                            string command = BuildCustomCommandString(p);
-                            if (!string.IsNullOrWhiteSpace(command))
-                            {
-                                await ApplyCustomOnStart(command, p);
-                                string customTemplate = mode == Models.PresetMode.Boost
-                                    ? "Custom {0} (Boost) Applied"
-                                    : "Custom {0} Applied";
-                                ToastNotification.ShowToastNotification(LocalizationService.Format(customTemplate, slot + 1),
-                                    accent: ToastNotification.AccentFor(customTemplate, (slot + 1).ToString()));
-                            }
-                        }
-                        return;
                     }
 
-                    // Legacy path: CommandString from Automations / tray menu
-                    if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
+                    var p = presets[slot];
+                    if (p.HasChanges)
                     {
-                        await Task.Run(() => GetBatteryStatus());
-
-                        if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
-                            || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
+                        // Build command string from the preset values
+                        string command = BuildCustomCommandString(p);
+                        if (!string.IsNullOrWhiteSpace(command))
                         {
-                            if (Settings.Default.EnableAutoNavigation &&
-                                Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
-                            {
-                                Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
-                                    ResolveAutomationProfile(Settings.Default.acPreset));
-                                Settings.Default.CommandString = Settings.Default.acCommandString;
-                                Settings.Default.Save();
-                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
-                                ToastNotification.ShowToastNotification("Charge Applied");
-                            }
-                            else
-                            {
-                                await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
-                                ToastNotification.ShowToastNotification("Settings Reapplied");
-                            }
+                            await ApplyCustomOnStart(command, p);
+                            // Direct apply outside the pipeline: keep the arbiter's
+                            // debounce state honest so a startup automation edge for
+                            // the same selection is recognized as a duplicate.
+                            App.GetService<PresetArbiter>()?.RecordApply(
+                                PresetIntentSource.BootRestore,
+                                PresetProfileApplier.CustomProfileKey(slot, mode));
+                            string customTemplate = mode == Models.PresetMode.Boost
+                                ? "Custom {0} (Boost) Applied"
+                                : "Custom {0} Applied";
+                            ToastNotification.ShowToastNotification(LocalizationService.Format(customTemplate, slot + 1),
+                                accent: ToastNotification.AccentFor(customTemplate, (slot + 1).ToString()));
+                        }
+                    }
+                    return;
+                }
+
+                // Legacy path: CommandString from Automations / tray menu
+                if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
+                {
+                    await Task.Run(() => GetBatteryStatus());
+
+                    if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                        || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
+                    {
+                        if (Settings.Default.EnableAutoNavigation &&
+                            Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
+                        {
+                            Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.acPreset));
+                            Settings.Default.CommandString = Settings.Default.acCommandString;
+                            Settings.Default.Save();
+                            // Startup restore of the AC selection: BootRestore, not an
+                            // automation edge â€” the boot grace must not swallow it.
+                            await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset,
+                                PresetIntentSource.BootRestore);
+                            ToastNotification.ShowToastNotification("Charge Applied");
                         }
                         else
                         {
-                            if (Settings.Default.EnableAutoNavigation &&
-                                Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
-                            {
-                                Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
-                                    ResolveAutomationProfile(Settings.Default.dcPreset));
-                                Settings.Default.CommandString = Settings.Default.dcCommandString;
-                                Settings.Default.Save();
-                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
-                                ToastNotification.ShowToastNotification("Discharge Applied");
-                            }
-                            else
-                            {
-                                await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
-                                ToastNotification.ShowToastNotification("Settings Reapplied");
-                            }
+                            await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                            ToastNotification.ShowToastNotification("Settings Reapplied");
+                        }
+                    }
+                    else
+                    {
+                        if (Settings.Default.EnableAutoNavigation &&
+                            Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
+                        {
+                            Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.dcPreset));
+                            Settings.Default.CommandString = Settings.Default.dcCommandString;
+                            Settings.Default.Save();
+                            // Startup restore of the DC selection â€” BootRestore (see AC branch).
+                            await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset,
+                                PresetIntentSource.BootRestore);
+                            ToastNotification.ShowToastNotification("Discharge Applied");
+                        }
+                        else
+                        {
+                            await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                            ToastNotification.ShowToastNotification("Settings Reapplied");
                         }
                     }
                 }
@@ -489,7 +647,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 var settings = KeyboardSettingsService.Load();
 
-                // BetterRGB: the streamer owns the keyboard handle — resume it instead
+                // BetterRGB: the streamer owns the keyboard handle â€” resume it instead
                 // of opening a fresh one and re-sending firmware reports.
                 if (settings.Engine == KeyboardEngine.BetterRGB)
                 {
@@ -632,7 +790,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>
         /// Auto-power lighting policy for the Keyboard and Light Bar pages: when a page's
         /// "auto off when unplugged" option is enabled, the lights follow the AC plug
-        /// state — unplugged turns them off, plugged in restores the user's saved lighting
+        /// state â€” unplugged turns them off, plugged in restores the user's saved lighting
         /// intent. The BetterRGB streamer (which owns the keyboard-zone handle) is
         /// stopped/started instead of sending firmware reports.
         /// </summary>
@@ -711,7 +869,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         internal static async Task AsyncApplyKeyboardOnStart()
         {
             // Wait for the system to settle after boot. The HID controller needs
-            // time to become discoverable — especially on cold startup.
+            // time to become discoverable â€” especially on cold startup.
             await Task.Delay(1000);
 
             KeyboardHidService? hidService = null;
@@ -741,7 +899,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 var settings = KeyboardSettingsService.Load();
                 if (settings.Engine == KeyboardEngine.BetterRGB)
                 {
-                    // BetterRGB: the streamer owns the keyboard-zone handle — skip the
+                    // BetterRGB: the streamer owns the keyboard-zone handle â€” skip the
                     // firmware keyboard apply. The light bar rides the usage-2 device
                     // and is unaffected by the engine choice.
                     var streamer = App.GetService<BetterRgbStreamService>();
@@ -769,7 +927,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
 
             // Auto-power lighting at startup: if the laptop is on battery and the
-            // option is enabled, the startup apply above turned the lights on —
+            // option is enabled, the startup apply above turned the lights on â€”
             // suppress them to honor the unplug-off policy.
             try
             {
@@ -890,20 +1048,44 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         /// <summary>
-        /// Applies EC fan curve and battery charge limit at app startup.
-        /// Runs once from mainWindow_Loaded — not on every Dashboard navigation.
+        /// Applies EC fan curve and battery charge limit at app startup, as a
+        /// phase-1 startup task (not on every Dashboard navigation). Skipped and
+        /// marked pending when the engine service is not running, then applied once
+        /// when it reaches Running.
         /// </summary>
         internal static void ApplyEcSettingsOnStart()
         {
-            var ec = App.GetService<UniwillECService>();
-            if (ec is null)
+            // Availability gate. Every EC call below is a pipe connect, and a connect
+            // to the missing pipe of a stopped engine costs the full 5 s connect
+            // timeout - here on the splash path, where the fan curve, the smart-fan
+            // start and the battery re-read add up to the "Initializing stalls" report.
+            // With the engine down these writes cannot succeed, so the apply is marked
+            // pending and the engine's Running transition performs it (App ensures the
+            // service right after the splash).
+            var availability = App.GetService<Uniwill_Control_Utility.Services.EngineAvailability>();
+            if (availability is not null && !availability.IsRunning)
+            {
+                App.GetService<Uniwill_Control_Utility.Services.EngineStartupApply>()?.MarkPending();
+                Serilog.Log.Debug(
+                    "[Engine] EC startup apply skipped: the engine service is not running (state {State})",
+                    availability.Query());
+                return;
+            }
+
+            var fan = App.GetService<IFanCapability>();
+            var battery = App.GetService<IBatteryCapability>();
+            if (fan is null || battery is null)
                 return;
 
-            try
-            {
-                ec.Initialize();
-            }
-            catch { /* EC not available on this hardware */ }
+            // Auto-apply the saved fan curve on startup - unless a stock preset
+            // owns the fans. ApplyOemStockMode hands the EC back to the
+            // firmware's per-mode table and the fan page is locked, so this
+            // write must not fight it. It used to: this task and ApplyOnStart run
+            // in parallel from ApplyStartupSettingsAsync, so the curve landed
+            // whenever it happened to finish last - field, 2026-11-02, "Office
+            // applied" with the fans running the saved Full Speed curve until
+            // the preset was re-applied by hand.
+            bool fansOwnedByPreset = PresetProfileApplier.IsBuiltInProfile(Properties.Settings.Default.presetProfile);
 
             // Auto-apply the saved fan curve on startup.
             try
@@ -939,13 +1121,13 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                 // If Smart Fan Mode is enabled, start it instead of applying
                 // the normal curve.
-                if (settings.EcSmartFanMode)
+                if (settings.EcSmartFanMode && !fansOwnedByPreset)
                 {
                     try
                     {
                         var tempProvider = new Models.FlydigiTemperatureProvider();
                         var smartFan = Uniwill_Control_Utility.Services.EcSmartFanControl.GetOrCreate(
-                            ec,
+                            fan,
                             tempProvider,
                             settings,
                             cpuCurve,
@@ -956,13 +1138,17 @@ namespace Uniwill_Control_Utility.Views.Windows
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"WARN | MainWindow: Smart Fan Mode auto-start failed: {ex.Message}");
-                        ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                        fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                     }
+                }
+                else if (!fansOwnedByPreset)
+                {
+                    fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                    System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-applied on startup");
                 }
                 else
                 {
-                    ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
-                    System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-applied on startup");
+                    System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-apply skipped - the stock preset owns the fans");
                 }
             }
             catch (Exception ex)
@@ -975,10 +1161,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             try
             {
                 int savedMode = Properties.Settings.Default.BatteryMode;
-                int currentMode = ec.GetBatteryMode();
+                int currentMode = battery.GetModeAsync().GetAwaiter().GetResult();
                 if (savedMode != currentMode)
                 {
-                    ec.SetBatteryMode(savedMode);
+                    battery.SetModeAsync(savedMode).GetAwaiter().GetResult();
                     System.Diagnostics.Debug.WriteLine($"INFO | MainWindow: Restored battery charge limit to mode {savedMode} (was {currentMode})");
                 }
             }
@@ -1051,6 +1237,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                // Throttled status probe for the title-bar OEM warning chip.
+                if ((DateTime.UtcNow - _oemLastProbeUtc).TotalSeconds >= 60)
+                    await RefreshOemWarningAsync();
             }
             catch (Exception ex)
             {
@@ -1062,6 +1251,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         // Win32_Battery.BatteryStatus values that indicate AC-powered state
         private const ushort BatteryStatusAc = 2;
+
+        /// <summary>Win32_Battery's "on battery" code; the value the WMI route used
+        /// to supply, kept so the AC/DC branches below keep reading one variable.</summary>
+        private const ushort BatteryStatusDischarging = 1;
+
         private const ushort BatteryStatusCritical = 6;
         private const ushort BatteryStatusCharging = 7;
         private const ushort BatteryStatusNoSystemBattery = 8;
@@ -1070,13 +1264,30 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
-                var batteryClass = new ManagementClass("Win32_Battery");
-                var batteries = batteryClass.GetInstances();
+                // The AC/DC decision comes from the OS power status, not from WMI's
+                // Win32_Battery: on the tester laptop (2026-11-02) a launch while
+                // unplugged was classified as AC until the charger was physically
+                // moved, i.e. the WMI class answered nothing usable and `statuscode`
+                // kept its default. PowerLineStatus is a kernel read with no filter
+                // driver or device query in the path - the same reason the battery
+                // envelope clamp uses it.
+                System.Windows.Forms.PowerStatus power = System.Windows.Forms.SystemInformation.PowerStatus;
 
-                foreach (var battery in batteries)
+                if ((power.BatteryChargeStatus & System.Windows.Forms.BatteryChargeStatus.NoSystemBattery) != 0)
                 {
-                    statuscode = (ushort)battery["BatteryStatus"];
+                    statuscode = BatteryStatusNoSystemBattery;
+                    return;
                 }
+
+                if (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                {
+                    statuscode = BatteryStatusDischarging;
+                    return;
+                }
+
+                statuscode = (power.BatteryChargeStatus & System.Windows.Forms.BatteryChargeStatus.Charging) != 0
+                    ? BatteryStatusCharging
+                    : BatteryStatusAc;
             }
             catch (Exception ex)
             {
@@ -1113,9 +1324,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 ResolveAutomationProfile(Settings.Default.acPreset));
                             Settings.Default.CommandString = Settings.Default.acCommandString;
                             Settings.Default.Save();
-                            await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
+                            var acResult = await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset,
+                                PresetIntentSource.AutomationAc);
 
-                            if (lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Applied");
+                            // Silence on suppression: a boot-grace drop of an uncalibrated
+                            // startup edge must not announce "Charge Applied".
+                            if (acResult.Applied && lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Applied");
                             lastAppliedState = "ac";
                         }
                     }
@@ -1128,9 +1342,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 ResolveAutomationProfile(Settings.Default.dcPreset));
                             Settings.Default.CommandString = Settings.Default.dcCommandString;
                             Settings.Default.Save();
-                            await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
+                            var dcResult = await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset,
+                                PresetIntentSource.AutomationBattery);
 
-                            if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Applied");
+                            // Silence on suppression â€” see the AC branch.
+                            if (dcResult.Applied && lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Applied");
                             lastAppliedState = "dc";
                         }
 
@@ -1200,7 +1416,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     }
 
                     // BetterRGB streamer AC policy (OpenRevo's auto-policy):
-                    // plugged in → restore the 60FPS streamer; battery → hardware
+                    // plugged in â†’ restore the 60FPS streamer; battery â†’ hardware
                     // firmware effects at the same params (0% CPU).
                     try
                     {
@@ -1247,7 +1463,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Debug.WriteLine($"[Resume] LHM reset failed: {ex.Message}");
                             }
 
-                            // Also reset the NvTuning NVML state — it uses a separate NVML
+                            // Also reset the NvTuning NVML state â€” it uses a separate NVML
                             // context from LHM and has its own stale handles after resume.
                             try
                             {
@@ -1279,9 +1495,28 @@ namespace Uniwill_Control_Utility.Views.Windows
                             {
                                 try
                                 {
-                                    await PresetProfileApplier.ApplyProfileAsync(activeProfile, PresetProfileApplier.DisplayName(activeProfile));
-                                    Debug.WriteLine($"[Resume] Preset '{activeProfile}' re-applied");
-                                    ToastNotification.ShowToastNotification("Resume Applied");
+                                    // Resume is an intent like any other: the arbiter's gate
+                                    // serializes it against a user apply that raced the wake,
+                                    // and its debounce drops a re-apply of a profile that was
+                                    // just applied by hand seconds before the wake.
+                                    bool resumeApplied;
+                                    var resumeArbiter = App.GetService<PresetArbiter>();
+                                    if (resumeArbiter is not null)
+                                    {
+                                        var r = await resumeArbiter.RequestAsync(PresetIntentSource.ResumeFromSleep, activeProfile);
+                                        resumeApplied = r.Applied;
+                                    }
+                                    else
+                                    {
+                                        await PresetProfileApplier.ApplyProfileAsync(activeProfile, PresetProfileApplier.DisplayName(activeProfile));
+                                        resumeApplied = true;
+                                    }
+
+                                    if (resumeApplied)
+                                    {
+                                        Debug.WriteLine($"[Resume] Preset '{activeProfile}' re-applied");
+                                        ToastNotification.ShowToastNotification("Resume Applied");
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -1310,7 +1545,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             }
 
                             // Auto-power lighting: the resume re-applies above turned the
-                            // lights back on per saved settings — if the auto-power option
+                            // lights back on per saved settings â€” if the auto-power option
                             // is enabled and the laptop is on battery, suppress them again.
                             try
                             {
@@ -1328,14 +1563,15 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // Re-apply Battery charge limit
                             try
                             {
-                                var ecService = App.GetService<UniwillECService>();
-                                if (ecService != null && ecService.Initialize())
+                                var battery = App.GetService<IBatteryCapability>();
+                                var engine = App.GetService<IEngineCapability>();
+                                if (battery != null && engine != null && engine.IsHardwareAvailableAsync().GetAwaiter().GetResult())
                                 {
                                     int savedMode = Settings.Default.BatteryMode;
-                                    int currentMode = ecService.GetBatteryMode();
+                                    int currentMode = battery.GetModeAsync().GetAwaiter().GetResult();
                                     if (savedMode != currentMode)
                                     {
-                                        ecService.SetBatteryMode(savedMode);
+                                        battery.SetModeAsync(savedMode).GetAwaiter().GetResult();
                                         Debug.WriteLine($"[Resume] Battery mode reverted from {currentMode} to saved {savedMode}");
                                     }
                                 }
@@ -1386,12 +1622,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // custom EC curve after resume would undo the OEM mode engine.
                             try
                             {
-                                var ecService = App.GetService<UniwillECService>();
-                                if (ecService != null && !IsFanCustomizationAllowed())
+                                var fan = App.GetService<IFanCapability>();
+                                if (fan != null && !IsFanCustomizationAllowed())
                                 {
-                                    Debug.WriteLine("[Resume] Stock preset active — EC fan duties not re-applied");
+                                    Debug.WriteLine("[Resume] Stock preset active â€” EC fan duties not re-applied");
                                 }
-                                else if (ecService != null)
+                                else if (fan != null)
                                 {
                                     var fanSettings = FanControlSettingsService.Load();
                                     EcFanCurve cpuCurve;
@@ -1420,7 +1656,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                         // Restart Smart Fan Mode after resume
                                         var tempProvider = new Models.FlydigiTemperatureProvider();
                                         var smartFan = Uniwill_Control_Utility.Services.EcSmartFanControl.Recreate(
-                                            ecService,
+                                            fan,
                                             tempProvider,
                                             fanSettings,
                                             cpuCurve,
@@ -1430,7 +1666,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     }
                                     else
                                     {
-                                        ecService.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                                        fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                                         Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
                                     }
                                 }
@@ -1472,7 +1708,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     try
                                     {
                                         // If the service still thinks it's connected, the HID link
-                                        // may be stale after hibernate — reconnect.
+                                        // may be stale after hibernate â€” reconnect.
                                         if (flydigiService.IsConnected)
                                         {
                                             Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
@@ -1551,7 +1787,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// </summary>
         private const int WM_DISPLAYCHANGE = 0x007E;
 
-        // SM_CMONITORS for GetSystemMetrics — tracks how many displays are active
+        // SM_CMONITORS for GetSystemMetrics â€” tracks how many displays are active
         // so we only reset GPU driver state on real topology changes, not fullscreen alt-tabs.
         private const int SM_CMONITORS = 80;
         private int _lastMonitorCount = -1;
@@ -1567,10 +1803,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                 bool topologyChanged = _lastMonitorCount < 0 || currentMonitorCount != _lastMonitorCount;
                 _lastMonitorCount = currentMonitorCount;
 
-                // Don't mark as handled — other WPF code may need this message.
+                // Don't mark as handled â€” other WPF code may need this message.
                 // Only reset GPU driver state when the monitor count actually changes.
                 // Fullscreen alt-tabs fire WM_DISPLAYCHANGE but don't change the
-                // monitor count — resetting on those causes a 15-second NVML
+                // monitor count â€” resetting on those causes a 15-second NVML
                 // blackout (GpuInteropGuard cooldown) and metrics show zeros.
                 if (topologyChanged)
                 {
@@ -1585,7 +1821,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
                     }
 
-                    // Also reset NvTuning's NVML context — separate from LHM.
+                    // Also reset NvTuning's NVML context â€” separate from LHM.
                     try
                     {
                         Scripts.GPUs.NVIDIA.Nvml.Reset();
@@ -1637,7 +1873,84 @@ namespace Uniwill_Control_Utility.Views.Windows
                 SetPageService(pageProvider);
         }
 
-        public void ShowWindow() => Show();
+        /// <summary>
+        /// Startup splash gate: while set, the host's first ShowWindow()
+        /// initializes the window without it EVER painting on-screen (the
+        /// dashboard's metrics timers need a shown window to start, and the
+        /// first tick fills it 1-2 s healthy / up to ~6 s guarded after that -
+        /// showing it then is the empty-dashboard flash the splash exists to
+        /// cover). App clears the gate, closes the splash, and Shows when the
+        /// first data frame lands (Services.DashboardFirstFrameSignal).
+        /// </summary>
+        public static bool GateFirstShowWindow { get; set; }
+
+        /// <summary>The park used while gated: WPF accepts offsets far outside
+        /// every monitor's bounds, so the window composites off-screen.</summary>
+        private const double GatedParkOffset = -32000;
+
+        /// <summary>True while the window is parked off-screen waiting for the
+        /// dashboard's first data frame (gate active, splash still up).</summary>
+        private bool _startupGateParked;
+
+        public void ShowWindow()
+        {
+            if (GateFirstShowWindow)
+            {
+                // Park BEFORE the first Show, then Show. The order is the fix:
+                // the baseline sequence (Show at the CenterScreen position,
+                // park afterwards) painted one visible frame of the window at
+                // screen center. WPF's Opacity=0 hides the WPF-composited
+                // content, but this window's backdrop (WindowBackdropType=Mica)
+                // is composited by DWM, so a 1080x1080 rounded panel appeared
+                // for exactly one frame behind the splash - the splash is a
+                // 320x290 card, so the whole screen around it is exposed (field
+                // report: "the main window blips at 92% of the pre-loader").
+                // Manual startup location + an off-screen Left/Top before Show
+                // means the window's very first composition is off every
+                // monitor edge. Show is still required: the host navigates
+                // right after this call, and NavigationView's template only
+                // applies through a real Show (the EnsureHandle/hidden-window
+                // variants threw NavigationView NREs, field-proven). The
+                // CenterScreen landing position is computed on release.
+                _startupGateParked = true;
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = GatedParkOffset;
+                Top = GatedParkOffset;
+                Opacity = 0;
+                Show();
+                return;
+            }
+
+            Show();
+        }
+
+        /// <summary>
+        /// Undo the startup gate: land at the work-area center (the primary
+        /// screen's, in DIPs - the same place WindowStartupLocation=CenterScreen
+        /// puts it), become opaque, then apply the app's work-area fit and
+        /// activate. Called by App after the splash has closed and the
+        /// dashboard's first data frame has landed, so the window's first
+        /// visible presentation is populated and nothing is ever painted
+        /// beside the splash card.
+        /// </summary>
+        public void ReleaseStartupGate()
+        {
+            if (_startupGateParked)
+            {
+                _startupGateParked = false;
+
+                // Position BEFORE raising the opacity: the first composited
+                // frame on-screen is the final one (a move and an opacity
+                // raise in the same dispatcher turn paint once).
+                Rect workArea = SystemParameters.WorkArea;
+                Left = workArea.Left + (workArea.Width - Width) / 2.0;
+                Top = workArea.Top + (workArea.Height - Height) / 2.0;
+                Opacity = 1;
+            }
+
+            App.FitWindowToWorkArea(this);
+            Activate();
+        }
 
         public void CloseWindow() => Close();
 
@@ -1650,6 +1963,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             source?.RemoveHook(_hwndHook);
 
             SystemEvents.PowerModeChanged -= HandlePowerModeChange;
+
+            UnwireDeviceConnectionWatcher();
 
             base.OnClosed(e);
             Application.Current.Shutdown();
@@ -1687,13 +2002,29 @@ namespace Uniwill_Control_Utility.Views.Windows
                 string command = PresetProfileApplier.BuildCommandString(profileName);
                 string displayName = PresetProfileApplier.DisplayName(profileName);
 
-                await PresetProfileApplier.ApplyProfileAsync(profileName, displayName);
+                // A tray click is an explicit user intent: the arbiter never suppresses
+                // it; it serializes it (gate) and persists the selection (policy rule).
+                var trayArbiter = App.GetService<PresetArbiter>();
+                bool trayApplied;
+                if (trayArbiter is not null)
+                {
+                    var r = await trayArbiter.RequestAsync(PresetIntentSource.UserInterface, profileName);
+                    trayApplied = r.Applied;
+                }
+                else
+                {
+                    await PresetProfileApplier.ApplyProfileAsync(profileName, displayName);
+                    Settings.Default.presetProfile = profileName;
+                    trayApplied = true;
+                }
 
-                Settings.Default.presetProfile = profileName;
-                Settings.Default.CommandString = command;
-                Settings.Default.Save();
+                if (trayApplied)
+                {
+                    Settings.Default.CommandString = command;
+                    Settings.Default.Save();
 
-                ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", displayName), accent: displayName);
+                    ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", displayName), accent: displayName);
+                }
             }
             catch (Exception ex)
             {
@@ -1769,7 +2100,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            // Legacy handler – delegates to extended handler with Normal mode.
+            // Legacy handler â€“ delegates to extended handler with Normal mode.
             if (sender is not MenuItem menuItem || menuItem.Tag is not int slot)
                 return;
             await TrayCustomPresetApplyAsync(slot, Models.PresetMode.Normal);
@@ -1799,6 +2130,13 @@ namespace Uniwill_Control_Utility.Views.Windows
                     return;
 
                 await ApplyCustomOnStart(command, p);
+                // Direct apply outside the pipeline (slot-aware legacy path): keep the
+                // arbiter's debounce/priority bookkeeping honest. The slot-qualified key
+                // matches the Q-key cycle vocabulary so a press-cycle back to this slot
+                // within the debounce window is seen as the same target.
+                App.GetService<PresetArbiter>()?.RecordApply(
+                    PresetIntentSource.UserInterface,
+                    PresetProfileApplier.CustomProfileKey(slot, mode));
                 string titleTemplate = mode == Models.PresetMode.Boost
                     ? "Custom {0} (Boost) Applied"
                     : "Custom {0} Applied";
@@ -1825,18 +2163,24 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
-        private static async Task TranslatePresetAsync(string commands, string? configuredName)
+        private static async Task<PresetArbiterResult> TranslatePresetAsync(string commands, string? configuredName, PresetIntentSource source)
         {
             string profileName = ResolveAutomationProfile(configuredName);
             if (string.IsNullOrEmpty(profileName))
             {
                 // Unknown profile ? fall back to raw command execution
                 await RyzenAdj_To_UCU.TranslateAsync(commands, appliedName: configuredName, localizeAppliedName: false);
-                return;
+                return new PresetArbiterResult(true, PresetArbiterAction.Apply, "raw command fallback");
             }
 
-            // Full apply: RyzenAdj + V-F curve (Custom) + EC limits (AMD)
+            // Full apply through the arbiter's single pipeline: arbitration (boot grace,
+            // Adaptive ownership, debounce) then RyzenAdj + V-F curve (Custom) + EC limits.
+            var arbiter = App.GetService<PresetArbiter>();
+            if (arbiter is not null)
+                return await arbiter.RequestAsync(source, profileName);
+
             await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+            return new PresetArbiterResult(true, PresetArbiterAction.Apply, "applied (no arbiter)");
         }
 
         /// <summary>
@@ -1897,29 +2241,31 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void mainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // StartMini is the user's own setting; a guardian relaunch after a
+            // StartMini is the user's own setting; a supervisor relaunch after a
             // crash always opens minimized, so recovery stays out of the way.
             if (Settings.Default.StartMini || App.GuardianRestart)
             {
                 this.WindowState = WindowState.Minimized;
             }
 
-            // Adjust window height based on feature toggles.
-            // When both Hydro UI and Flydigi are disabled, use a smaller height.
+            // Adjust window height based on feature toggles and live device presence.
             // Runs here (Loaded) instead of the constructor so the window is already
             // shown and the layout is finalized, avoiding a visible flash at 1080.
-            bool hydroDisabled = !Settings.Default.EnableHydroUiNavigation;
-            bool flydigiDisabled = !Settings.Default.EnableFlydigi;
-            if (hydroDisabled && flydigiDisabled)
-            {
-                this.Height = 907;
-            }
+            ApplyPreferredHeight();
+            WireDeviceConnectionWatcher();
 
             // Keep the window inside the monitor's work area so the title bar
             // never spills above the top screen edge. On the 2560x1600 internal
-            // panel at 150% scale, 1080 DIP = 1620 physical px — taller than the
-            // screen — so CenterScreen splits the overflow off the top.
-            App.FitWindowToWorkArea(this);
+            // panel at 150% scale, 1080 DIP = 1620 physical px â€” taller than the
+            // screen â€” so CenterScreen splits the overflow off the top.
+            // Skipped while the startup gate parks the window off-screen:
+            // Screen.FromHandle resolves a parked window to the NEAREST monitor,
+            // and the fit's re-center would drag it back on-screen - where the
+            // Mica backdrop composites a frame even at Opacity 0 (that frame is
+            // the splash-phase blip). ReleaseStartupGate applies the same fit at
+            // the landing position instead.
+            if (!_startupGateParked)
+                App.FitWindowToWorkArea(this);
 
             _ = Task.Run(PremadePresets.SetPremadePresets);
 
@@ -1945,17 +2291,106 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             Task.Run(Garbage.Garbage_Collect);
 
-            // Watch for the laptop panel being turned back on (external-only → attached)
+            // Watch for the laptop panel being turned back on (external-only â†’ attached)
             // and auto-apply the UCU-declared refresh rate + color profile after a settle
             // delay when the live panel differs.
             StartPanelWatcher();
         }
 
-        // Auto-reconcile the internal panel's display settings on the detached→attached
+        /// <summary>
+        /// Height for the current feature/connection state: 907 when both optional
+        /// nav sections are unavailable (disabled in Settings, or their device is
+        /// not connected), otherwise the 1080 base from XAML.
+        /// </summary>
+        public static double PreferredHeight(bool hydroDisabled, bool flydigiDisabled, bool hydroConnected, bool flydigiConnected)
+        {
+            bool hydroAbsent = hydroDisabled || !hydroConnected;
+            bool flydigiAbsent = flydigiDisabled || !flydigiConnected;
+            return (hydroAbsent && flydigiAbsent) ? 907 : 1080;
+        }
+
+        /// <summary>
+        /// Applies the height rule from the current Settings and connection state.
+        /// Does not touch position: the work-area clamp stays a separate step.
+        /// </summary>
+        public void ApplyPreferredHeight()
+        {
+            Height = PreferredHeight(
+                !Settings.Default.EnableHydroUiNavigation,
+                !Settings.Default.EnableFlydigi,
+                App.GetService<HydroUIService>()?.IsConnected ?? false,
+                (App.GetService<FlydigiCoolerHidService>()?.IsConnected ?? false)
+                    || (App.GetService<FlydigiCoolerBleService>()?.IsConnected ?? false));
+        }
+
+        private EventHandler<HydroUIService.WatercoolerConnectionState>? _hydroConnectionHandler;
+        private EventHandler<bool>? _flydigiConnectionHandler;
+
+        /// <summary>
+        /// A device connecting a few seconds after startup grows the window back to
+        /// 1080; a drop shrinks it again. The services raise this from background
+        /// threads, so hop to the dispatcher before touching layout.
+        /// </summary>
+        private void OnDeviceConnectionChanged()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.InvokeAsync(OnDeviceConnectionChanged);
+                return;
+            }
+
+            double before = Height;
+            ApplyPreferredHeight();
+
+            // Growing back to 1080 on a short panel would spill the title bar
+            // above the top edge, so re-fit; a parked window is left alone (see Loaded).
+            if (Height != before && !_startupGateParked)
+                App.FitWindowToWorkArea(this);
+        }
+
+        private void WireDeviceConnectionWatcher()
+        {
+            var hydro = App.GetService<HydroUIService>();
+            if (hydro != null)
+            {
+                _hydroConnectionHandler = (_, _) => OnDeviceConnectionChanged();
+                hydro.ConnectionStateChanged += _hydroConnectionHandler;
+            }
+
+            _flydigiConnectionHandler = (_, _) => OnDeviceConnectionChanged();
+
+            var hid = App.GetService<FlydigiCoolerHidService>();
+            if (hid != null)
+                hid.ConnectionStateChanged += _flydigiConnectionHandler;
+
+            var ble = App.GetService<FlydigiCoolerBleService>();
+            if (ble != null)
+                ble.ConnectionStateChanged += _flydigiConnectionHandler;
+        }
+
+        private void UnwireDeviceConnectionWatcher()
+        {
+            var hydro = App.GetService<HydroUIService>();
+            if (hydro != null && _hydroConnectionHandler != null)
+                hydro.ConnectionStateChanged -= _hydroConnectionHandler;
+
+            var hid = App.GetService<FlydigiCoolerHidService>();
+            if (hid != null && _flydigiConnectionHandler != null)
+                hid.ConnectionStateChanged -= _flydigiConnectionHandler;
+
+            var ble = App.GetService<FlydigiCoolerBleService>();
+            if (ble != null && _flydigiConnectionHandler != null)
+                ble.ConnectionStateChanged -= _flydigiConnectionHandler;
+
+            _hydroConnectionHandler = null;
+            _flydigiConnectionHandler = null;
+        }
+
+        // Auto-reconcile the internal panel's display settings on the detachedâ†’attached
         // transition: the watcher polls the panel's attach state; on re-enable it waits a
         // settle delay (Windows is still finalizing the display mode) and then applies the
         // declared values if the live panel differs. While the panel stays attached, no
-        // auto-apply happens — Windows-side changes are adopted by the normal syncs.
+        // auto-apply happens â€” Windows-side changes are adopted by the normal syncs.
         private const int PanelSettleDelayMs = 3000;
         private bool _panelWasAttached = true;
         private bool _panelReconcilePending;
@@ -1983,7 +2418,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (attached != _panelWasAttached)
             {
                 // The ITE RGB MCU resets itself during a display (mux) switch; streaming
-                // frames into a resetting MCU repaints the keyboard key-by-key — the
+                // frames into a resetting MCU repaints the keyboard key-by-key â€” the
                 // visible blink storm. Pause the stream and let the MCU settle first.
                 App.GetService<BetterRgbStreamService>()?.RestartAfterDisplaySwitch();
             }
@@ -2364,19 +2799,19 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             // Apply the curve
-            var ec = App.GetService<UniwillECService>();
-            if (ec != null && IsFanCustomizationAllowed())
+            var fan = App.GetService<IFanCapability>();
+            if (fan != null && IsFanCustomizationAllowed())
             {
                 var curve = GetFanPresetCurve(settings.UnifiedPreset);
                 if (enabled)
                 {
-                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
+                    fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures).GetAwaiter().GetResult();
                 }
                 else
                 {
                     var cpuCurve = GetFanPresetCurve(settings.CpuPreset);
                     var gpuCurve = GetFanPresetCurve(settings.GpuPreset);
-                    ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                    fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
                 }
             }
 
@@ -2407,19 +2842,19 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
-            if (ec != null && IsFanCustomizationAllowed())
+            var fan = App.GetService<IFanCapability>();
+            if (fan != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve curve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.UnifiedDuties)
                     : GetFanPresetCurve(presetName);
                 if (settings.UnifiedMode)
                 {
-                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
+                    fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures).GetAwaiter().GetResult();
                 }
                 else
                 {
-                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                    fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
                 }
             }
         }
@@ -2442,8 +2877,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             settings.CpuPreset = presetName;
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
-            if (ec != null && IsFanCustomizationAllowed())
+            var fan = App.GetService<IFanCapability>();
+            if (fan != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.CpuDuties)
@@ -2451,7 +2886,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Models.EcFanCurve gpuCurve = settings.GpuPreset == "Custom"
                     ? GetFanCustomCurve(settings.GpuDuties)
                     : GetFanPresetCurve(settings.GpuPreset);
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
             }
         }
 
@@ -2473,8 +2908,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             settings.GpuPreset = presetName;
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
-            if (ec != null && IsFanCustomizationAllowed())
+            var fan = App.GetService<IFanCapability>();
+            if (fan != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = settings.CpuPreset == "Custom"
                     ? GetFanCustomCurve(settings.CpuDuties)
@@ -2482,7 +2917,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Models.EcFanCurve gpuCurve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.GpuDuties)
                     : GetFanPresetCurve(presetName);
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
             }
         }
 
@@ -2530,8 +2965,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             settings.EcSmartFanMode = enabled;
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
-            if (ec == null || !IsFanCustomizationAllowed())
+            var fan = App.GetService<IFanCapability>();
+            if (fan == null || !IsFanCustomizationAllowed())
                 return;
 
             if (enabled)
@@ -2545,7 +2980,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     : (settings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures);
 
                 var tempProvider = new Models.FlydigiTemperatureProvider();
-                var smartFan = Services.EcSmartFanControl.GetOrCreate(ec, tempProvider, settings, cpuCurve, temps);
+                var smartFan = Services.EcSmartFanControl.GetOrCreate(fan, tempProvider, settings, cpuCurve, temps);
                 smartFan.Start();
             }
             else
@@ -2566,7 +3001,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     ? cpuTemps
                     : (settings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
 
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
             }
         }
 
@@ -2856,7 +3291,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                // No voltage control on Intel — undervolt removed
+                // No voltage control on Intel â€” undervolt removed
                 parts.Add($"--intel-pl={p.IntelPl1:F0},{p.IntelPl2:F0}");
             }
 
@@ -2903,7 +3338,12 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
                 var ec = Scripts.RyzenAdj_To_UCU.EcService;
-                ec?.ApplyCpuPowerLimits((int)p.CpuSustained, (int)p.CpuBoost);
+                ec?.ApplyCpuPowerLimitsAsync((int)p.CpuSustained, (int)p.CpuBoost).GetAwaiter().GetResult();
+
+                // The contract note (U-107): boot/tray custom-slot applies
+                // establish the guardian's contract too.
+                if (ec is not null)
+                    Services.PowerContractStore.NoteCpuApplied((int)p.CpuSustained, (int)p.CpuBoost);
             }
         }
 

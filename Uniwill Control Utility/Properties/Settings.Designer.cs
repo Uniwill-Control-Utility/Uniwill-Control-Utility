@@ -385,18 +385,6 @@ namespace Uniwill_Control_Utility.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool ApplyOnStart {
-            get {
-                return ((bool)(this["ApplyOnStart"]));
-            }
-            set {
-                this["ApplyOnStart"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool ShowPrerequisiteDialog {
             get {
@@ -1025,6 +1013,22 @@ namespace Uniwill_Control_Utility.Properties {
         public bool TouchpadEnabled {
             get { return ((bool)(this["TouchpadEnabled"])); }
             set { this["TouchpadEnabled"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool PowerGuardGpu {
+            get { return ((bool)(this["PowerGuardGpu"])); }
+            set { this["PowerGuardGpu"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool PowerGuardCpu {
+            get { return ((bool)(this["PowerGuardCpu"])); }
+            set { this["PowerGuardCpu"] = value; }
         }
 
     }

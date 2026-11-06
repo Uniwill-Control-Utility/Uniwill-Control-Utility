@@ -9,6 +9,8 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Views.Pages;
+using UCU.Contracts.Capabilities;
+using UCU.Core.Supervision;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -39,7 +41,7 @@ namespace Uniwill_Control_Utility.Services
     /// paths announces the switch.
     ///
     /// Q-key LED: the EC firmware drives the LED from its own internal mode state,
-    /// and the 0x0751 literal in UniwillECService.ApplyOemStockMode is what recolors
+    /// and the 0x0751 literal in EcEngine.ApplyOemStockMode is what recolors
     /// it (Office white / Gaming yellow / Turbo red on this platform; other firmware
     /// maps the same literals to its own colors). The corrected OpenRevo disassembly
     /// (second linear sweep of its mode-apply function) shows Mechrevo/IDB firmware
@@ -76,7 +78,9 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private const int StartupDelayMs = 4000;
 
-        private readonly UniwillECService _ec;
+        private readonly IEngineCapability _engine;
+        private readonly IFanCapability _fan;
+        private readonly PresetArbiter _arbiter;
         private readonly CancellationTokenSource _cts = new();
         private Task? _watchTask;
 
@@ -86,9 +90,11 @@ namespace Uniwill_Control_Utility.Services
         private bool _disposed;
         private Presets? _presetsPage;
 
-        public QKeyButtonService(UniwillECService ec)
+        public QKeyButtonService(IEngineCapability engine, IFanCapability fan, PresetArbiter arbiter)
         {
-            _ec = ec;
+            _engine = engine;
+            _fan = fan;
+            _arbiter = arbiter;
         }
 
         /// <summary>
@@ -133,7 +139,7 @@ namespace Uniwill_Control_Utility.Services
         {
             await Task.Delay(StartupDelayMs, ct);
 
-            if (!_ec.Initialize())
+            if (!await _engine.IsHardwareAvailableAsync(ct).ConfigureAwait(false))
             {
                 if (!_providerUnavailableLogged)
                 {
@@ -146,7 +152,7 @@ namespace Uniwill_Control_Utility.Services
             // The EC raises the press echo only while 0x0741 bit0 is set, so arm
             // manual control before subscribing: a machine that booted at the
             // firmware's own gate (0x04) would otherwise leave the listener deaf.
-            _ec.UnlockManualMode();
+            await _fan.UnlockManualModeAsync(ct).ConfigureAwait(false);
 
             try
             {
@@ -281,10 +287,14 @@ namespace Uniwill_Control_Utility.Services
                 string next = names[(idx + 1) % names.Length];
 
                 string displayName = PresetProfileApplier.DisplayName(next);
-                await PresetProfileApplier.ApplyProfileAsync(next, displayName);
 
-                Settings.Default.presetProfile = next;
-                Settings.Default.Save();
+                // The press is an intent, not a direct apply: the arbiter serializes it
+                // against UI/automation/boot applies, enforces the Adaptive-ownership rule
+                // (the local check above stays for the site-specific log), and persists the
+                // selection per the policy's persistence rules.
+                var pressResult = await _arbiter.RequestAsync(PresetIntentSource.HardwarePhysicalButton, next);
+                if (!pressResult.Applied)
+                    return;
 
                 // The Presets page keeps its own selected-profile state, and its render
                 // tree may only be touched from the render thread: post the re-sync

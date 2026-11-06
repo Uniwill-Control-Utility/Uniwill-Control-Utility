@@ -325,33 +325,6 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border x:Name="GuardianDivider"
-                                    Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Row: Crash guardian (watchdog) -->
-                            <Grid x:Name="GuardianRow">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Relaunch the application after a crash" />
-                                    <ui:TextBlock Margin="0,2,0,2"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)" />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbGuardian"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="cbGuardian_Checked"
-                                                 Unchecked="cbGuardian_Unchecked" />
-                            </Grid>
-
-                            <!-- Divider -->
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
@@ -779,7 +752,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Enable or disable the camera device in Device Manager (PnP hotswap)" />
+                                                   Text="Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbWebcamToggle"
                                                  Grid.Column="1"
@@ -818,6 +791,193 @@
                                                  Unchecked="cbTouchpadToggle_Unchecked" />
                             </Grid>
 
+                            <!-- Divider -->
+                            <Border x:Name="WinLockDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Windows key lock (EC truth, U-108) -->
+                            <Grid x:Name="WinLockRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Windows Key Lock" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Blocks the Windows key; the lock lives in the firmware, so it stays active after UCU closes" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbWinLockToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="False"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbWinLockToggle_Checked"
+                                                 Unchecked="cbWinLockToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="FnLockDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Fn key lock (EC truth, U-108) -->
+                            <Grid x:Name="FnLockRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fn Key Lock" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Locks the Fn layer, like the keyboard's own Fn lock shortcut; the state lives in the firmware" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbFnLockToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="False"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbFnLockToggle_Checked"
+                                                 Unchecked="cbFnLockToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="AcRecoveryDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: AC power recovery (EC truth, U-108) -->
+                            <Grid x:Name="AcRecoveryRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="AC Power Recovery" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the laptop on automatically when AC power is restored, e.g. after a power outage" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbAcRecoveryToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="False"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbAcRecoveryToggle_Checked"
+                                                 Unchecked="cbAcRecoveryToggle_Unchecked" />
+                            </Grid>
+
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- OEM Control Center takeover (story U-203): pause the OEM
+                         stack (engine machine scope + user scope), restore it from
+                         the journal. Status + actions only; the hardening gate's
+                         refusals surface as the suspect list, never as actions.
+                         Collapsed by default: the card exists only where the OEM
+                         stack does, and SettingsPage_Loaded reveals it unless the
+                         engine reports no catalog services and no OEM processes
+                         (field, 2026-11-06: it stayed after XMG CC was uninstalled). -->
+                    <ui:CardExpander x:Name="OemTakeoverCard"
+                                     Margin="0,0,0,8"
+                                     Visibility="Collapsed"
+                                     IsExpanded="False"
+                                     Expanded="OemTakeoverCard_Expanded">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8AF;" FontSize="20" Margin="6,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="OEM Control Center" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Pause the OEM Control Center stack so this app owns the fan and power path, and restore it untouched afterwards"
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <!-- Row: status + actions -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <ui:TextBlock x:Name="tbOemStatus" FontTypography="Body" Text="Status: checking…" />
+                                    <ui:TextBlock x:Name="tbOemStatusDetail" Margin="0,2,0,2"
+                                                  FontTypography="Caption"
+                                                  Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                  Text=""
+                                                  TextWrapping="Wrap" />
+                                    <ui:TextBlock x:Name="tbOemSuspects" Margin="0,4,0,2"
+                                                  FontTypography="Caption"
+                                                  Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                  Text=""
+                                                  TextWrapping="Wrap"
+                                                  Visibility="Collapsed" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <ui:Button x:Name="btnOemPause"
+                                               Margin="0,0,8,0"
+                                               Click="btnOemPause_Click">
+                                        <ui:Button.Content>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE769;" FontSize="14" />
+                                                <TextBlock Margin="8,0,0,0" Text="Pause stack" />
+                                            </StackPanel>
+                                        </ui:Button.Content>
+                                    </ui:Button>
+                                    <ui:Button x:Name="btnOemRestore" Click="btnOemRestore_Click">
+                                        <ui:Button.Content>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="14" />
+                                                <TextBlock Margin="8,0,0,0" Text="Restore stack" />
+                                            </StackPanel>
+                                        </ui:Button.Content>
+                                    </ui:Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Journal (merged engine + user audit rows, newest first) -->
+                            <StackPanel x:Name="OemJournalSection" Visibility="Collapsed">
+                                <ui:TextBlock FontTypography="Body" Text="Takeover journal" />
+                                <ItemsControl x:Name="icOemJournal" Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2,0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Kind}"
+                                                           FontSize="11" FontWeight="SemiBold"
+                                                           VerticalAlignment="Center" MinWidth="110" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Target}"
+                                                           FontSize="11" Margin="8,0,8,0"
+                                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="2" Text="{Binding TimeText}"
+                                                           FontSize="11" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </StackPanel>
                     </ui:CardExpander>
 
