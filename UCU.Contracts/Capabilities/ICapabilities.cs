@@ -335,6 +335,14 @@ namespace UCU.Contracts.Capabilities
         /// and a lost signal costs one relaunch.
         /// </summary>
         Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Creates or removes this user's logon autostart entry. The service does
+        /// it because an unelevated app cannot register a scheduled task at all;
+        /// the request carries the choice and the delay, and the service resolves
+        /// the action path and the account itself.
+        /// </summary>
+        Task<bool> SetAutostartAsync(bool enabled, int delaySeconds, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

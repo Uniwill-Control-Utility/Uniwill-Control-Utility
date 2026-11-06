@@ -110,6 +110,9 @@ public sealed class DiagnosticsExportTests
         public Task<bool> IsHardwareAvailableAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
 
         public Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+        public Task<bool> SetAutostartAsync(bool enabled, int delaySeconds, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
     }
 
     private sealed class FakeOem : IOemCapability

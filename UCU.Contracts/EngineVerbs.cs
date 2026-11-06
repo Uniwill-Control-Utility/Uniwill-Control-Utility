@@ -288,6 +288,21 @@ namespace UCU.Contracts
             /// LocalSystem service. Best-effort by contract: a crash never sends it.
             /// </summary>
             public const string NotifyAppExit = "engine.notify_app_exit";
+
+            /// <summary>
+            /// This user's logon autostart entry ("UCU Autostart"). The service
+            /// owns it because the Task Scheduler refuses task creation to a
+            /// medium-integrity token: the 0.9.6 app could register its own entry
+            /// only because it ran elevated, and 0.9.7's unelevated app cannot
+            /// (field, 2026-11-06 - opening Settings threw E_ACCESSDENIED).
+            ///
+            /// The request carries the user's CHOICE only. The action path comes
+            /// from the engine's own install layout and the account from the
+            /// interactive session: a caller-supplied path would be a
+            /// create-a-task-running-anything-as-the-user primitive, i.e. an
+            /// escalation route from any authenticated account.
+            /// </summary>
+            public const string SetAutostart = "engine.set_autostart";
         }
 
         /// <summary>

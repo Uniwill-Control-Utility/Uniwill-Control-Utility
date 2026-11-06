@@ -72,6 +72,21 @@ public sealed class EngineRpcTests
     }
 
     [Fact]
+    public async Task SetAutostart_RefusesOnADevLayoutInsteadOfThrowing()
+    {
+        // The verb the unelevated app cannot perform itself: it registers the logon
+        // entry as LocalSystem. The test host is a dev layout (no app exe beside
+        // the engine), so the guard answers false rather than scheduling something
+        // - and, crucially, the verb is reachable and faultless there: a refusal
+        // must never take the Settings page down again (field, 2026-11-06).
+        // Removal is deliberately NOT asserted here: on a machine that has the
+        // entry, that call would delete the developer's real autostart.
+        await using var host = await EngineHostFixture.StartAsync();
+
+        Assert.False(await host.Engine.SetAutostartAsync(enabled: true, delaySeconds: 0));
+    }
+
+    [Fact]
     public async Task GetMetricsSnapshot_ServesTheProbeReadingOverTheWire()
     {
         // The kernel-side metrics verb end to end: scripted probe -> probe loop

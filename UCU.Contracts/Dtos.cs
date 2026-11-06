@@ -27,6 +27,21 @@ namespace UCU.Contracts
         public bool Value { get; init; }
     }
 
+    /// <summary>
+    /// Request for <c>engine.set_autostart</c>. Deliberately carries the user's
+    /// choice and nothing else: the engine resolves the action path from its own
+    /// install layout and the account from the interactive session, so a caller
+    /// cannot name a program for the service to schedule.
+    /// </summary>
+    public sealed record AutostartRequestDto
+    {
+        /// <summary>True creates or updates the entry, false removes it.</summary>
+        public bool Enabled { get; init; }
+
+        /// <summary>Logon delay in seconds (0-120, the Settings row's range).</summary>
+        public int DelaySeconds { get; init; }
+    }
+
     public sealed record WordAddressDto
     {
         public ushort Address { get; init; }
