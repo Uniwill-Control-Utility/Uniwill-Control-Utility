@@ -201,6 +201,58 @@ public sealed class SettingsPageToggleReflectionTests
         Assert.DoesNotContain("ReflectionInProgress", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void StartupDelayBox_IsReflectedWithItsBelief_NotWrittenDirectly()
+    {
+        string source = ReadSettingsPage();
+
+        // The same rule for the one actuating row that is not a toggle. Writing
+        // the saved delay into the box raises ValueChanged, and acting on that
+        // re-registered the startup task merely because Settings was opened.
+        Assert.DoesNotContain("nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;", source, StringComparison.Ordinal);
+        Assert.Contains("ReflectStartupDelay(Settings.Default.StartupDelaySeconds);", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StartupDelayHandler_ActuatesOnlyOnUserIntent()
+    {
+        string body = MethodBody(ReadSettingsPage(), "private void nbStartupDelay_ValueChanged");
+
+        int guard = body.IndexOf("!_startupDelay.HasValue", StringComparison.Ordinal);
+        int acts = body.IndexOf("UpdateScheduledTask();", StringComparison.Ordinal);
+
+        Assert.True(acts >= 0, "nbStartupDelay_ValueChanged must still apply the delay for the user.");
+        Assert.True(guard >= 0 && guard < acts,
+            "nbStartupDelay_ValueChanged must return when the box shows the delay the page already believes: that is a reflected write.");
+
+        // A belief of null means the page has never observed the row, which is
+        // never user intent (the same clause UserIntent carries).
+        int beliefNull = body.IndexOf("_startupDelay = seconds;", StringComparison.Ordinal);
+        Assert.True(beliefNull > guard && beliefNull < acts,
+            "The handler must move the belief to the commanded delay before it actuates.");
+    }
+
+    [Fact]
+    public void ScheduledTaskWrites_CannotEscapeThePage()
+    {
+        string source = ReadSettingsPage();
+
+        // Field, 2026-11-06: an unelevated app cannot register a scheduled task,
+        // and the UnauthorizedAccessException escaped a ValueChanged handler into
+        // the global handler - the Settings page became unreachable while the app
+        // kept running. Both write paths must fence the call.
+        foreach (string actuation in new[] { "ScheduledTaskService.Register(", "ScheduledTaskService.Unregister(" })
+        {
+            int call = source.IndexOf(actuation, StringComparison.Ordinal);
+            Assert.True(call >= 0, $"{actuation} must still be called.");
+
+            int tryBlock = source.LastIndexOf("try", call, StringComparison.Ordinal);
+            int catchBlock = source.IndexOf("catch (Exception ex)", call, StringComparison.Ordinal);
+            Assert.True(tryBlock >= 0 && tryBlock < call && catchBlock > call,
+                $"{actuation} must run inside a try/catch: a denied write must not throw out of the page.");
+        }
+    }
+
     private static string MethodBody(string source, string signature)
     {
         int start = source.IndexOf(signature, StringComparison.Ordinal);
