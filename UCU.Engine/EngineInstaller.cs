@@ -207,6 +207,14 @@ namespace UCU.Engine
         internal const string ShimFileName = "Uninstall.exe";
 
         /// <summary>
+        /// The pre-0.9.7 Add/Remove Programs key: vpk published it under the display
+        /// name, the packer renames it to <c>MSI:{ProductCode}</c> from 0.9.7 on.
+        /// A major upgrade leaves the old one behind, so the elevated install pass
+        /// deletes it by exact name.
+        /// </summary>
+        internal const string LegacyArpKeyName = "MSI:Uniwill-Control-Utility";
+
+        /// <summary>
         /// The layout's uninstall shim (<c>&lt;install root&gt;\Uninstall.exe</c>,
         /// compiled by <c>build\pack.ps1</c>), given the engine exe path it runs from
         /// (<c>&lt;install root&gt;\Service\</c>). Null in a dev checkout, which has no
@@ -358,6 +366,14 @@ namespace UCU.Engine
         {
             try
             {
+                // 0.9.6 and earlier published their entry as
+                // "MSI:Uniwill-Control-Utility"; the packer renames it to
+                // "MSI:{ProductCode}" from 0.9.7 on. A major upgrade removes the old
+                // product but leaves that key behind (field, 2026-11-06: 0.9.6 -> 0.9.7
+                // left two visible rows, the stale one still pointing at the shim), so
+                // the elevated install pass deletes it. The name cannot belong to a
+                // 0.9.7+ install, which is why the exact-key delete is safe.
+                RemoveLegacyArpEntry();
                 // The packed entry's shell-route target first: it is authored
                 // as "[INSTALLFOLDER]Uninstall.exe" and [INSTALLFOLDER] expands
                 // to the layout ROOT, while the MSI ships the shim inside the
@@ -414,6 +430,36 @@ namespace UCU.Engine
             catch (Exception ex)
             {
                 Log.Warning(ex, "[EngineInstaller] Control Panel uninstall redirect skipped");
+            }
+        }
+
+        /// <summary>
+        /// Deletes the pre-0.9.7 Add/Remove Programs entry (<see cref="LegacyArpKeyName"/>).
+        /// The 0.9.6 MSI publishes that key and a major upgrade removes the product
+        /// without removing it, so an upgraded machine shows the old row next to the
+        /// new <c>MSI:{ProductCode}</c> one - and the old row's command points at the
+        /// shim, which would then uninstall a product that no longer exists. Best
+        /// effort: a missing key or a denied write never fails the install.
+        /// </summary>
+        internal static void RemoveLegacyArpEntry()
+        {
+            try
+            {
+                using RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using RegistryKey? uninstall = baseKey.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", writable: true);
+
+                if (uninstall?.OpenSubKey(LegacyArpKeyName) is null)
+                    return;
+
+                uninstall.DeleteSubKeyTree(LegacyArpKeyName, throwOnMissingSubKey: false);
+                Log.Information(
+                    "[EngineInstaller] removed the legacy Add/Remove Programs entry {Key} left by a pre-0.9.7 install",
+                    LegacyArpKeyName);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[EngineInstaller] legacy Add/Remove Programs entry not removed");
             }
         }
 

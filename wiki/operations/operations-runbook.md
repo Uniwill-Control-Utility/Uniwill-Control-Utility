@@ -211,6 +211,16 @@ Values authored into the package at build time mean no runtime registry writer, 
 
 Product-code transport (guarded-box signature, 22:37 field): the Windows Installer registration tree is PHANTOM to in-process readers - `MsiEnumProductsW` enumerates 421 other products and never ours, elevated included - while the MsiInstaller event stream shows the registration succeeding (msiserver writes are the ground truth, invisible to the blinding). The published ARP entry stays visible, so the shim and the sentinel read the code from the `UCUProductCode` row first; GUID-key ARP (pre-suppression packs) and the enumeration (ARP-blind views) are the ordered fallbacks. The sentinel's registration probe counts the published entry (our DisplayName + GUID-shaped `UCUProductCode`, non-GUID key) as the live machine registration; its component lifecycle makes the probe vanish exactly when the product does.
 
+### A 0.9.6 -> 0.9.7 upgrade left the old Add/Remove Programs row (fixed)
+
+Field 2026-11-06, real upgrade test (0.9.6 MSI from the GitHub release): the upgrade itself is clean - files replaced, `UCU Engine` created with the right binPath, no stale `Uniwill Control Utility Service.exe` - but **two visible rows remained**: `MSI:Uniwill-Control-Utility` (0.9.6, the pre-rename key vpk publishes under the display name) and `MSI:{ProductCode}` (0.9.7). The old row's command points at the shim, so clicking it would try to uninstall a product that no longer exists.
+
+`EngineInstaller.RemoveLegacyArpEntry`, called from the elevated install pass via `RepairControlPanelUninstall`, deletes the legacy key by exact name. It cannot belong to a 0.9.7+ install, which is why a targeted delete is safe - no product enumeration, no `/x` sweep.
+
+Confirmed in the same test: 0.9.6's MSI has **no `ServiceInstall`/`ServiceControl` and no service custom actions** (its `Uniwill Control Utility Service.exe` is a plain file), so 0.9.7 creates the service from nothing; the 1072 (`ERROR_SERVICE_MARKED_FOR_DELETE`) handling matters for 0.9.7 -> next and for uninstall/reinstall races, not for this upgrade.
+
+Test-environment note: this needs a clean Windows Installer database. On the dev box ~40 packs left phantom `Installer\Products` registrations under the same UpgradeCode at 0.9.7, which made the 0.9.6 MSI fail `LaunchConditions` (`NOT WIX_DOWNGRADE_DETECTED`) with 1603 even with no Uniwill product installed. Purging `Installer\Products`, `Installer\Features`, the `Installer\UpgradeCodes` values and the ARP rows for Uniwill products clears it.
+
 ### Staging a pack on the guarded box (dev workflow)
 
 The full MSI cycle is the ONLY valid staging (field-proven 2026-10-29: a robocopy-patched layout broke launches; the cycle fixed it):
