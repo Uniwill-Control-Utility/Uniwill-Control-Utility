@@ -18,7 +18,7 @@ namespace Uniwill_Control_Utility.ViewModels
         ObservableObject,
         INavigationAware
     {
-        private const string WikiUrl = "https://github.com/jgudec/Uniwill-Control-Utility/wiki";
+        private const string WikiUrl = "https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/wiki";
 
         private readonly INavigationService _navigationService;
         private readonly IHardwareMonitoringService _hardwareMonitoring;

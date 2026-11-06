@@ -292,17 +292,17 @@ static class MsiEdit
         var extra = new List<string[]>
         {
             new[] { "Publisher", manufacturer },
-            new[] { "HelpLink", "https://github.com/jgudec/Uniwill-Control-Utility" },
-            new[] { "URLInfoAbout", "https://github.com/jgudec/Uniwill-Control-Utility" },
-            new[] { "URLUpdateInfo", "https://github.com/jgudec/Uniwill-Control-Utility/releases" },
+            new[] { "HelpLink", "https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility" },
+            new[] { "URLInfoAbout", "https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility" },
+            new[] { "URLUpdateInfo", "https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases" },
         };
 
         var insert = "INSERT INTO `Registry` (`Registry`, `Root`, `Key`, `Name`, `Value`, `Component_`) " +
-                     "VALUES ('ARPUCHelp', 2, '" + key + "', 'HelpLink', 'https://github.com/jgudec/Uniwill-Control-Utility', 'ArpRegistration')";
+                     "VALUES ('ARPUCHelp', 2, '" + key + "', 'HelpLink', 'https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility', 'ArpRegistration')";
         var urlAbout = "INSERT INTO `Registry` (`Registry`, `Root`, `Key`, `Name`, `Value`, `Component_`) " +
-                       "VALUES ('ARPUCAbout', 2, '" + key + "', 'URLInfoAbout', 'https://github.com/jgudec/Uniwill-Control-Utility', 'ArpRegistration')";
+                       "VALUES ('ARPUCAbout', 2, '" + key + "', 'URLInfoAbout', 'https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility', 'ArpRegistration')";
         var urlUpdate = "INSERT INTO `Registry` (`Registry`, `Root`, `Key`, `Name`, `Value`, `Component_`) " +
-                        "VALUES ('ARPUCUpdate', 2, '" + key + "', 'URLUpdateInfo', 'https://github.com/jgudec/Uniwill-Control-Utility/releases', 'ArpRegistration')";
+                        "VALUES ('ARPUCUpdate', 2, '" + key + "', 'URLUpdateInfo', 'https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases', 'ArpRegistration')";
         foreach (var sql in new[] { insert, urlAbout, urlUpdate })
         {
             try { Execute(db, sql); }
