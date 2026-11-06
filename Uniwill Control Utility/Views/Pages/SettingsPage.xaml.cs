@@ -147,7 +147,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Menu does not write NVRAM, the Flydigi services are not
             // resumed/suspended, and the touchpad admin flow does not run.
             ReflectToggleState(cbStartBoot, Settings.Default.StartOnBoot, ref _startOnBoot);
-            nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;
+            ReflectStartupDelay(Settings.Default.StartupDelaySeconds);
             bool bootEnabled = Settings.Default.StartOnBoot;
             StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
             StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
@@ -370,7 +370,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             StartupDelayDivider.Visibility = Visibility.Collapsed;
             StartupDelayRow.Visibility = Visibility.Collapsed;
 
-            Services.ScheduledTaskService.Unregister(ScheduledTaskName);
+            try
+            {
+                Services.ScheduledTaskService.Unregister(ScheduledTaskName);
+            }
+            catch (Exception ex)
+            {
+                // Same refusal as the register path: a startup entry this user
+                // cannot write must not take the page down.
+                _logger.LogWarning(ex, "[Settings] could not unregister the '{Task}' startup task", ScheduledTaskName);
+            }
 
             Settings.Default.StartOnBoot = false;
             Settings.Default.Save();
@@ -382,13 +391,40 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void UpdateScheduledTask()
         {
             int delaySeconds = (int)(nbStartupDelay.Value ?? 0);
-            Services.ScheduledTaskService.Register(ScheduledTaskName, "Start UCU", "", TimeSpan.FromSeconds(delaySeconds));
+
+            try
+            {
+                Services.ScheduledTaskService.Register(ScheduledTaskName, "Start UCU", "", TimeSpan.FromSeconds(delaySeconds));
+            }
+            catch (Exception ex)
+            {
+                // Field, 2026-11-06: an unelevated app cannot register a scheduled
+                // task (Access Denied from the Task Scheduler service), and this
+                // exception used to escape a ValueChanged handler and take the
+                // whole Settings page down with an error dialog. The row reports
+                // the refusal in the log; the page stays usable.
+                _logger.LogWarning(ex, "[Settings] could not register the '{Task}' startup task", ScheduledTaskName);
+            }
         }
 
         private void nbStartupDelay_ValueChanged(object sender, RoutedEventArgs e)
         {
             int seconds = (int)(nbStartupDelay.Value ?? 0);
 
+            // STATE EQUALITY, the same rule the toggles use: the page writes the
+            // saved delay into the box on load (ReflectStartupDelay), and that
+            // assignment raises ValueChanged. Acting on it re-registered the
+            // startup task merely because Settings was opened - and on a machine
+            // that denies the write that was the 2026-11-06 crash. A belief of
+            // null means "never observed", which is never user intent either.
+            if (!_startupDelay.HasValue || seconds == _startupDelay.Value)
+            {
+                _logger.LogDebug("[Settings] startup delay reflection, not intent: {Seconds}s belief={Belief}",
+                    seconds, _startupDelay);
+                return;
+            }
+
+            _startupDelay = seconds;
             Settings.Default.StartupDelaySeconds = seconds;
             Settings.Default.Save();
 
@@ -574,6 +610,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool? _webcamOn;
         private bool? _touchpadOn;
         private bool? _startOnBoot;
+        private int? _startupDelay;
         private bool? _apMenuUnlocked;
         private bool? _powerBoost;
         private bool? _flydigiEnabled;
@@ -603,6 +640,24 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (toggle is not null)
                 toggle.IsChecked = on;
+        }
+
+        /// <summary>
+        /// The NumberBox half of the same rule. Writing the saved delay into the
+        /// box raises ValueChanged, and that event must not re-register the
+        /// startup task. The belief is read back after the write because the box
+        /// coerces to its Minimum/Maximum: a coerced value is still a reflection,
+        /// not a user edit.
+        /// </summary>
+        private void ReflectStartupDelay(int seconds)
+        {
+            _startupDelay = seconds;
+
+            if (nbStartupDelay is not null)
+            {
+                nbStartupDelay.Value = seconds;
+                _startupDelay = (int)(nbStartupDelay.Value ?? seconds);
+            }
         }
 
         /// <summary>
