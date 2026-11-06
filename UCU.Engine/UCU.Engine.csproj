@@ -4,8 +4,8 @@
        process that needs privilege. Installed as the Windows service "UCUEngine"
        (LocalSystem), it exposes the EC operations over a named pipe so the UI process
        can start unelevated.
-       Exe name has spaces on purpose: Task Manager shows the file name, and next to
-       "Uniwill Control Utility.exe" the pair reads as one product. -->
+       Exe name has spaces on purpose: it sits beside "Uniwill Control Utility.exe" in
+       the install layout, so the pair reads as one product in a folder listing. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -15,14 +15,19 @@
     <Platforms>AnyCPU;x64</Platforms>
     <AssemblyName>Uniwill Control Utility Engine</AssemblyName>
     <RootNamespace>UCU.Engine</RootNamespace>
-    <AssemblyTitle>Uniwill Control Utility Engine</AssemblyTitle>
-    <Product>Uniwill Control Utility Engine</Product>
+    <!-- Task Manager labels a process with the exe's FileDescription, while the
+         Services tab shows the SCM DisplayName ("UCU Engine"): the title and
+         product carry the service label so the two tabs read the same. The file
+         name stays "Uniwill Control Utility Engine.exe" - it is the identity the
+         installer, the MSI File row and the supervisor's FindAppExe resolve. -->
+    <AssemblyTitle>UCU Engine</AssemblyTitle>
+    <Product>UCU Engine</Product>
     <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
     <!-- Version: Directory.Build.props, the single source of truth. -->
     <ApplicationIcon>..\Uniwill Control Utility\favicon.ico</ApplicationIcon>
     <!-- The SCM service name (the stable identity used by sc.exe and the app).
          The user-facing label in services.msc is the DisplayName in
-         EngineInstaller; the exe and assembly keep the product name. -->
+         EngineInstaller, and the assembly title/product above match it. -->
     <EngineServiceName>UCUEngine</EngineServiceName>
   </PropertyGroup>
 
