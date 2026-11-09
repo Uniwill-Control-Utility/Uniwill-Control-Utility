@@ -692,6 +692,7 @@ namespace Uniwill_Control_Utility.Services
                         continue;
                     }
 
+                    CancellationTokenSource loopCts;
                     lock (_engineLock)
                     {
                         if (_disposed)
@@ -703,11 +704,15 @@ namespace Uniwill_Control_Utility.Services
                         _hid = hid;
                         _running = true;
                         _sendFailStreak = 0;
+
+                        // Created under the lock so the loop's finally can tell "I am
+                        // still the current loop" by reference.
+                        loopCts = new CancellationTokenSource();
+                        _loopCts = loopCts;
                     }
 
                     Log.Information("[BetterRGB] RGB runtime mode handshake (0x33/0x32) succeeded on the 0xFF03/MI_01 interface! Spawning streaming worker thread... ({Reason})", reason);
-                    _loopCts = new CancellationTokenSource();
-                    _loopTask = Task.Run(() => StreamLoop(prm, _loopCts.Token));
+                    _loopTask = Task.Run(() => StreamLoop(prm, loopCts));
                     return true;
                 }
                 catch (Exception ex)
@@ -740,8 +745,10 @@ namespace Uniwill_Control_Utility.Services
         /// timelines: reconnects and adaptive-FPS changes never reset or skip them —
         /// degradation is done by lowering effectiveFps, never by dropping frames.
         /// </summary>
-        private async Task StreamLoop(BetterRgbParams prm, CancellationToken ct)
+        private async Task StreamLoop(BetterRgbParams prm, CancellationTokenSource cts)
         {
+            CancellationToken ct = cts.Token;
+
             try
             {
                 long frameIndex = 1;
@@ -958,7 +965,24 @@ namespace Uniwill_Control_Utility.Services
             }
             finally
             {
-                _running = false;
+                // Only the loop that still owns _loopCts may clear the running flag.
+                // A cancelled loop's continuation can land after its replacement has
+                // started; clearing it then makes StopEngine skip the cancel, and the
+                // streamer keeps sending after "stopped" (battery policy and the
+                // power-off both silently ineffective). The CTS is owned by this loop,
+                // so it is disposed here - Cancel and Dispose stay serialised by the
+                // same lock StopEngine takes.
+                lock (_engineLock)
+                {
+                    if (ReferenceEquals(_loopCts, cts))
+                    {
+                        _running = false;
+                        _loopCts = null;
+                    }
+
+                    cts.Dispose();
+                }
+
                 Log.Information("[BetterRGB] Stream engine thread STOPPED (total rendered frames: {Frames})", _totalFrames);
             }
         }
