@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Models
 {
@@ -209,7 +210,7 @@ namespace Uniwill_Control_Utility.Models
             try
             {
                 var json = JsonSerializer.Serialize(presets.ToList(), _serializeOptions);
-                File.WriteAllText(FilePathFor(mode), json);
+                AtomicJsonFile.Write(FilePathFor(mode), json);
             }
             catch
             {

@@ -249,14 +249,25 @@ namespace Uniwill_Control_Utility.Services
         {
             if (File.Exists(_filePath))
             {
-                string json = File.ReadAllText(_filePath, Encoding.UTF8);
-                string migrated = MigrateBetterRgbFieldsToJson(MigrateGpuFieldsToJson(json));
-                _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(migrated)
-                    ?? new Dictionary<string, AdaptivePreset>();
+                try
+                {
+                    string json = File.ReadAllText(_filePath, Encoding.UTF8);
+                    string migrated = MigrateBetterRgbFieldsToJson(MigrateGpuFieldsToJson(json));
+                    _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(migrated)
+                        ?? new Dictionary<string, AdaptivePreset>();
 
-                // If migration rewrites happened, persist the new format back to disk
-                if (migrated != json)
-                    SavePresets();
+                    // If migration rewrites happened, persist the new format back to disk
+                    if (migrated != json)
+                        SavePresets();
+                }
+                catch (Exception ex)
+                {
+                    // A truncated file used to throw out of the field initializer and
+                    // permanently brick the Adaptive page. Keep the bad file for support.
+                    try { File.Move(_filePath, _filePath + ".bak", overwrite: true); } catch { }
+                    _presets = new Dictionary<string, AdaptivePreset>();
+                    Scripts.Misc.DiagnosticLogger.LogError(ex, "adaptive presets unreadable; starting empty (bad file kept as .bak)");
+                }
             }
             else
             {
@@ -403,7 +414,7 @@ namespace Uniwill_Control_Utility.Services
         private void SavePresets()
         {
             string json = JsonConvert.SerializeObject(_presets, Newtonsoft.Json.Formatting.Indented);
-            File.WriteAllText(_filePath, json, Encoding.UTF8);
+            AtomicJsonFile.Write(_filePath, json);
         }
     }
 }

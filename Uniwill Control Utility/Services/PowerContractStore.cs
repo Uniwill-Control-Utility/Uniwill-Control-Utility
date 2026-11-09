@@ -114,8 +114,7 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 string path = FilePath;
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllText(path, JsonSerializer.Serialize(contract, Json));
+                AtomicJsonFile.Write(path, JsonSerializer.Serialize(contract, Json));
             }
             catch (Exception ex)
             {
