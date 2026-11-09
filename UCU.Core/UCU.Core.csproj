@@ -41,9 +41,19 @@
           Condition="Exists('$(EcRegistryFile)') AND Exists('$(EcRegistryGeneratorProject)')"
           Inputs="$(EcRegistryFile)"
           Outputs="$(EcVaultGeneratedFile)">
+    <!-- Restore is part of the target on purpose: tools\EcRegistryGen is not in the
+         solution, so nothing else restores it. Without it a clean clone (and every
+         edit of the registry JSON) failed the build with NETSDK1004.
+
+         The RID/self-contained properties are stripped for the same reason a release
+         build needs them stripped: "dotnet publish -r win-x64" (pack.ps1 does exactly
+         that) sets them as global properties, the inner build inherited them, and the
+         generator's output then lived in a RID-specific folder the no-build run below
+         does not look in, so the publish died with MSB3073 on a clean tree. -->
     <MSBuild Projects="$(EcRegistryGeneratorProject)"
-             Targets="Build"
-             Properties="Configuration=$(Configuration)" />
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="RuntimeIdentifier;SelfContained;PublishDir;OutDir;IntermediateOutputPath;BaseOutputPath" />
     <Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; run --project &quot;$(EcRegistryGeneratorProject)&quot; --no-build --configuration $(Configuration) -- &quot;$(EcRegistryFile)&quot; &quot;$(EcVaultGeneratedFile)&quot;" />
   </Target>
 
