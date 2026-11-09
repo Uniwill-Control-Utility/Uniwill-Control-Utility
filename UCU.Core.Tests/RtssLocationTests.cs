@@ -52,6 +52,54 @@ public sealed class RtssLocationTests
     }
 
     [Fact]
+    public void TheEngineLaunchRequiresAProgramFilesRoot()
+    {
+        // The field-proven install shape: Program Files (x86), both views.
+        string installed = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            "RivaTuner Statistics Server", "RTSS.exe");
+        Assert.True(RtssLocation.IsTrustedLaunchImage(installed));
+
+        string installed64 = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "RivaTuner Statistics Server", "RTSS.exe");
+        Assert.True(RtssLocation.IsTrustedLaunchImage(installed64));
+    }
+
+    [Fact]
+    public void AUserWritableImageIsRefusedEvenWhenItIsNamedRTSS()
+    {
+        // The escalation this guard exists for: an HKCU uninstall witness that any
+        // same-user process can write, pointing the LocalSystem engine at a binary
+        // the same user owns.
+        Assert.False(RtssLocation.IsTrustedLaunchImage(
+            Path.Combine(Path.GetTempPath(), "evil", "RTSS.exe")));
+
+        // Still the accepted name, but not a trusted location.
+        Assert.False(RtssLocation.IsTrustedLaunchImage(@"C:\tools\rtss.EXE"));
+    }
+
+    [Fact]
+    public void TheRootCheckIsNotPrefixMatched()
+    {
+        // "C:\Program Files (x86)evil" is not under "C:\Program Files (x86)".
+        string nearMiss = Environment
+            .GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
+            .TrimEnd(Path.DirectorySeparatorChar) + "evil\\RTSS.exe";
+        Assert.False(RtssLocation.IsTrustedLaunchImage(nearMiss));
+    }
+
+    [Fact]
+    public void ADotDotPathIsRefused()
+    {
+        // Passes a naive prefix test, resolves outside Program Files.
+        string traversal = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "..", "..", "Users", "someone", "RTSS.exe");
+        Assert.False(RtssLocation.IsTrustedLaunchImage(traversal));
+    }
+
+    [Fact]
     public void TheProductIsNamedByItsKeyAndItsDisplayName()
     {
         // The probed install shape: the key name the 32-bit installer writes.

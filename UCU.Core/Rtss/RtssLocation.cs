@@ -316,6 +316,61 @@ namespace UCU.Core.Rtss
             return string.Equals(name, ExeName, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// The engine-side launch guard: RTSS.exe *and* under a Program Files root.
+        /// The pipe's DACL admits every interactive user, so an HKCU uninstall
+        /// witness - which any same-user process can write - must not be able to
+        /// point the LocalSystem engine at a user-writable image: that is an
+        /// unelevated process starting itself with the console user's linked
+        /// (admin) token, with no UAC prompt in between.
+        ///
+        /// shortcut: a per-user RTSS install outside Program Files (never seen in
+        /// the field; the installer writes Program Files (x86)) is refused rather
+        /// than signature-verified. Upgrade to an Authenticode signer check if
+        /// that install shape ever appears.
+        /// </summary>
+        public static bool IsTrustedLaunchImage(string? path)
+        {
+            if (!IsLaunchableImage(path))
+                return false;
+
+            string full;
+            try
+            {
+                // Resolve first: "C:\Program Files\..\Users\me\RTSS.exe" passes a
+                // prefix test but is not under Program Files.
+                full = Path.GetFullPath(path!.Trim().Trim('"'));
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return IsUnder(full, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles))
+                || IsUnder(full, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86));
+        }
+
+        private static bool IsUnder(string fullPath, string root)
+        {
+            if (string.IsNullOrEmpty(root))
+                return false;
+
+            string prefix;
+            try
+            {
+                // The trailing separator is the point: "C:\Program Files (x86)evil"
+                // must not match "C:\Program Files (x86)".
+                prefix = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static bool IsLaunchableFile(string? path)
         {
             return IsLaunchableImage(path) && File.Exists(path!.Trim().Trim('"'));

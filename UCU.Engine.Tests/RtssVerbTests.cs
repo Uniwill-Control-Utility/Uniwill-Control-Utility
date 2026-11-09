@@ -23,9 +23,10 @@ public sealed class RtssVerbTests
 
         bool started = await host.Rtss.StartAsync();
 
-        if (located is null)
+        if (located is null || !RtssLocation.IsTrustedLaunchImage(located))
         {
-            // No RTSS on this machine: the verb answers false and asks for nothing.
+            // No RTSS on this machine, or one outside Program Files: the verb
+            // answers false and asks for nothing (the launch guard).
             Assert.False(started);
             Assert.Empty(host.RtssLaunches);
             return;
