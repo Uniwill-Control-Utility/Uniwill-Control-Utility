@@ -94,6 +94,16 @@ namespace UCU.Hardware.Firmware
 
         public byte[]? Read(string name, string guid)
         {
+            // The engine holds SeSystemEnvironmentPrivilege, so an ungated read
+            // hands any interactive user firmware variables they cannot read
+            // themselves (Secure Boot dbx, vendor provisioning data). This service
+            // only ever serves the OEM entry and its door.
+            if (!IsUnderOemGuid(guid) || !IsOemVariableName(name))
+            {
+                Log.Warning("[FwNvram] read {Name} refused: only the OEM entry and its door are served", name);
+                return null;
+            }
+
             byte[]? data = _env.Read(name, guid, out uint error);
 
             if (data is null && error != ERROR_ENVVAR_NOT_FOUND)
@@ -110,6 +120,32 @@ namespace UCU.Hardware.Firmware
         public bool Write(string name, string guid, byte[] data)
         {
             bool magicEntry = IsOemMagicEntry(name, guid);
+
+            // The name and the length are part of the address, and both arrive from
+            // a pipe verb any interactive user can call. Under the OEM GUID this app
+            // owns exactly one variable, and its length is the firmware's layout:
+            // a one-byte write of a name nobody reads (or a short write of the entry)
+            // destroys offsets the rows cannot repair - the mem-OC switch, the GPU
+            // mux mirror and the AP-menu pair. So only the entry, and only a
+            // same-length (read-modify-write) replacement, is written at all.
+            if (IsUnderOemGuid(guid) && !magicEntry)
+            {
+                Log.Warning("[FwNvram] write {Name} refused: only {Entry} is written under the OEM GUID",
+                    name, OemMagicVariable);
+                return false;
+            }
+
+            if (magicEntry)
+            {
+                byte[]? existing = _env.Read(name, guid, out _);
+                if (existing is not null && existing.Length != data.Length)
+                {
+                    Log.Warning(
+                        "[FwNvram] write {Name} refused: {Bytes} bytes against the entry's {Existing} (the length is the firmware layout)",
+                        name, data.Length, existing.Length);
+                    return false;
+                }
+            }
 
             // The gatekeeper comes first: on a 50-series firmware the entry
             // write below is refused (returns false, nothing written) when
@@ -237,5 +273,12 @@ namespace UCU.Hardware.Firmware
         private static bool IsOemMagicEntry(string name, string guid) =>
             string.Equals(name, OemMagicVariable, StringComparison.OrdinalIgnoreCase)
             && string.Equals(guid, OemMagicVariableGuid, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsUnderOemGuid(string guid) =>
+            string.Equals(guid, OemMagicVariableGuid, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsOemVariableName(string name) =>
+            string.Equals(name, OemMagicVariable, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, OemMagicDoor, StringComparison.OrdinalIgnoreCase);
     }
 }

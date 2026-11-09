@@ -509,10 +509,35 @@ namespace UCU.Hardware.Ec
         }
 
         /// <summary>
-        /// Reads multiple bytes starting at the given address.
+        /// The largest block one read may ask for. Every fan table is 16 bytes
+        /// (EcVault.EC_TABLE_LENGTH); this is four times the largest legitimate
+        /// block. The count comes from a pipe verb, so it is caller-chosen, and an
+        /// unbounded one held the EC lock for minutes (one delay per byte) until
+        /// the watchdog killed the service mid-write.
+        /// </summary>
+        public const int MaxBlockBytes = 64;
+
+        /// <summary>
+        /// Reads multiple bytes starting at the given address. Refuses a count
+        /// outside 1..<see cref="MaxBlockBytes"/> and a range past the 16-bit
+        /// address space before taking the lock.
         /// </summary>
         public byte[] ReadECRegisters(ushort startAddress, int count)
         {
+            if (count < 1 || count > MaxBlockBytes)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count), count,
+                    $"an EC block read must be 1..{MaxBlockBytes} bytes");
+            }
+
+            // (ushort)(startAddress + i) wraps silently: without this, a read at
+            // 0xFFFF reads register 0x0000 instead of failing.
+            if (startAddress + count - 1 > ushort.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count), count,
+                    $"the block read starts at 0x{startAddress:X4} and runs past the 16-bit address space");
+            }
+
             EnsureInitialized();
             byte[] data = new byte[count];
             lock (_lock)
@@ -800,6 +825,18 @@ namespace UCU.Hardware.Ec
         public void SetGpuMuxMode(GpuMuxMode mode)
         {
             EnsureInitialized();
+
+            // The enum arrives from a pipe verb, and System.Text.Json accepts an
+            // undefined numeric value: mode 7 would write raw 7 into the mux register,
+            // which persists across a reboot and can leave the panel with no GPU. The
+            // raw-write gate refuses this register precisely because "the semantic
+            // verb validates the value first" - this is that validation.
+            if (!EcMuxCodec.IsKnownRaw(ModeToRaw(mode), Platform))
+            {
+                throw new ArgumentOutOfRangeException(nameof(mode), mode,
+                    $"'{mode}' is not a MUX mode this platform's firmware models");
+            }
+
             lock (_lock)
             {
                 byte target = ModeToRaw(mode);

@@ -48,9 +48,31 @@ public sealed class CpuVerbsTests
         Assert.Equal(0xE0000004u, smu.Calls[0].Value);
     }
 
-    [Fact]
-    public async Task ExecuteAmdSmuCommand_UnknownCommand_IsInvalidValue()
+    [Theory]
+    [InlineData("enable-oc")]
+    [InlineData("oc-volt")]
+    [InlineData("oc-clk")]
+    [InlineData("per-core-oc-clk")]
+    [InlineData("set-vddoff-vid")]
+    [InlineData("set-cofall")]
+    public async Task ExecuteAmdSmuCommand_OverclockingMailbox_IsRefusedBeforeTheMailbox(string name)
     {
+        // The SMU table carries these, no row of the app sends them, and a wrong
+        // value hangs the CPU until the battery is pulled. The name arrives from the
+        // pipe, so the verb refuses it before the mailbox is touched.
+        var smu = new FakeAmdSmuService();
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        EngineException ex = await Assert.ThrowsAsync<EngineException>(
+            () => host.Smu.ExecuteCommandAsync(name, 0xFFFFFFFF));
+
+        Assert.Equal(EngineErrorCode.InvalidValue, ex.Code);
+        Assert.Empty(smu.Calls);
+    }
+
+    [Fact]
+    public async Task ExecuteAmdSmuCommand_UnknownCommand_IsInvalidValue()    {
         // The preset author typed a command the socket table does not have:
         // a request fault, not a hardware fault, and the app's fallback-first
         // routing must NOT treat it as "engine not answering".
@@ -107,14 +129,14 @@ public sealed class CpuVerbsTests
     {
         // Two applies for one preset batch must not interleave on the shared
         // mailbox: the domain queue serialises the whole handler.
-        var smu = new FakeAmdSmuService().Answers("a-cmd").Answers("b-cmd");
+        var smu = new FakeAmdSmuService().Answers("slow-limit").Answers("fast-limit");
 
         await using var host = await EngineHostFixture.StartAsync(
             configure: o => o with { AmdSmuOverride = smu });
 
-        await host.Smu.ExecuteCommandAsync("a-cmd", 1);
-        await host.Smu.ExecuteCommandAsync("b-cmd", 2);
+        await host.Smu.ExecuteCommandAsync("slow-limit", 1);
+        await host.Smu.ExecuteCommandAsync("fast-limit", 2);
 
-        Assert.Equal(new[] { ("a-cmd", 1u), ("b-cmd", 2u) }, smu.Calls);
+        Assert.Equal(new[] { ("slow-limit", 1u), ("fast-limit", 2u) }, smu.Calls);
     }
 }

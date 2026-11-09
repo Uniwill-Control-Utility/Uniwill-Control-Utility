@@ -101,14 +101,49 @@ public sealed class FwNvramServiceMagicDoorTests
     }
 
     [Fact]
-    public void Write_OtherNameUnderTheGuid_MovesNoDoor()
+    public void Write_OtherNameUnderTheGuid_IsRefusedAndMovesNoDoor()
     {
+        // The name is part of the address: a variable under the OEM GUID that no
+        // row reads is firmware data this app would damage, not control. The pipe
+        // verb carries the name, so the refusal lives here, at the single funnel.
         var env = new FakeFirmwareEnvironment().WithDoor();
         var service = new FwNvramService(env);
 
-        Assert.True(service.Write("SomeOtherEntry", FwNvramService.OemMagicVariableGuid, Entry));
+        Assert.False(service.Write("SomeOtherEntry", FwNvramService.OemMagicVariableGuid, Entry));
 
-        Assert.Equal(new[] { "SomeOtherEntry" }, env.Writes.Select(w => w.Name).ToArray());
+        Assert.Empty(env.Writes);
+    }
+
+    [Fact]
+    public void Write_OemMagicEntry_WithADifferentLength_IsRefusedAndWritesNothing()
+    {
+        // A short write truncates the entry: the mem-OC switch, the GPU-mux mirror
+        // and the AP-menu pair all live at fixed offsets inside these bytes.
+        var env = new FakeFirmwareEnvironment()
+            .WithDoor()
+            .WithVariable(FwNvramService.OemMagicVariable, EntryBytes());
+        var service = new FwNvramService(env);
+
+        Assert.False(service.Write(FwNvramService.OemMagicVariable, FwNvramService.OemMagicVariableGuid, new byte[1]));
+
+        Assert.Empty(env.Writes);                                  // no door, no entry
+        Assert.Equal(Entry.Length, env.EntryBytes()!.Length);      // the stored entry is intact
+    }
+
+    [Fact]
+    public void Write_OemMagicEntry_WithTheSameLength_IsAccepted()
+    {
+        var env = new FakeFirmwareEnvironment()
+            .WithDoor()
+            .WithVariable(FwNvramService.OemMagicVariable, EntryBytes());
+        var service = new FwNvramService(env);
+
+        byte[] replacement = EntryBytes();
+        replacement[FwNvramService.OffsetMemOcSwitch] = 1;
+
+        Assert.True(service.Write(FwNvramService.OemMagicVariable, FwNvramService.OemMagicVariableGuid, replacement));
+
+        Assert.Equal(1, env.EntryBytes()![FwNvramService.OffsetMemOcSwitch]);
     }
 
     [Fact]
@@ -131,8 +166,31 @@ public sealed class FwNvramServiceMagicDoorTests
     }
 
     [Fact]
-    public void Reads_NeverTouchTheDoor()
+    public void Read_OutsideTheOemEntry_IsRefused()
     {
+        // The engine holds SeSystemEnvironmentPrivilege, so an ungated read hands any
+        // interactive user firmware variables they cannot read themselves (Secure Boot
+        // dbx, vendor provisioning data). The door is served because the unlock
+        // handshake probes it; nothing else is.
+        var env = new FakeFirmwareEnvironment()
+            .WithDoor()
+            .WithVariable("SecureBoot", new byte[] { 1 })
+            .WithVariable("VendorData", new byte[] { 2 });
+        var service = new FwNvramService(env);
+
+        const string MicrosoftGuid = "{8BE4DF61-93CA-11D2-AA0D-00E098032B8C}";
+        Assert.Null(service.Read("SecureBoot", MicrosoftGuid));
+
+        // A foreign name under the OEM GUID is refused too: only this app's entry
+        // and its door are served.
+        Assert.Null(service.Read("VendorData", FwNvramService.OemMagicVariableGuid));
+
+        // The two names the handshake and the rows need still answer.
+        Assert.NotNull(service.Read(FwNvramService.OemMagicDoor, FwNvramService.OemMagicVariableGuid));
+    }
+
+    [Fact]
+    public void Reads_NeverTouchTheDoor()    {
         var env = new FakeFirmwareEnvironment()
             .WithDoor()
             .WithVariable(FwNvramService.OemMagicVariable, EntryBytes());
