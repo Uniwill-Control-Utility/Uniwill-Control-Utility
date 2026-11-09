@@ -58,17 +58,13 @@
       <_Parameter1>Uniwill Control Utility.Tests</_Parameter1>
     </AssemblyAttribute>
     <EmbeddedResource Include="Localization\*.json" />
-    <PackageReference Include="Accord.Math" Version="3.8.0" />
     <PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />
-    <PackageReference Include="FuzzyStrings.NetStandard" Version="1.0.1" />
     <PackageReference Include="GameLib.NET" Version="1.4.1" />
     <PackageReference Include="hidlibrary" Version="3.3.40" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre744" />
     <PackageReference Include="LLT.NvAPIWrapper.Net" Version="1.1.9-pre.21" />
     <PackageReference Include="MahApps.Metro.IconPacks" Version="6.2.1" />
-    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
-    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.3" />
     <PackageReference Include="MouseKeyHook" Version="5.7.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
@@ -243,9 +239,6 @@
     <None Update="Assets\Intel\PawnIO\IntelMSR.bin">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="kernel32.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="favicon.ico">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
@@ -255,15 +248,6 @@
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
     <None Update="Assets\AMD\PawnIO\RyzenSMU.bin">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="ucrtbased.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="vcruntime140d.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="vcruntime140_1d.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

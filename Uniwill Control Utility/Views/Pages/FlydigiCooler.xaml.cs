@@ -859,36 +859,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// Applies fan to the device from the given settings object.
-        /// </summary>
-        private async Task ApplyFanFromSettings(Bs2ProSettings settings)
-        {
-            if (_coolerService == null || !_coolerService.IsConnected)
-                return;
-
-            try
-            {
-                switch (settings.FanMode)
-                {
-                    case FanModeManual: // Manual RPM
-                        if (settings.ManualRpm > 0)
-                            await _coolerService.WriteRealtimeRpmAsync(settings.ManualRpm);
-                        break;
-                    case FanModeGear: // Gear
-                        if (settings.ManualGear > 0)
-                            await _coolerService.WriteGearAsync((byte)settings.ManualGear);
-                        break;
-                    case FanModeAuto: // Curve — handled by FlydigiSmartControl (restart in ApplyOverrideState)
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"FlydigiCooler: Failed to re-apply fan on override-lift: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// Creates and shows the Adaptive Mode override snackbar.
         /// Defers showing until the SnackbarPresenter is in the visual tree to avoid
         /// the snackbar being created before the page is navigated to.

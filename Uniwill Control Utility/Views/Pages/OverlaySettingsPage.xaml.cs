@@ -485,12 +485,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region Button Handlers
 
-        private void VisibilityButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (SaveOptionsWithValidation())
-                _overlay.ToggleOverlay();
-        }
-
         private void PreviewButton_Click(object sender, RoutedEventArgs e)
         {
             if (SaveOptionsWithValidation())

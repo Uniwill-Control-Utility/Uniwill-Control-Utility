@@ -40,15 +40,6 @@ public partial class StartupProgressWindow : FluentWindow
     }
 
     /// <summary>
-    /// Single-string overload for non-tracker status updates (sets title only, clears detail).
-    /// </summary>
-    internal void SetStatusLabelSingle(string text)
-    {
-        StatusTitle.Text = text;
-        StatusDetail.Text = string.Empty;
-    }
-
-    /// <summary>
     /// Updates the progress bar value directly without animation.
     /// Used for phase-level progress tracking during parallel startup.
     /// </summary>
