@@ -799,7 +799,7 @@ namespace Uniwill_Control_Utility.Services
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            File.WriteAllText(_journalPath, JsonSerializer.Serialize(journal));
+            AtomicJsonFile.Write(_journalPath, JsonSerializer.Serialize(journal));
         }
 
         private IReadOnlyList<OemJournalRow> MergeJournal(List<TakeoverJournalEntry> userJournal)

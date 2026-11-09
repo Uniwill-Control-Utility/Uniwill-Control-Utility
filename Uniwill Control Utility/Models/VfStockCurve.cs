@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Models
 {
@@ -66,7 +67,7 @@ namespace Uniwill_Control_Utility.Models
             try
             {
                 var json = JsonSerializer.Serialize(points, _jsonOptions);
-                File.WriteAllText(FilePath, json);
+                AtomicJsonFile.Write(FilePath, json);
             }
             catch
             {

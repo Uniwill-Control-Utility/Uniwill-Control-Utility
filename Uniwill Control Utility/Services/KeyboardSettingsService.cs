@@ -53,7 +53,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 Directory.CreateDirectory(SettingsFolder);
                 var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
-                File.WriteAllText(SettingsFile, json);
+                AtomicJsonFile.Write(SettingsFile, json);
                 SettingsChanged?.Invoke(null, EventArgs.Empty);
             }
             catch (Exception ex)
@@ -73,7 +73,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 Directory.CreateDirectory(SettingsFolder);
                 var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
-                File.WriteAllText(SavedSettingsFile, json);
+                AtomicJsonFile.Write(SavedSettingsFile, json);
             }
             catch (Exception ex)
             {

@@ -401,7 +401,7 @@ namespace Uniwill_Control_Utility.Services
                 var filePath = Path.Combine(SettingsFolder, "bs2pro_settings.json");
 
                 var json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
-                File.WriteAllText(filePath, json);
+                AtomicJsonFile.Write(filePath, json);
                 SettingsChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)

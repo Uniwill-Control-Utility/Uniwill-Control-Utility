@@ -1273,11 +1273,19 @@ namespace UCU.Hardware.Takeover
 
         internal void SaveJournal(List<TakeoverJournalEntry> journal)
         {
-            string? directory = Path.GetDirectoryName(_journalPath);
+            WriteJournalAtomically(_journalPath, JsonSerializer.SerializeToUtf8Bytes(journal, TakeoverJournalJson.Default.ListTakeoverJournalEntry));
+        }
+
+        // The journal must survive a crash: write a sibling .tmp, then move it over the
+        // live file (atomic on one volume), never truncate-in-place.
+        private static void WriteJournalAtomically(string path, byte[] bytes)
+        {
+            string? directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
-
-            File.WriteAllBytes(_journalPath, JsonSerializer.SerializeToUtf8Bytes(journal, TakeoverJournalJson.Default.ListTakeoverJournalEntry));
+            string temp = path + ".tmp";
+            File.WriteAllBytes(temp, bytes);
+            File.Move(temp, path, overwrite: true);
         }
 
         /// <summary>WinVerifyTrust + signer-subject per path, cached per pass

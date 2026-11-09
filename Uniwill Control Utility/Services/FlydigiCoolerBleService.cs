@@ -225,7 +225,7 @@ namespace Uniwill_Control_Utility.Services
                 Directory.CreateDirectory(settingsFolder);
                 var filePath = Path.Combine(settingsFolder, SettingsFileName);
                 var json = JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
-                File.WriteAllText(filePath, json);
+                AtomicJsonFile.Write(filePath, json);
                 SettingsChanged?.Invoke(this, EventArgs.Empty);
                 Log($"{LogPrefix} Settings saved: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
             }
