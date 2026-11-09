@@ -333,7 +333,10 @@ namespace Uniwill_Control_Utility.Services
                 bool shouldWrite = !_lastDuty.HasValue
                     || Math.Abs(targetDuty - _lastDuty.Value) >= 4; // 4/200 = 2%
 
-                Log.Information("[DIAG] EcSmartFanControl tick: temp {Temp:F1}°C, targetDuty {Duty} ({DutyPct}%), shouldWrite={ShouldWrite}, lastDuty={LastDuty}",
+                // Debug, not Information: this runs once per control tick (~1 s), and at
+                // Information the app log rolled 8 MB every ~19 h and the diagnostics
+                // export shipped all of it. The write path logs what actually landed.
+                Log.Debug("[DIAG] EcSmartFanControl tick: temp {Temp:F1}°C, targetDuty {Duty} ({DutyPct}%), shouldWrite={ShouldWrite}, lastDuty={LastDuty}",
                     filtered, targetDuty, targetDuty * 100 / 200, shouldWrite, _lastDuty);
 
                 if (shouldWrite)

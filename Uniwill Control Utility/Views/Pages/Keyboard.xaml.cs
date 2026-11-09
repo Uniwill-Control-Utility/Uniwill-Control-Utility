@@ -90,16 +90,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // BetterRGB streamer FPS presets (SelectedIndex 2 = 60, OpenRevo's default).
 
-            // Subscribe to override state changes so the UI updates when Adaptive
-            // Mode activates (which may happen after Page_Loaded at startup).
-            var deviceApplier = App.GetService<DeviceApplier>();
-            if (deviceApplier != null)
-                deviceApplier.KeyboardOverrideChanged += OnKeyboardOverrideChanged;
-
-            // Re-sync the power row when settings change externally (mini-tray
-            // Keyboard RGB toggle, Adaptive apply) so the visible page never shows
-            // a stale ON/OFF without re-navigation.
-            KeyboardSettingsService.SettingsChanged += OnKeyboardSettingsChangedExternally;
+            // The override and settings subscriptions live in Page_Loaded, not here:
+            // the page instance is cached for the app's lifetime, so a constructor
+            // subscription paired with the Page_Unloaded removal leaves the page deaf
+            // after the first navigation away and back (the override banner and the
+            // power row then stop following Adaptive Mode and the tray toggle).
 
             // Show unavailable state initially; HID opens in background
             KeyboardAvailable.Visibility = Visibility.Collapsed;
@@ -151,6 +146,18 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            // The override subscription is taken in the block below (which needs the
+            // same DeviceApplier); both live here rather than in the constructor
+            // because the page is a cached singleton and the removals are in
+            // Page_Unloaded - a constructor subscription would never come back after
+            // the first navigation away.
+
+            // Re-sync the power row when settings change externally (mini-tray
+            // Keyboard RGB toggle, Adaptive apply) so the visible page never shows
+            // a stale ON/OFF without re-navigation.
+            KeyboardSettingsService.SettingsChanged -= OnKeyboardSettingsChangedExternally;
+            KeyboardSettingsService.SettingsChanged += OnKeyboardSettingsChangedExternally;
+
             _visualizer.KeysSelected += OnKeysSelected;
             _visualizer.RefreshLayout();
             UpdateEffectUi();
@@ -175,10 +182,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             SyncUiFromSettings();
 
             // Reconcile DeviceApplier override state with UI.
-            // (Event subscription is in the constructor; Page_Loaded just syncs state.)
+            // The subscription is (re)taken just above; Page_Loaded then syncs state.
             var deviceApplier = App.GetService<DeviceApplier>();
             if (deviceApplier != null)
             {
+                deviceApplier.KeyboardOverrideChanged -= OnKeyboardOverrideChanged;
+                deviceApplier.KeyboardOverrideChanged += OnKeyboardOverrideChanged;
+
                 bool isOverridden = deviceApplier.IsKeyboardOverridden;
 
                 // Always force override state on Page_Loaded. The override event may

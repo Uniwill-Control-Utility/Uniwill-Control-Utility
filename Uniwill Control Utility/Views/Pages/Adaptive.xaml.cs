@@ -52,11 +52,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             adaptiveMode.Interval = TimeSpan.FromSeconds(5);
             adaptiveMode.Tick += new EventHandler(adaptive_Tick);
-            adaptiveMode.Start();
 
             sensors.Interval = TimeSpan.FromSeconds(5);
             sensors.Tick += new EventHandler(sensors_Tick);
-            sensors.Start();
+
+            // Started in Page_Loaded, not here. The page is cached, but
+            // PageService.InvalidateBoostDependentPages drops it on every Power Boost
+            // toggle and a new instance is built: without a Stop in Page_Unloaded each
+            // discarded page kept two 5 s hardware timers running for the rest of the
+            // session, plus the DeviceApplier reference that kept it alive.
 
             nudPolling.Value = 5;
 
@@ -2095,6 +2099,18 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            // Restart this instance's polling and re-take the DeviceApplier reference
+            // (Page_Unloaded released both). Start() on a running timer is a no-op, and
+            // the -= before += keeps a re-enter from stacking handlers.
+            adaptiveMode.Start();
+            sensors.Start();
+
+            if (_deviceApplier is not null)
+            {
+                _deviceApplier.ManualControlLockChanged -= OnManualControlLockChanged;
+                _deviceApplier.ManualControlLockChanged += OnManualControlLockChanged;
+            }
+
             // Recheck Flydigi card visibility on navigation (device may have connected/disconnected)
             UpdateFlydigiCardVisibility();
 
@@ -2198,6 +2214,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _hydroUIService.ConnectionStateChanged -= OnWaterCoolerConnectionStateChanged;
                 _hydroUIService.SmartModeStateChanged -= OnSmartModeStateChanged;
             }
+
+            // Stop this instance's polling and release the singleton's reference to it:
+            // a discarded page (a Power Boost toggle rebuilds it) must not keep two 5 s
+            // hardware timers and a Process.GetProcesses scan alive behind the live page.
+            adaptiveMode.Stop();
+            sensors.Stop();
+
+            if (_deviceApplier is not null)
+                _deviceApplier.ManualControlLockChanged -= OnManualControlLockChanged;
         }
 
 
@@ -2737,55 +2762,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProCurveEditor.SetCurve(FlydigiFanCurveProfile.CreateBalanced());
                 }
             }
-        }
-
-        private void btnBs2ProEditCurve_Click(object sender, RoutedEventArgs e)
-        {
-            // Load the current custom curve from Bs2ProSettings if it exists
-            var bs2SettingsPath = System.IO.Path.Combine(Settings.Default.Path, Bs2ProSettingsFile);
-            FlydigiFanCurveProfile? seedProfile = FlydigiFanCurveProfile.CreateBalanced();
-
-            if (System.IO.File.Exists(bs2SettingsPath))
-            {
-                try
-                {
-                    var bs2Settings = Newtonsoft.Json.JsonConvert.DeserializeObject<
-                        Uniwill_Control_Utility.Models.Bs2ProSettings>(
-                        System.IO.File.ReadAllText(bs2SettingsPath));
-                    if (bs2Settings != null && !string.IsNullOrEmpty(bs2Settings.CustomCurveJson))
-                    {
-                        seedProfile = Uniwill_Control_Utility.Models.FlydigiFanCurveProfile.FromJSON(bs2Settings.CustomCurveJson);
-                    }
-                }
-                catch (Exception) { /* use default balanced */ }
-            }
-
-            var dialog = new Views.Windows.FlydigiCurveEditorWindow(seedProfile);
-            if (dialog.ShowDialog() != true || dialog.EditedProfile == null)
-                return;
-
-            // Persist the custom curve to bs2pro_settings.json
-            try
-            {
-                var bs2Settings = new Uniwill_Control_Utility.Models.Bs2ProSettings();
-                if (System.IO.File.Exists(bs2SettingsPath))
-                {
-                    bs2Settings = Newtonsoft.Json.JsonConvert.DeserializeObject<
-                        Uniwill_Control_Utility.Models.Bs2ProSettings>(
-                        System.IO.File.ReadAllText(bs2SettingsPath)) ?? bs2Settings;
-                }
-                bs2Settings.CustomCurveJson = dialog.EditedProfile.ToJSON();
-                bs2Settings.SelectedCurveProfile = CurveProfileCustom;
-                System.IO.File.WriteAllText(bs2SettingsPath,
-                    Newtonsoft.Json.JsonConvert.SerializeObject(bs2Settings, Newtonsoft.Json.Formatting.Indented));
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "Failed to save custom curve from Adaptive Mode");
-            }
-
-            // The Flydigi page will pick up the new curve on its next smart control tick
-            // because it reads from the same settings file.
         }
 
         // RGB helpers

@@ -215,7 +215,9 @@ namespace Uniwill_Control_Utility.Services.Performance
         /// </summary>
         private static bool HasVisibleWindow(int gamePid)
         {
-            return EnumWindows((hWnd, lParam) =>
+            bool found = false;
+
+            EnumWindows((hWnd, lParam) =>
             {
                 if (GetWindowThreadProcessId(hWnd, out uint pid) != 0 && unchecked((int)pid) == gamePid)
                 {
@@ -225,11 +227,20 @@ namespace Uniwill_Control_Utility.Services.Performance
                     {
                         // Check if it's not minimized.
                         if (!IsIconic(hWnd))
+                        {
+                            found = true;
                             return false; // found it, stop enumeration
+                        }
                     }
                 }
                 return true; // continue enumeration
             }, IntPtr.Zero);
+
+            // EnumWindows answers "the callback never returned false", which is the
+            // OPPOSITE of "found one" - returning that value inverted this check: the
+            // overlay was hidden when the game was behind it and shown when the game
+            // was minimised. The closure is the fact.
+            return found;
         }
 
         [LibraryImport("user32.dll")]

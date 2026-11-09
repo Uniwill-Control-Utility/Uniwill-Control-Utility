@@ -32,6 +32,15 @@ namespace Uniwill_Control_Utility.Services.Performance
         private static int _claimedSlot; // -1 = not claimed
 
         /// <summary>
+        /// Guards the cached view AND every write through it. AcquireMapping unmaps
+        /// the view when RTSS restarted (header mismatch), so a writer that is not
+        /// holding this lock can touch an unmapped page - an uncatchable
+        /// AccessViolationException. RtssReader holds the same weapon for its reads
+        /// (Services\Performance\RtssReader.cs:93-104).
+        /// </summary>
+        private static readonly object _mapLock = new();
+
+        /// <summary>
         /// Write an OSD string into RTSS shared memory.
         /// Returns the claimed slot (>= 0) on success; -1 when the write did
         /// not land (RTSS not running / mapping lost, header invalid, no slot
@@ -42,6 +51,12 @@ namespace Uniwill_Control_Utility.Services.Performance
         /// the owner - which is a distinct failure face from frozen values.
         /// </summary>
         internal static int Update(string osdText)
+        {
+            lock (_mapLock)
+                return UpdateCore(osdText);
+        }
+
+        private static int UpdateCore(string osdText)
         {
             if (!AcquireMapping(out IntPtr viewPtr, out uint version))
             {
@@ -133,6 +148,12 @@ namespace Uniwill_Control_Utility.Services.Performance
         /// which slot was used so the next Update() can re-claim the same slot.
         /// </summary>
         internal static void Release()
+        {
+            lock (_mapLock)
+                ReleaseCore();
+        }
+
+        private static void ReleaseCore()
         {
             if (!AcquireMapping(out IntPtr viewPtr, out uint version))
                 return;
