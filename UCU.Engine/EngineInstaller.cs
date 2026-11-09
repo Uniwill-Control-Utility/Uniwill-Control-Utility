@@ -1198,14 +1198,17 @@ namespace UCU.Engine
         {
             try
             {
-                string script = Path.Combine(Path.GetTempPath(), "ucu-verb-tail.cmd");
+                string script = NewScriptPath("ucu-verb-tail.cmd");
                 File.WriteAllText(script,
                     "@echo off\r\n" +
                     "ping -n 6 127.0.0.1 >nul\r\n" +
                     "rd /s /q \"" + root + "\"\r\n" +
                     "ping -n 4 127.0.0.1 >nul\r\n" +
                     "rd /s /q \"" + root + "\"\r\n" +
-                    "del \"%~f0\"\r\n");
+                    // (goto) closes this batch's file handle first: a bare del
+                    // deletes the running script and cmd fails the next line, so
+                    // the directory would never be removed (measured on Win11).
+                    "(goto) 2>nul & del \"%~f0\" & rd \"%~dp0\" 2>nul\r\n");
 
                 Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + script + "\"")
                 {
@@ -1218,6 +1221,18 @@ namespace UCU.Engine
             {
                 Log.Debug(ex, "[EngineInstaller] layout tail not spawned");
             }
+        }
+
+        /// <summary>
+        /// A fresh directory per run: a fixed %TEMP% file name is pre-placeable
+        /// and swappable by any same-user process, and these scripts run as
+        /// SYSTEM.
+        /// </summary>
+        private static string NewScriptPath(string fileName)
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(directory);
+            return Path.Combine(directory, fileName);
         }
 
         /// <summary>
