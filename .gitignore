@@ -396,3 +396,5 @@ build/msi-edit/obj/
 **/*-plan.md
 **/*plan-*.md
 **/*-plan.json
+# Stray third-party installers dropped in the repo root (a git add -A hazard).
+/install.ps1

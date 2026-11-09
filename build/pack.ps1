@@ -147,9 +147,8 @@ if ($LASTEXITCODE -ne 0) { throw "UCU.Updater.exe shim compile failed" }
 # missing - the script is the reproducibility gate the wiki asks for.
 $payload = @(
     "ADLX_3DSettings.dll", "ADLX_AutoTuning.dll", "ADLX_DisplaySettings.dll", "ADLX_PerformanceMetrics.dll",
-    "BlackSharp.Core.dll", "DiskInfoToolkit.dll", "HidSharp.dll", "LibreHardwareMonitorLib.dll",
-    "Magpie.dll", "MagpieRT.dll", "RAMSPDToolkit-NDD.dll", "RTSSSharedMemoryNET.dll",
-    "kernel32.dll", "ucrtbased.dll", "vcruntime140d.dll", "vcruntime140_1d.dll"
+    "BlackSharp.Core.dll", "DiskInfoToolkit.dll", "Magpie.dll", "MagpieRT.dll", "RAMSPDToolkit-NDD.dll",
+    "RTSSSharedMemoryNET.dll"
 )
 foreach ($file in $payload) {
     $dst = Join-Path $publishDir $file

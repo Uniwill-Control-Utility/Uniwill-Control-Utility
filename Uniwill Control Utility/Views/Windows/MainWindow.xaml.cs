@@ -1,8 +1,5 @@
-using Accord.Math.Distances;
-using DuoVia.FuzzyStrings;
 using GameLib.Plugin.RiotGames.Model;
 using Gma.System.MouseKeyHook;
-using HidSharp.Utility;
 using Microsoft.Win32;
 using RyzenSmu;
 using Serilog;
@@ -2096,14 +2093,6 @@ namespace Uniwill_Control_Utility.Views.Windows
                     IsEnabled = false
                 });
             }
-        }
-
-        private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
-        {
-            // Legacy handler â€“ delegates to extended handler with Normal mode.
-            if (sender is not MenuItem menuItem || menuItem.Tag is not int slot)
-                return;
-            await TrayCustomPresetApplyAsync(slot, Models.PresetMode.Normal);
         }
 
         private async void TrayCustomPreset_ClickExtended(object? sender, RoutedEventArgs e)

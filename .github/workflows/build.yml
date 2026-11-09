@@ -1,0 +1,51 @@
+name: build
+
+# The gate the project documents (a clean Release build at the warning baseline and
+# all five suites) used to be run by hand. Findings S0/S6 that shipped broken would
+# have been caught by this in under a minute.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore "Uniwill Control Utility.sln"
+
+      - name: Build (Release)
+        # 130 is the known-warning baseline; a new warning is a review item, not a
+        # build breaker, so the count is printed rather than asserted here.
+        run: dotnet build "Uniwill Control Utility.sln" -c Release --no-restore
+
+      - name: EC vault artifact is the generator output
+        # The committed EcAddresses.g.cs must equal what tools/EcRegistryGen emits:
+        # a hand-edited or stale artifact fails here instead of shipping.
+        run: git diff --exit-code -- UCU.Core/Ec/Generated
+
+      - name: Tests (Contracts)
+        run: dotnet test UCU.Contracts.Tests/UCU.Contracts.Tests.csproj -c Release --no-build
+
+      - name: Tests (Core)
+        run: dotnet test UCU.Core.Tests/UCU.Core.Tests.csproj -c Release --no-build
+
+      - name: Tests (Hardware)
+        run: dotnet test UCU.Hardware.Tests/UCU.Hardware.Tests.csproj -c Release --no-build
+
+      - name: Tests (Engine)
+        run: dotnet test UCU.Engine.Tests/UCU.Engine.Tests.csproj -c Release --no-build
+
+      - name: Tests (app)
+        # If the runner's session cannot host these (a few need a desktop), split this
+        # step into its own workflow_dispatch job rather than deleting it: the suite is
+        # most of the coverage for the view layer.
+        run: dotnet test "Uniwill Control Utility.Tests/Uniwill Control Utility.Tests.csproj" -c Release --no-build
