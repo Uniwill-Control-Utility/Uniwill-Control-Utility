@@ -1824,6 +1824,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void ApplyBetterRgbIfNeeded()
         {
+            // Same guard as ApplyKeyboardIfNeeded's: the caller checks, but this
+            // method is also reachable from the change-notification path, and every
+            // other use of the field in this file is null-guarded. Returning before
+            // the diff check keeps the last* tracking untouched, so the apply happens
+            // on the first tick after the service is available. (CS8602 pointed here.)
+            if (_deviceApplier == null)
+                return;
+
             var cfg = BuildBetterRgbSettingsFromUi();
             string effect = cfg.Mode;
             int fps = cfg.Fps;
