@@ -16,9 +16,11 @@ namespace UCU.Engine
     /// (full) token and starts the image as that token.
     ///
     /// The verb takes NO path. The engine locates RTSS from its own witnesses
-    /// and launches only an image named RTSS.exe - the same chokepoint rule
-    /// the raw-register write gate enforces: no arbitrary-execution surface
-    /// behind a service handle.
+    /// and launches only an image that is named RTSS.exe AND sits under a
+    /// Program Files root (IsTrustedLaunchImage) - the same chokepoint rule the
+    /// raw-register write gate enforces, and the reason the HKCU witness alone
+    /// is not enough: a user-writable image launched with the console user's
+    /// linked token would be an unelevated process elevating itself.
     /// </summary>
     internal static class RtssVerbs
     {
@@ -37,9 +39,10 @@ namespace UCU.Engine
                 return false;
             }
 
-            if (!RtssLocation.IsLaunchableImage(exe))
+            if (!RtssLocation.IsTrustedLaunchImage(exe))
             {
-                Log.Warning("[Rtss] start: located image is not {Exe} - refused", RtssLocation.ExeName);
+                Log.Warning("[Rtss] start: located image is not a trusted {Exe} (outside Program Files) - refused",
+                    RtssLocation.ExeName);
                 return false;
             }
 
