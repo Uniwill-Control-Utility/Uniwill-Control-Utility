@@ -666,20 +666,26 @@ namespace Uniwill_Control_Utility
             if (!File.Exists(engine))
                 throw new FileNotFoundException("engine exe not found", engine);
 
-            string verbScript = Path.Combine(Path.GetTempPath(), "ucu-verb-task.cmd");
+            string verbScript = NewScriptPath("ucu-verb-task.cmd");
             File.WriteAllText(verbScript,
                 "@echo off\r\n" +
                 "\"" + engine + "\" --uninstall-engine\r\n" +
-                "del \"%~f0\"\r\n");
+                // (goto) closes this batch's file handle first: a bare del
+                // deletes the running script and cmd fails the next line, so the
+                // directory would never be removed (measured on Win11).
+                "(goto) 2>nul & del \"%~f0\" & rd \"%~dp0\" 2>nul\r\n");
 
-            string launcher = Path.Combine(Path.GetTempPath(), "ucu-sentinel-verb.cmd");
+            string launcher = NewScriptPath("ucu-sentinel-verb.cmd");
             File.WriteAllText(launcher,
                 "@echo off\r\n" +
                 "schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
                     ShortPath(verbScript) + "\" /sc once /st 23:59 /ru SYSTEM /f\r\n" +
                 "schtasks /run /tn \"UCU Uninstall Verb\"\r\n" +
                 "schtasks /delete /tn \"UCU Uninstall Verb\" /f\r\n" +
-                "del \"%~f0\"\r\n");
+                // (goto) closes this batch's file handle first. A bare del
+                // deletes the running script and cmd fails the next line, so the
+                // directory would never be removed (measured on Win11).
+                "(goto) 2>nul & del \"%~f0\" & rd \"%~dp0\" 2>nul\r\n");
 
             // The launcher outlives this process (no job object binds it);
             // a hidden elevated cmd keeps the desktop clean apart from the
@@ -695,6 +701,18 @@ namespace Uniwill_Control_Utility
             };
             Process.Start(psi);
             Environment.Exit(0);
+        }
+
+        /// <summary>
+        /// A fresh directory per run: a fixed %TEMP% file name is pre-placeable
+        /// and swappable by any same-user process, and these scripts run
+        /// elevated / as SYSTEM.
+        /// </summary>
+        internal static string NewScriptPath(string fileName)
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(directory);
+            return Path.Combine(directory, fileName);
         }
 
         /// <summary>
