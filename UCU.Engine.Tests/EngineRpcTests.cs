@@ -246,6 +246,40 @@ public sealed class EngineRpcTests
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, await host.Telemetry.ReadRegistersAsync(0x0402, 4));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(65)]
+    [InlineData(100000)]
+    public async Task ReadRegisters_RefusesABlockOutsideTheCap(int count)
+    {
+        // The count arrives from the pipe, so it is caller-chosen. Unbounded, it
+        // held the EC lock for one delay per byte (100000 = ~10 min) until the
+        // watchdog killed the service mid-write. The test would hang if the guard
+        // were gone, and would answer Internal (OverflowException) for the
+        // negative case; InvalidValue is the guard's signature.
+        var transport = new FakeEcTransport();
+        await using var host = await EngineHostFixture.StartAsync(transport: transport);
+
+        EngineException ex = await Assert.ThrowsAsync<EngineException>(
+            () => host.Telemetry.ReadRegistersAsync(0x0402, count));
+
+        Assert.Equal(EngineErrorCode.InvalidValue, ex.Code);
+    }
+
+    [Fact]
+    public async Task ReadRegisters_RefusesABlockPastTheAddressSpace()
+    {
+        // (ushort)(startAddress + i) wraps, so without the range check this read
+        // would silently return register 0x0000.. instead of failing.
+        await using var host = await EngineHostFixture.StartAsync();
+
+        EngineException ex = await Assert.ThrowsAsync<EngineException>(
+            () => host.Telemetry.ReadRegistersAsync(0xFFFF, 2));
+
+        Assert.Equal(EngineErrorCode.InvalidValue, ex.Code);
+    }
+
     [Fact]
     public async Task WriteRegister_ReachesTheTransport()
     {

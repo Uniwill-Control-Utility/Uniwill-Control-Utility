@@ -45,9 +45,23 @@ public sealed class EcEngineMuxTests
         Assert.Equal($"0x072A=0x{expectedRaw:X2}", transport.SequenceOf(EcEngine.REG_GPU_STATUS));
     }
 
-    [Fact]
-    public void WriteIsSkippedWhenTheEcIsAlreadyAtTheTargetMode()
+    [Theory]
+    [InlineData(EcPlatform.Amd)]
+    [InlineData(EcPlatform.Intel)]
+    public void AnUndefinedModeIsRefusedBeforeAnyWrite(EcPlatform platform)
     {
+        // The mode arrives from a pipe verb and System.Text.Json accepts an undefined
+        // numeric value. Raw 7 would persist in the EC across a reboot and can leave
+        // the panel with no GPU; the write must never reach the transport.
+        var (engine, transport) = CreateEngine(platform, 0xFF);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => engine.SetGpuMuxMode((GpuMuxMode)7));
+
+        Assert.Empty(transport.WritesAt(EcEngine.REG_GPU_STATUS));
+    }
+
+    [Fact]
+    public void WriteIsSkippedWhenTheEcIsAlreadyAtTheTargetMode()    {
         var (engine, transport) = CreateEngine(EcPlatform.Amd, 0x01);
 
         engine.SetGpuMuxMode(GpuMuxMode.DgpuOnly);

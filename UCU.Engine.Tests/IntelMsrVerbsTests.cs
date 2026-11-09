@@ -1,3 +1,4 @@
+using UCU.Contracts;
 using UCU.Hardware.Cpu.Intel;
 
 namespace UCU.Engine.Tests;
@@ -101,8 +102,43 @@ public sealed class IntelMsrVerbsTests
     }
 
     [Fact]
-    public async Task WriteFailure_AnswersFalse_NotASilentSuccess()
+    public async Task SetTdp_AboveTheEcPowerDomain_IsRefused()
     {
+        // Above the EC's own power domain there is no laptop TDP; the ported stack
+        // would mask pl2*8 and write a silent nonsense value.
+        var msr = new FakeIntelMsrService();
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { IntelMsrOverride = msr });
+
+        EngineException ex = await Assert.ThrowsAsync<EngineException>(
+            () => host.IntelMsr.SetTdpAsync(300, 44));
+
+        Assert.Equal(EngineErrorCode.InvalidValue, ex.Code);
+        Assert.Empty(msr.Registers);
+    }
+
+    [Theory]
+    [InlineData(2000)]
+    [InlineData(-2000)]
+    public async Task SetVoltageOffset_BeyondTheMsrField_IsRefused(int millivolts)
+    {
+        // The 0x150 offset field is 11 bits at 1/1.024 mV: anything past ±1000 mV
+        // is a garbage register value, not an undervolt.
+        var msr = new FakeIntelMsrService();
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { IntelMsrOverride = msr });
+
+        EngineException ex = await Assert.ThrowsAsync<EngineException>(
+            () => host.IntelMsr.SetVoltageOffsetAsync(millivolts, 0));
+
+        Assert.Equal(EngineErrorCode.InvalidValue, ex.Code);
+        Assert.Empty(msr.Registers);
+    }
+
+    [Fact]
+    public async Task WriteFailure_AnswersFalse_NotASilentSuccess()    {
         // The honest signal the app route never had: the MSR write failed
         // (HRESULT in the engine log) and the verb carries that as false,
         // which the app's route renders as "landed=False" — no fallback,
