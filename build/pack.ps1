@@ -169,7 +169,7 @@ if (Test-Path $vpkPortable) {
 # would advertise an update channel nothing reads, so they are removed here -
 # unless a future release brings a real updater back.
 Get-ChildItem $releasesDir -File |
-    Where-Object { $_.Name -match '\.nupkg$' -or $_.Name -eq 'releases.win.json' -or $_.Name -eq 'assets.win.json' } |
+    Where-Object { $_.Name -match '\.nupkg$' -or $_.Name -eq 'releases.win.json' -or $_.Name -eq 'assets.win.json' -or $_.Name -eq 'RELEASES' } |
     ForEach-Object {
         Remove-Item $_.FullName -Force
         Write-Host "Removed $($_.Name) (Velopack update asset - no in-app updater)" -ForegroundColor DarkGray
