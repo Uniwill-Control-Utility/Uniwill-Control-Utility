@@ -2,14 +2,16 @@
 <#
 .SYNOPSIS
     Packages Uniwill Control Utility for release: publish, stage native payload,
-    Velopack pack (per-machine MSI + full/delta nupkgs).
+    Velopack pack (per-machine MSI installer).
 
 .DESCRIPTION
-    Produces the GitHub release assets for Uniwill-Control-Utility/Uniwill-Control-Utility:
-      Releases\Uniwill-Control-Utility.msi            per-machine installer (Program Files)
-      Releases\Uniwill-Control-Utility-<ver>-full.nupkg   Velopack full package
-      Releases\Uniwill-Control-Utility-<ver>-delta.nupkg  Velopack delta from the previous release
-      Releases\releases.win.json                      Velopack GitHub feed index
+    Produces the GitHub release asset for Uniwill-Control-Utility/Uniwill-Control-Utility:
+      Releases\Uniwill-Control-Utility-win.msi   per-machine installer (Program Files)
+
+    vpk also emits its update-package assets (full/delta nupkg, releases.win.json,
+    a portable zip). None of them are shipped: UCU has no in-app updater - an
+    installed copy updates by running the new release's MSI - so the script
+    deletes them, the same way it deletes the portable zip.
 
     No portable zip is produced: the engine runs as a machine-wide service
     created on first launch, so an unpacked copy has no update or removal
@@ -17,9 +19,6 @@
 
     The version is read from the csproj (single source of truth) - bump it there,
     tag the GitHub release with the same version, upload the printed manifest.
-
-    The Releases\ directory is persistent: deltas are built from the newest full
-    nupkg it contains, so keep it in sync with GitHub (step 4 seeds it).
 
 .EXAMPLE
     dotnet tool restore
@@ -128,19 +127,6 @@ if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
     (Join-Path $PSScriptRoot "uninstall-shim\UninstallShim.cs")
 if ($LASTEXITCODE -ne 0) { throw "Uninstall.exe shim compile failed" }
 
-# --- 2e. Compile the UCU.Updater.exe shim (elevated update apply) ---
-# The per-machine layout needs admin to write, and the running engine service
-# locks the Service\ payload the update replaces. The shim (requireAdministrator,
-# same manifest as Uninstall.exe) stops the engine, runs Uninstall.exe -a
-# --from-update, and starts the engine again; the app routes its Velopack apply
-# through it when it exists. Same framework csc as above, no dependencies.
-& $csc /nologo /target:winexe /platform:x64 `
-    "/win32icon:$(Join-Path $projDir 'favicon.ico')" `
-    "/win32manifest:$(Join-Path $PSScriptRoot 'uninstall-shim\admin.manifest')" `
-    "/out:$(Join-Path $publishDir 'UCU.Updater.exe')" `
-    (Join-Path $PSScriptRoot "updater-shim\UpdaterShim.cs")
-if ($LASTEXITCODE -ne 0) { throw "UCU.Updater.exe shim compile failed" }
-
 # --- 3. Stage loose native payload (this list IS the packaging manifest) ---
 # These files live in the project root and are not all produced by the publish
 # (see wiki/architecture/dependency-inventory.md). Fail loudly if any is
@@ -159,19 +145,12 @@ foreach ($file in $payload) {
     }
 }
 
-# --- 4. Seed the persistent Releases dir so deltas can be built ---
+# --- 4. Velopack pack: the per-machine MSI ---
 dotnet tool restore | Out-Null
-dotnet vpk download github --repoUrl https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility -o $releasesDir
-if ($LASTEXITCODE -ne 0) {
-    Write-Warning "vpk download github failed (first run? no Velopack assets on GitHub yet) - building a full-only release."
-}
-
-# --- 5. Velopack pack: per-machine MSI + full/delta nupkgs + releases.win.json ---
 dotnet vpk pack -u Uniwill-Control-Utility -v $version -p $publishDir -o $releasesDir `
     -e "Uniwill Control Utility.exe" `
     --packTitle "Uniwill Control Utility" `
     --icon (Join-Path $projDir "favicon.ico") `
-    --delta BestSpeed `
     -f net10-x64-desktop `
     --msi --instLocation PerMachine
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
@@ -185,7 +164,18 @@ if (Test-Path $vpkPortable) {
     Write-Host "Removed vpk's portable zip (not a shipped asset)" -ForegroundColor DarkGray
 }
 
-# --- 5a. Rebind the MSI's Add/Remove Programs entry to Uninstall.exe ------
+# The update-package assets exist for Velopack's UpdateManager, which the app no
+# longer has (an installed copy updates by running the new MSI). Shipping them
+# would advertise an update channel nothing reads, so they are removed here -
+# unless a future release brings a real updater back.
+Get-ChildItem $releasesDir -File |
+    Where-Object { $_.Name -match '\.nupkg$' -or $_.Name -eq 'releases.win.json' -or $_.Name -eq 'assets.win.json' } |
+    ForEach-Object {
+        Remove-Item $_.FullName -Force
+        Write-Host "Removed $($_.Name) (Velopack update asset - no in-app updater)" -ForegroundColor DarkGray
+    }
+
+# --- 4a. Rebind the MSI's Add/Remove Programs entry to Uninstall.exe ------
 # The Control Panel / Settings uninstall must run the complete-sweep shim,
 # not a thin `msiexec /x`. The packed vpk template already publishes ONE ARP
 # entry itself (ARPSYSTEMCOMPONENT=1 suppresses the Windows Installer engine's
@@ -262,7 +252,7 @@ if ($arpEcho -notmatch [regex]::Escape("Uninstall\MSI:$arpCode")) {
 }
 Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs Uninstall.exe" -ForegroundColor Cyan
 
-# --- 5a. U-111 (MSI registers the engine service) is a proven dead end ----
+# --- 4b. U-111 (MSI registers the engine service) is a proven dead end ----
 # The goal was real: a fresh install paid one UAC because the app's
 # unelevated chain registered UCUEngine. The mechanism Windows Installer
 # prescribes - ServiceInstall/ServiceControl/MsiLockPermissionsEx rows +
@@ -292,7 +282,7 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 # `export` mode keeps MSI's ISTG format inspectable if a future Windows
 # gives msi.dll its DDL back.
 
-# --- 5c. U-111b: author the engine-service CustomActions -----------------
+# --- 4c. U-111b: author the engine-service CustomActions -----------------
 # Fresh installs pay ZERO UAC at first launch: the MSI's deferred
 # CustomActions (SYSTEM, NoImpersonate) run --install-engine inside the
 # install, --remove-service inside the uninstall. Encoding, sequencing,
@@ -317,7 +307,7 @@ if ($caEcho -notmatch "--uninstall-engine") {
     throw "post-edit verification: the sweep verb --uninstall-engine appears in a CA target (must be --remove-service)"
 }
 
-# --- 5b. Stamp the Setup.exe bootstrapper requireAdministrator ---
+# --- 4d. Stamp the Setup.exe bootstrapper requireAdministrator ---
 # vpk's bootstrapper template is asInvoker and vpk exposes no manifest flag,
 # so a double-click on a per-machine pack fails mid-install with
 # ERROR_ELEVATION_REQUIRED and leaves a partial layout in %LOCALAPPDATA%.
@@ -349,8 +339,8 @@ if ($setupExe) {
     }
 }
 
-# --- 6. Upload manifest ---
+# --- 5. Upload manifest ---
 Write-Host "`nUpload these assets to the GitHub release tagged v$version :" -ForegroundColor Green
 Get-ChildItem $releasesDir |
-    Where-Object { $_.Name -match "releases\.win\.json$|Uniwill-Control-Utility-$([regex]::Escape($version))-(full|delta)\.nupkg$|\.msi$|win-Setup\.exe$" } |
+    Where-Object { $_.Name -match "\.msi$|win-Setup\.exe$" } |
     ForEach-Object { Write-Host "  $($_.Name)" }

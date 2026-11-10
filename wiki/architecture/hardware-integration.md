@@ -34,7 +34,7 @@ flowchart LR
 
 `UCU.Hardware\Ec\EcEngine.cs` is the register-level EC implementation: the activation handshake, fan tables and PWM, turbo/boost fields, GPU power control and Dynamic Boost fields, platform power values, keyboard/light-bar operations, battery charge mode, and telemetry reads. It talks to `UWACPIDriver.sys` through the `\\.\ACPIDriver` device IOCTLs via `EcDriverTransport` (`IEcTransport`), which the hardware test suite replaces with a fake.
 
-The engine exposes the EC as a **verb surface** — the domain verbs `fan`, `power`, `mux`, `keyboard`, `battery`, `telemetry` and the engine-management verbs — and the UI consumes it through the capability interfaces (`IFanCapability`, `IPowerCapability`, `IGpuMuxCapability`, `IKeyboardCapability`, `IBatteryCapability`, `IEcTelemetryCapability`, `IEngineCapability`) implemented as RPC proxies. The scope is deliberately EC-only: SMU, Intel MSR, and NVAPI features stayed app-side when the service was introduced.
+The engine exposes the EC as a **verb surface** — the domain verbs `fan`, `power`, `mux`, `keyboard`, `battery`, `telemetry` and the engine-management verbs — and the UI consumes it through the capability interfaces (`IFanCapability`, `IPowerCapability`, `IGpuMuxCapability`, `IKeyboardCapability`, `IBatteryCapability`, `IEcTelemetryCapability`, `IEngineCapability`) implemented as RPC proxies. The scope started EC-only, with SMU, Intel MSR and NVAPI left app-side; the privilege-gated rows have since moved one at a time, each for a documented reason: the sensor snapshot, the PnP device rows, NVRAM, the SMU/Intel mailboxes, MiniLED, the OEM takeover, and now the NVAPI **writes** (`gpu.apply_vf_curve`, `gpu.set_drs_preference` — an unelevated NVAPI clock/voltage write is refused with `NVAPI_INVALID_USER_PRIVILEGE`, so only the reads stay app-side, where they work unelevated and feed the curve editor).
 
 Ordering and fault isolation are structural:
 
@@ -69,9 +69,11 @@ The AMD backend loads PawnIO modules from the app's `Assets/AMD/PawnIO` (the `.b
 
 The Intel backend loads `IntelMSR.bin` and `IntelMCHBAR.bin` through PawnIO and implements power-limit and voltage controls. CPU voltage controls may be unavailable when firmware locks the interface even if the family is recognized.
 
-## NVIDIA GPU path (app-side)
+## NVIDIA GPU path (app-side reads, engine-side writes)
 
 `NvTuning` combines the managed NvAPI wrapper, NVML P/Invoke, private NVAPI calls for V-F curve access, and — for laptop power ceilings and Dynamic Boost coordination — the EC fields, which now travel as `power`-domain RPC verbs. Application order matters: power ceilings affect whether the driver accepts a curve, so custom-profile logic sets power before and after curve changes.
+
+**Reads are app-side, writes are not.** NVAPI's clock and voltage setters are privilege-gated: an `asInvoker` caller is answered `0xFFFFFF77` = `NVAPI_INVALID_USER_PRIVILEGE` and the write never lands (field, 2026-11-10: every V-F curve apply after phase 4 returned it, so presets kept showing offsets the GPU never had — MSI Afterburner applies the same curve because it runs elevated). The V-F curve apply (`0x0733E009` clock-boost table), the core/memory pstate write (`SetPerformanceStates20`) and the DRS preference (`0x8B34C9A2`) therefore travel as `gpu.apply_vf_curve` / `gpu.set_clocks` / `gpu.set_drs_preference` through `UCU.Hardware\Gpu\NvApiGpuTuning.cs`, whose LocalSystem token the driver accepts; the preset pipeline (startup, tray, Adaptive, Automations) and the Presets page reach them through `IGpuTuningCapability`. The pstate write keeps its honesty rule engine-side: a driver that declares `PerformanceStatesInfo.IsReadOnly` is reported as a refusal, never as success. The app's local NVAPI writes stay as the fallback for a machine whose engine is not answering (and are what an elevated dev run uses), and a refusal is logged at Warning naming the privilege answer instead of a bare hex status. Curve *reads* (`TryGetVfCurve`) stay in the app process — they answer unelevated, and the editor polls them live.
 
 Per-operation admin flows (dGPU PnP hotswap, webcam PnP) elevate through `Scripts/Misc\ElevatedProcess` (`runas`, hidden, exit-code verified) rather than running the whole app elevated.
 

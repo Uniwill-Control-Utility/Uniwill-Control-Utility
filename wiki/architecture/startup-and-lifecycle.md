@@ -147,12 +147,12 @@ The engine service survives sleep itself; after resume, the gate's driver handle
 ## Minimize, close and shutdown
 
 - The tray icon persists while the window is hidden; `MinimizeClose` decides whether close hides or exits; tray exit terminates.
-- `App.OnExit` reports the intentional exit to the engine first — `engine.notify_app_exit`, best-effort with a 2 s budget so a wedged engine cannot wedge the exit — then deinitializes SMU/Intel backends, disposes peripheral services, and stops the Generic Host on a background task (dispatcher-deadlock avoidance). A staged Velopack update can be applied via the updater shim from here.
+- `App.OnExit` reports the intentional exit to the engine first — `engine.notify_app_exit`, best-effort with a 2 s budget so a wedged engine cannot wedge the exit — then deinitializes SMU/Intel backends, disposes peripheral services, and stops the Generic Host on a background task (dispatcher-deadlock avoidance).
 - Stopping the app never stops the engine; the service remains for the next launch and supervises this one's death as intentional.
 
 ## Updates and uninstall
 
-- **Update:** `VelopackUpdateService.ApplyAndRestart`/`TryApplyOnExit` route through `UCU.Updater.exe` when the stamped shim is present: it elevates, runs `sc stop UCUEngine` (the service locks the `Service\` payload), runs Velopack's `Uninstall.exe -a --from-update` (apply + relaunch), and starts the engine on the new payload. Declined consent (1223) falls back to a normal shutdown; the staged package is kept. Layouts without the shim (plain dev builds) keep the direct Velopack path.
+- **Update:** there is no in-app updater. An installed copy is updated by downloading and running the release's `Uniwill-Control-Utility-win.msi`; the About card's `Check for updates` button only asks GitHub whether a newer release exists (`UpdateChecker`, one HTTPS GET + version compare) and links to the release page — it downloads and applies nothing. The app's own check/download/apply flow, `VelopackUpdateService` and the `UCU.Updater.exe` shim were deleted on 2026-11-10 — an installed build must never build Velopack's `UpdateManager` in-process (its registration repair can `/x` the live product; see the runbook).
 - **Uninstall:** the elevated `Uninstall.exe` shim stops the engine synchronously (a force-killed app would look like a crash the supervisor resurrects), kills app and legacy guardian processes, deletes the "UCU Autostart"/legacy "UCU"/"UCU Guardian" tasks, `sc delete UCUEngine`, removes the legacy App Paths shim key and uninstall registry entries, then sweeps `%ProgramData%\UCU` and the install root.
 
 ## Failure behavior
