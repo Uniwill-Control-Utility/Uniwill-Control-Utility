@@ -341,6 +341,16 @@ Application info and project resources.
 
 UCU requires the following to be installed and configured before first use:
 
+### .NET 10 Desktop Runtime (x64)
+
+The app is built framework-dependent, so it needs the **.NET 10 Desktop Runtime**:
+
+```
+https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+```
+
+The release's **Uniwill-Control-Utility-win-Setup.exe** installs it for you when missing, then installs the app. If you install from the MSI directly, install this runtime first; without it the app cannot start.
+
 ### UWACPIDriver.sys (Uniwill EC Driver)
 
 UCU communicates with the Uniwill Embedded Controller through the `UWACPIDriver.sys` kernel driver. Check if it's already present at:
