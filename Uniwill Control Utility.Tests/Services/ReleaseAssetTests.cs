@@ -14,19 +14,24 @@ namespace Uniwill_Control_Utility.Tests.Services;
 public sealed class ReleaseAssetTests
 {
     [Fact]
-    public void PackScript_ShipsTheMsi_AndDeletesTheUpdaterOnlyAssets()
+    public void PackScript_ShipsTheMsi_AndKeepsSetupPayload()
+
     {
         string script = ReadRepoFile("build", "pack.ps1");
 
-        // The MSI is the product of the script.
+        // The MSI is a direct-install route, and the Setup bootstrapper installs
+        // from the FULL nupkg - so that package and the feed index are shipped
+        // (deleting them broke Setup.exe in the field-report sense: it is a
+        // downloader, not a bundle).
         Assert.Contains("--msi --instLocation PerMachine", script, StringComparison.Ordinal);
+        Assert.Contains("-delta\\.nupkg$", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("-full\\.nupkg$' -or $_.Name -eq 'releases", script, StringComparison.Ordinal);
 
-        // The updater-only outputs are deleted, and the manifest offers installers only.
+        // The upload manifest offers installers plus Setup's payload.
+        Assert.Contains("-full\\.nupkg$", script, StringComparison.Ordinal);
         Assert.Contains("releases.win.json", script, StringComparison.Ordinal);
-        Assert.Contains("assets.win.json", script, StringComparison.Ordinal);
-        Assert.Contains("Where-Object { $_.Name -match \"\\.msi$|win-Setup\\.exe$\" }", script, StringComparison.Ordinal);
 
-        // The updater-only half is gone, not merely unreferenced.
+        // The updater-only half stays gone: no delta pass, no feed download.
         Assert.DoesNotContain("--delta", script, StringComparison.Ordinal);
         Assert.DoesNotContain("vpk download github", script, StringComparison.Ordinal);
     }
