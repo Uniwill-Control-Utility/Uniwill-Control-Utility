@@ -19,6 +19,10 @@
 
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.2.0" />
+    <!-- The clock-offset write (gpu.set_clocks). The app already ships this
+         wrapper and has proven it as far as the privilege check; hand-building
+         the pstate struct engine-side would be an unverifiable layout risk. -->
+    <PackageReference Include="LLT.NvAPIWrapper.Net" Version="1.1.9-pre.21" />
     <!-- The MiniLED local-dimming WMI handshake (Devices/). Executing the OEM
          root\WMI method is a privileged act the unelevated app cannot do, so
          the WMI dependency rides the LocalSystem side of the boundary. -->
@@ -39,6 +43,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+    <!-- The gpu.* verbs answer with the engine's tuning-result DTO; the contract
+         assembly stays free of hardware, so the dependency points this way only. -->
+    <ProjectReference Include="..\UCU.Contracts\UCU.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

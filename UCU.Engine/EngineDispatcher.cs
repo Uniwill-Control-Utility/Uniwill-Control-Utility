@@ -30,13 +30,13 @@ namespace UCU.Engine
             EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit,
             EngineMetricsSnapshotSource metrics, IPnpDeviceService devices, IFwNvramService nvram,
             IAmdSmuService smu, IIntelMsrService msr, IMiniLedService miniLed,
-            IOemTakeoverService oemTakeover,
+            IOemTakeoverService oemTakeover, UCU.Hardware.Gpu.IGpuTuningService gpuTuning,
             EcRawWriteGuard rawWriteGuard, EngineRuntimeOptions options)
         {
             _gate = gate;
             _queues = queues;
             _appExit = appExit;
-            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, oemTakeover, rawWriteGuard, options.RtssLaunchOverride);
+            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, oemTakeover, gpuTuning, rawWriteGuard, options.RtssLaunchOverride);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -106,7 +106,8 @@ namespace UCU.Engine
         private static Dictionary<string, VerbHandler> BuildHandlers(
             EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics,
             IPnpDeviceService devices, IFwNvramService nvram, IAmdSmuService smu, IIntelMsrService msr,
-            IMiniLedService miniLed, IOemTakeoverService oem, EcRawWriteGuard rawWriteGuard, Func<string, bool>? rtssLaunch)
+            IMiniLedService miniLed, IOemTakeoverService oem, UCU.Hardware.Gpu.IGpuTuningService gpuTuning,
+            EcRawWriteGuard rawWriteGuard, Func<string, bool>? rtssLaunch)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
 
@@ -131,6 +132,10 @@ namespace UCU.Engine
             // oem.* falls to the default (telemetry) queue: pause/restore
             // sequence against each other, away from the EC verbs' queues.
             OemVerbs.Register(Add, oem);
+
+            // gpu.* runs on the default (telemetry) queue like oem.*: the two
+            // writes order against each other, away from the EC verbs.
+            GpuVerbs.Register(Add, gpuTuning);
 
             return handlers;
         }

@@ -20,8 +20,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
     <!-- Single source of truth for the version: flows to AssemblyVersion, FileVersion,
-         the title-bar chip, the About page, and build\pack.ps1 (Velopack packVersion).
-         Must be 3-part (a.b.c) — Velopack rejects 4-part versions. Bump the third
+         the About page, and build\pack.ps1 (Velopack packVersion).
+         Must be 3-part (a.b.c) - Velopack rejects 4-part versions. Bump the third
          part for every release. -->
     <!-- Version: Directory.Build.props, the single source of truth. -->
     <!-- Custom Main in App.xaml.cs runs the Velopack bootstrap before WPF starts,

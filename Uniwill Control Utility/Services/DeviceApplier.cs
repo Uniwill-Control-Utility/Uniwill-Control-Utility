@@ -313,30 +313,44 @@ namespace Uniwill_Control_Utility.Services
                 FanControlSettingsService.Save(saved);
                 _savedEcFanSettings = null;
 
-                // Re-apply restored settings to the EC immediately.
+                // Re-apply restored settings to the EC immediately - unless a stock
+                // preset owns the fans. This path runs long after boot (Adaptive
+                // stopped, its navigation feature disabled, tray quick control), and
+                // it used to write the page's saved curve over whatever preset was
+                // active: the EC then ran the page's values while the UI claimed the
+                // preset (field, 2026-11-10, PC Specialist Recoil 3 16 - the page
+                // held Full Speed and locked into the stock-preset overlay).
                 if (_fan is not null)
                 {
-                    try
+                    if (PresetProfileApplier.IsBuiltInProfile(Properties.Settings.Default.presetProfile))
                     {
-                        var cpuCurve = saved.CpuPreset == "Custom" && saved.CpuDuties?.Length == 11
-                            ? BuildCurveFromSettings(saved.CpuPreset, saved.CpuDuties)
-                            : GetPresetCurve(saved.CpuPreset);
-
-                        var gpuCurve = saved.GpuPreset == "Custom" && saved.GpuDuties?.Length == 11
-                            ? BuildCurveFromSettings(saved.GpuPreset, saved.GpuDuties)
-                            : GetPresetCurve(saved.GpuPreset);
-
-                        var cpuTemps = saved.CpuTempThresholds ?? EcFanCurve.CpuTemperatures;
-                        var gpuTemps = saved.GpuTempThresholds ?? EcFanCurve.GpuTemperatures;
-
-                        // The capability call is fully asynchronous off-thread (bridge
-                        // task pool / RPC), so blocking this worker keeps the pre-RPC
-                        // synchronous flow without parking an EC sequence on the UI thread.
-                        _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                        DiagnosticLogger.LogInfo(
+                            $"[Fan] Adaptive override lifted; EC re-apply skipped - the stock preset '{Properties.Settings.Default.presetProfile}' owns the fans");
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user EC Fan settings on override-lift");
+                        try
+                        {
+                            var cpuCurve = saved.CpuPreset == "Custom" && saved.CpuDuties?.Length == 11
+                                ? BuildCurveFromSettings(saved.CpuPreset, saved.CpuDuties)
+                                : GetPresetCurve(saved.CpuPreset);
+
+                            var gpuCurve = saved.GpuPreset == "Custom" && saved.GpuDuties?.Length == 11
+                                ? BuildCurveFromSettings(saved.GpuPreset, saved.GpuDuties)
+                                : GetPresetCurve(saved.GpuPreset);
+
+                            var cpuTemps = saved.CpuTempThresholds ?? EcFanCurve.CpuTemperatures;
+                            var gpuTemps = saved.GpuTempThresholds ?? EcFanCurve.GpuTemperatures;
+
+                            // The capability call is fully asynchronous off-thread (bridge
+                            // task pool / RPC), so blocking this worker keeps the pre-RPC
+                            // synchronous flow without parking an EC sequence on the UI thread.
+                            _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user EC Fan settings on override-lift");
+                        }
                     }
                 }
             }

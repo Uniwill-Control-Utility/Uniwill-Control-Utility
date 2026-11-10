@@ -131,12 +131,9 @@
                         </Grid>
                     </ui:Card>
 
-                    <!-- Updates card: Velopack check/download against GitHub
-                         Releases, as a one-row card like the Settings rows —
-                         icon + title left, status caption under the title,
-                         action buttons right. Installed (MSI) layouts only;
-                         portable zips show a "not available" caption with the
-                         buttons collapsed (see code-behind). -->
+                    <!-- Updates card. There is no in-app updater: the button asks
+                         GitHub whether a newer release exists, and a newer one
+                         offers the release page (download the MSI and run it). -->
                     <ui:Card Margin="0,0,0,8" Padding="16">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -154,14 +151,11 @@
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <ui:TextBlock FontTypography="Body" Text="Updates" />
-                                <!-- Default caption for installed layouts; the
-                                     code-behind overwrites it for portable
-                                     layouts and update state transitions. -->
                                 <ui:TextBlock x:Name="tbDownloadMsg"
                                               Margin="0,2,0,2"
                                               FontTypography="Caption"
                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                              Text="Lets you easily stay up to date with the latest releases"
+                                              Text="Updates ship as Uniwill-Control-Utility-win.msi."
                                               TextWrapping="Wrap" />
                             </StackPanel>
 
@@ -177,8 +171,9 @@
                                                        FontSize="18"
                                                        Margin="0,0,8,0" />
 
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="Check for Updates" />
+                                        <TextBlock x:Name="btnCheckText"
+                                                   VerticalAlignment="Center"
+                                                   Text="Check for updates" />
                                     </StackPanel>
                                 </ui:Button>
 
@@ -190,14 +185,13 @@
                                            Click="btnDownload_Click">
 
                                     <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon x:Name="btnDownloadIcon"
-                                                       Symbol="ArrowDownload20"
+                                        <ui:SymbolIcon Symbol="ArrowDownload20"
                                                        FontSize="18"
                                                        Margin="0,0,8,0" />
 
                                         <TextBlock x:Name="btnDownloadText"
                                                    VerticalAlignment="Center"
-                                                   Text="Download Update" />
+                                                   Text="Download installer" />
                                     </StackPanel>
                                 </ui:Button>
                             </StackPanel>

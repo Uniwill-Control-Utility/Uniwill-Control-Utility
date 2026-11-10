@@ -271,60 +271,6 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border x:Name="AutoCheckDivider"
-                                    Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Row: Check for updates automatically -->
-                            <Grid x:Name="AutoCheckRow">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Check for updates automatically" />
-                                    <ui:TextBlock Margin="0,2,0,2"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically check GitHub for new releases on startup" />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbAutoCheck"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="cbAutoCheck_Checked"
-                                                 Unchecked="cbAutoCheck_Unchecked" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border x:Name="AutoUpdateDivider"
-                                    Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Row: Automatic updates (silent download + apply on exit) -->
-                            <Grid x:Name="AutoUpdateRow">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Automatic updates" />
-                                    <ui:TextBlock Margin="0,2,0,2"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Download updates in the background and install when the application exits" />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbAutoUpdate"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="cbAutoUpdate_Checked"
-                                                 Unchecked="cbAutoUpdate_Unchecked" />
-                            </Grid>
-
-                            <!-- Divider -->
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 

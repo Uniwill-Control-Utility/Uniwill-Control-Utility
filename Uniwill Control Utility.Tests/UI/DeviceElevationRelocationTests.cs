@@ -17,6 +17,11 @@ namespace Uniwill_Control_Utility.Tests.UI;
 /// The elevated PowerShell/RunAsync routes stay in the files as the FALLBACK for
 /// a machine whose engine is not answering; what must not come back is them
 /// being the FIRST route.
+///
+/// The GPU tuning rows (V-F curve, NVIDIA DRS preference) make the same argument
+/// from the other side: they never had an elevated route at all, so an
+/// unelevated NVAPI write was answered NVAPI_INVALID_USER_PRIVILEGE and the
+/// write silently never landed. They now ride the engine's gpu verbs.
 /// </summary>
 public sealed class DeviceElevationRelocationTests
 {
@@ -171,6 +176,81 @@ public sealed class DeviceElevationRelocationTests
             service,
             StringComparison.Ordinal);
         Assert.DoesNotContain("CM_Disable_DevNode(device.DevInst, Native.", service, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void VfCurveWrite_AsksTheEngineFirst_TheLocalNvapiWrite_IsFallbackOnly()
+    {
+        // Field defect 2026-11-10: the V-F curve silently stopped applying after
+        // phase 4 put the app on an asInvoker token. The log named it:
+        // "setControl returned 0xFFFFFF77" = NVAPI_INVALID_USER_PRIVILEGE, the
+        // driver's "run me elevated" answer. The write now asks the LocalSystem
+        // engine first; the local NVAPI call is the fallback for an engine that
+        // is not answering (and is what an elevated dev run still uses).
+        string source = Read("Scripts", "GPUs", "NVIDIA", "NvTuning.cs");
+        string body = MethodBody(source, "public static int ApplyVfCurveOffsets_ClockBoostTable");
+
+        int engine = body.IndexOf("Tuning.ApplyVfCurveAsync", StringComparison.Ordinal);
+        int local = body.IndexOf("ApplyVfCurveOffsets_ClockBoostTableLocal", StringComparison.Ordinal);
+
+        Assert.True(engine >= 0, "The curve write must ask the engine's gpu verb: an unelevated NVAPI write is refused.");
+        Assert.True(local >= 0, "The local NVAPI write stays as the fallback.");
+        Assert.True(engine < local, "The engine is the FIRST route; the local write is the fallback.");
+
+        // A refusal must be readable in the field log at the default level, and
+        // it must name the privilege answer instead of logging a bare hex code.
+        Assert.Contains("LogWarning", body, StringComparison.Ordinal);
+        Assert.Contains("NVAPI_INVALID_USER_PRIVILEGE", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DrsPreference_AsksTheEngineFirst_TheLocalNvapiWrite_IsFallbackOnly()
+    {
+        // Same privilege gate, same automatic-path argument as the PnP rows above:
+        // GpuPowerSaving.ApplyAsync fires at startup, on charger transitions, on
+        // resume, from the tray and from Automations.
+        string source = Read("Scripts", "GPUs", "NVIDIA", "GpuPowerSaving.cs");
+        string body = MethodBody(source, "private static void SetNvidiaDrsGpuPreference");
+
+        int engine = body.IndexOf("Tuning.SetDrsPreferenceAsync", StringComparison.Ordinal);
+        int local = body.IndexOf("0x8B34C9A2", StringComparison.Ordinal);
+
+        Assert.True(engine >= 0, "The DRS preference must ask the engine's gpu verb.");
+        Assert.True(local >= 0, "The local NVAPI write stays as the fallback.");
+        Assert.True(engine < local, "The engine is the FIRST route; the local write is the fallback.");
+    }
+
+    [Fact]
+    public void App_WiresTheGpuTuningCapability_BeforeAnyStartupApply()
+    {
+        string source = Read("App.xaml.cs");
+
+        Assert.Contains("services.AddSingleton<IGpuTuningCapability, GpuTuningCapability>();", source, StringComparison.Ordinal);
+        Assert.Contains("NvTuning.Tuning = gpuTuningCapability;", source, StringComparison.Ordinal);
+        Assert.Contains("GpuPowerSaving.Tuning = gpuTuningCapability;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SetClocks_AsksTheEngineFirst_TheLocalPstateWrite_IsFallbackOnly()
+    {
+        // The core/memory sliders hit the same privilege gate as the curve: the
+        // field log shows "SetClocks: EXCEPTION NVIDIAApiException:
+        // NVAPI_INVALID_USER_PRIVILEGE" on every call and never the driver's
+        // read-only declaration. The pstate write therefore rides the engine's
+        // gpu.set_clocks verb first, and the local write is the fallback.
+        string source = Read("Scripts", "GPUs", "NVIDIA", "NvTuning.cs");
+        string body = MethodBody(source, "public static int SetClocks");
+
+        int engine = body.IndexOf("Tuning.SetClocksAsync", StringComparison.Ordinal);
+        int local = body.IndexOf("GPUApi.SetPerformanceStates20", StringComparison.Ordinal);
+
+        Assert.True(engine >= 0, "SetClocks must ask the engine's gpu verb.");
+        Assert.True(local >= 0, "The local pstate write stays as the fallback.");
+        Assert.True(engine < local, "The engine is the FIRST route; the local write is the fallback.");
+
+        // A refusal has to be visible at the default log level, not only at the
+        // Information level the debug panel raises.
+        Assert.Contains("the core/memory offsets are NOT applied", body, StringComparison.Ordinal);
     }
 
     private static string MethodBody(string source, string signature)

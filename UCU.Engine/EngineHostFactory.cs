@@ -93,6 +93,12 @@ namespace UCU.Engine
                     options.OemTakeoverOverride ?? new UCU.Hardware.Takeover.OemTakeoverService(
                         Path.Combine(EnginePaths.ResolveLogDirectory(options, isService), "oem-takeover-journal.json")));
 
+                // The GPU tuning writes (V-F curve, DRS preference): NVAPI answers
+                // NVAPI_INVALID_USER_PRIVILEGE (0xFFFFFF77) to the asInvoker app's
+                // token, so the write is LocalSystem's; tests script the answer.
+                services.AddSingleton<UCU.Hardware.Gpu.IGpuTuningService>(
+                    options.GpuTuningOverride ?? new UCU.Hardware.Gpu.NvApiGpuTuning());
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
                 services.AddHostedService<AppSupervision>();

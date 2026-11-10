@@ -155,8 +155,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
-            cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
-            cbAutoUpdate.IsChecked = Settings.Default.AutoUpdateApply;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             ReflectToggleState(cbPowerBoostMode, Settings.Default.EnablePowerBoostMode, ref _powerBoost);
             ReflectToggleState(cbHideFlydigi, Settings.Default.EnableFlydigi, ref _flydigiEnabled);
@@ -482,31 +480,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.DisableToastPopups = false;
             Settings.Default.Save();
         }
-
-        private void cbAutoCheck_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.UpdateCheck = true;
-            Settings.Default.Save();
-        }
-
-        private void cbAutoCheck_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.UpdateCheck = false;
-            Settings.Default.Save();
-        }
-
-        private void cbAutoUpdate_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.AutoUpdateApply = true;
-            Settings.Default.Save();
-        }
-
-        private void cbAutoUpdate_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.AutoUpdateApply = false;
-            Settings.Default.Save();
-        }
-
 
         private void cbAdaptive_Checked(object sender, RoutedEventArgs e)
         {

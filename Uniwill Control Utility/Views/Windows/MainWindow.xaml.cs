@@ -78,11 +78,6 @@ namespace Uniwill_Control_Utility.Views.Windows
             SetupNavigationService(pageProvider);
             SetupUI();
 
-            // Title-bar update card follows the Velopack update state.
-            var updateService = App.GetService<VelopackUpdateService>();
-            if (updateService is not null)
-                updateService.StateChanged += OnUpdateStateChanged;
-
             // Title-bar OEM warning chip (U-203): lights up while the OEM
             // Control Center stack is live, i.e. while it can override this
             // app's fan and power writes. The Settings card stays the full
@@ -270,34 +265,6 @@ namespace Uniwill_Control_Utility.Views.Windows
             ModelNameText.Visibility = visibility;
             VersionCard.Visibility = visibility;
             LaptopNameCard.Visibility = visibility;
-            ApplyUpdateCardVisibility();
-        }
-
-        // The update card is gated by both the update state and the current page
-        // (hidden on Dashboard, like the version chip).
-        private bool _updateCardVisible;
-
-        private void OnUpdateStateChanged(Services.UpdateState state, int progress)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _updateCardVisible = Services.UpdatePolicy.ShouldShowTitleBarCard(state);
-                UpdateCardText.Text = state switch
-                {
-                    Services.UpdateState.Downloading => LocalizationService.Format("Downloading update: {0}%", progress),
-                    Services.UpdateState.PendingApply => LocalizationService.Get("Update downloaded"),
-                    _ => LocalizationService.Get("Update available"),
-                };
-                ApplyUpdateCardVisibility();
-            });
-        }
-
-        private void ApplyUpdateCardVisibility()
-        {
-            bool isDashboard = IsPageSelected(typeof(Views.Pages.DashboardPage));
-            UpdateCard.Visibility = _updateCardVisible && !isDashboard
-                ? Visibility.Visible
-                : Visibility.Collapsed;
         }
 
         // ---- OEM takeover warning chip (U-203) --------------------------------
@@ -419,12 +386,6 @@ namespace Uniwill_Control_Utility.Views.Windows
                 OemWarnPauseButton.IsEnabled = true;
                 await RefreshOemWarningAsync();
             }
-        }
-
-        private void UpdateRestartButton_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            // Applies the staged package and relaunches the app (terminates us).
-            App.GetService<VelopackUpdateService>()?.ApplyAndRestart();
         }
 
         private void SetupUI()
@@ -1074,15 +1035,33 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (fan is null || battery is null)
                 return;
 
-            // Auto-apply the saved fan curve on startup - unless a stock preset
-            // owns the fans. ApplyOemStockMode hands the EC back to the
-            // firmware's per-mode table and the fan page is locked, so this
-            // write must not fight it. It used to: this task and ApplyOnStart run
-            // in parallel from ApplyStartupSettingsAsync, so the curve landed
-            // whenever it happened to finish last - field, 2026-11-02, "Office
-            // applied" with the fans running the saved Full Speed curve until
-            // the preset was re-applied by hand.
-            bool fansOwnedByPreset = PresetProfileApplier.IsBuiltInProfile(Properties.Settings.Default.presetProfile);
+            // Auto-apply the saved fan curve on startup - unless the active preset
+            // owns the fans. A stock preset hands them to the firmware's per-mode
+            // table (ApplyOemStockMode) and the fan page locks, so this write must
+            // not fight it; a Custom preset that carries its own fan values applies
+            // them itself from ApplyCustomOnStart. This task used to stand down for
+            // STOCK presets only, so under a Custom preset the EC got the Fan
+            // Control page's values while the toast said "Custom N Applied"
+            // (field, 2026-11-10, PCSpecialist Recoil 3 16: the page held Full
+            // Speed, a fixed EC preset, so the fans ran Full Speed and the editor
+            // was read-only as if a stock preset were active).
+            bool fansOwnedByPreset = PresetProfileApplier.ActiveProfileOwnsFans();
+
+            string fanOwner = PresetProfileApplier.IsBuiltInProfile(Properties.Settings.Default.presetProfile)
+                ? "firmware (stock preset)"
+                : fansOwnedByPreset ? "custom preset" : "fan control page";
+            if (fansOwnedByPreset)
+            {
+                DiagnosticLogger.LogInfo($"[Fan] startup fan owner: {fanOwner} (profile '{Properties.Settings.Default.presetProfile}')");
+            }
+            else
+            {
+                // The surprising answer, so it survives the default Warning level:
+                // no preset carries fan values and the page's saved curve is what
+                // the EC is about to run.
+                DiagnosticLogger.LogWarning(
+                    $"[Fan] startup fan owner: {fanOwner} (profile '{Properties.Settings.Default.presetProfile}' carries no fan values)");
+            }
 
             // Auto-apply the saved fan curve on startup.
             try
@@ -3334,6 +3313,15 @@ namespace Uniwill_Control_Utility.Views.Windows
                 if (ec is not null)
                     Services.PowerContractStore.NoteCpuApplied((int)p.CpuSustained, (int)p.CpuBoost);
             }
+
+            // The preset's own fan block, at startup. The parallel fan-page task
+            // stands down for it (PresetProfileApplier.ActiveCustomPresetHasFanChanges),
+            // because the boot path used to skip the preset's fans entirely: the EC
+            // ran whatever the Fan Control page held while the toast said "Custom N
+            // Applied" (field, 2026-11-10, PCSpecialist Recoil 3 16). The apply also
+            // writes the values into the page's store, so the page and the next
+            // boot agree with the preset instead of drifting from it.
+            PresetProfileApplier.ApplyFanSettingsFromPreset(p);
         }
 
         #endregion

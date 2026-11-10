@@ -318,6 +318,33 @@ namespace UCU.Contracts.Capabilities
         Task<int[]> GetClockRatiosAsync(CancellationToken cancellationToken = default);
     }
 
+    /// <summary>
+    /// NVIDIA tuning writes that only an elevated token can land. The
+    /// asInvoker app's clock/voltage applies are refused with
+    /// NVAPI_INVALID_USER_PRIVILEGE (0xFFFFFF77), so the engine performs the
+    /// same NVAPI interop as LocalSystem. The answer keeps the raw NVAPI status
+    /// because a refusal is data the app must log, not a transport fault: no
+    /// call here throws on a refusal.
+    ///
+    /// Reads stay app-side. They answer unelevated, and the GPU pages must not
+    /// need the engine for their telemetry.
+    /// </summary>
+    public interface IGpuTuningCapability
+    {
+        /// <summary>Per-point V-F curve offsets (point index -> MHz). Indices
+        /// outside the usable point range are skipped, never written outside
+        /// the buffer; <see cref="GpuTuningResultDto.AppliedPoints"/> says how
+        /// many landed.</summary>
+        Task<GpuTuningResultDto> ApplyVfCurveAsync(Dictionary<int, int> offsetsMhz, CancellationToken cancellationToken = default);
+
+        Task<GpuTuningResultDto> SetDrsPreferenceAsync(DrsGpuPreference preference, CancellationToken cancellationToken = default);
+
+        /// <summary>The core/memory offset sliders (MHz). Out-of-range offsets and
+        /// a driver that declares performance states read-only are answers with
+        /// <see cref="GpuTuningResultDto.Succeeded"/> false, never a silent success.</summary>
+        Task<GpuTuningResultDto> SetClocksAsync(int coreOffsetMhz, int memoryOffsetMhz, CancellationToken cancellationToken = default);
+    }
+
     /// <summary>Engine identity and health; the app uses this for its status display
     /// and to detect a version-skewed install.</summary>
     public interface IEngineCapability

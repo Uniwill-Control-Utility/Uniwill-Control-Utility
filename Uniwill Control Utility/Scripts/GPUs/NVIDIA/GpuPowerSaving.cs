@@ -63,6 +63,16 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// </summary>
         internal static UCU.Contracts.Capabilities.IDeviceCapability? Devices { get; set; }
 
+        /// <summary>
+        /// The engine's GPU tuning capability (LocalSystem). The NVIDIA DRS
+        /// preference is a privilege-gated NVAPI write - an asInvoker caller is
+        /// answered NVAPI_INVALID_USER_PRIVILEGE and the preference never lands -
+        /// and this path is reached by AUTOMATIC applies (startup, charger
+        /// transitions, resume, Automations), so the engine answers first and the
+        /// local NVAPI write below stays as the fallback.
+        /// </summary>
+        internal static UCU.Contracts.Capabilities.IGpuTuningCapability? Tuning { get; set; }
+
         #region Windows GPU Preference Registry
 
         private const string WindowsGpuPrefKey = @"Software\Microsoft\DirectX\UserGpuPreferences";
@@ -145,6 +155,36 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         private static void SetNvidiaDrsGpuPreference(GpuPowerSavingMode mode)
         {
             if (GpuInteropGuard.IsBlocked) return;
+
+            if (Tuning != null)
+            {
+                var preference = mode switch
+                {
+                    GpuPowerSavingMode.Enable => UCU.Contracts.DrsGpuPreference.Integrated,
+                    GpuPowerSavingMode.Disable => UCU.Contracts.DrsGpuPreference.Discrete,
+                    _ => UCU.Contracts.DrsGpuPreference.Auto,
+                };
+
+                try
+                {
+                    var result = Tuning.SetDrsPreferenceAsync(preference).GetAwaiter().GetResult();
+                    if (result.Succeeded)
+                    {
+                        Log.Information("[GpuPowerSaving] NVIDIA DRS GPU preference set via engine: {Preference}", preference);
+                        return;
+                    }
+
+                    Log.Warning(
+                        "[GpuPowerSaving] Engine DRS preference refused 0x{Status:X} ({Detail}) - using the local NVAPI write",
+                        result.Status, result.Detail);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(
+                        "[GpuPowerSaving] Engine DRS preference unavailable ({Message}) - using the local NVAPI write",
+                        ex.Message);
+                }
+            }
 
             try
             {

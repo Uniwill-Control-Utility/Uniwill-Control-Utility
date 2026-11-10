@@ -393,6 +393,32 @@ namespace UCU.Client
             _client.InvokeAsync(EngineVerbs.Telemetry.WriteRegister, new RegisterWriteDto { Address = address, Value = value }, cancellationToken);
     }
 
+    /// <summary>NVIDIA tuning verb proxies (privileged writes; reads stay app-side).</summary>
+    public sealed class GpuTuningCapability : IGpuTuningCapability
+    {
+        private readonly EngineClient _client;
+
+        public GpuTuningCapability(EngineClient client) => _client = client;
+
+        public Task<GpuTuningResultDto> ApplyVfCurveAsync(Dictionary<int, int> offsetsMhz, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuTuningResultDto>(
+                EngineVerbs.Gpu.ApplyVfCurve,
+                EngineSerializer.ToParams(new VfCurveOffsetsDto { OffsetsMhz = offsetsMhz }),
+                cancellationToken);
+
+        public Task<GpuTuningResultDto> SetDrsPreferenceAsync(DrsGpuPreference preference, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuTuningResultDto>(
+                EngineVerbs.Gpu.SetDrsPreference,
+                EngineSerializer.ToParams(new DrsPreferenceDto { Preference = preference }),
+                cancellationToken);
+
+        public Task<GpuTuningResultDto> SetClocksAsync(int coreOffsetMhz, int memoryOffsetMhz, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuTuningResultDto>(
+                EngineVerbs.Gpu.SetClocks,
+                EngineSerializer.ToParams(new SetClocksDto { CoreOffsetMhz = coreOffsetMhz, MemoryOffsetMhz = memoryOffsetMhz }),
+                cancellationToken);
+    }
+
     /// <summary>Engine identity proxies.</summary>
     public sealed class EngineCapability : IEngineCapability
     {

@@ -55,6 +55,16 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             Log.Information("[{Source}.{Caller}] {Message}", source, caller, message);
         }
 
+        public static void LogWarning(
+            string message,
+            [CallerMemberName] string caller = "",
+            [CallerFilePath] string file = "")
+        {
+            var source = System.IO.Path.GetFileNameWithoutExtension(file);
+            Fire($"[{source}.{caller}] WARNING: {message}");
+            Log.Warning("[{Source}.{Caller}] {Message}", source, caller, message);
+        }
+
         public static void LogDebug(
             string message,
             [CallerMemberName] string caller = "",

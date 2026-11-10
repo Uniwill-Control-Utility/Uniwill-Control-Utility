@@ -137,11 +137,18 @@ namespace Uniwill_Control_Utility.Services
                 _cachedUtc = DateTime.UtcNow;
 
                 // Keep the liveness probe's lifetime tied to the state that needs it.
+                // One timer, reused: assigning null here (as this did) orphaned the
+                // timer it had just created, so every SCM read - one per 2 s TTL on a
+                // guarded machine - started another immortal 5 s probe loop at the pipe.
                 if (state == EngineServiceState.AccessDenied && _livenessProbe is not null)
+                {
                     EnsureProbeTimer();
-                else
-                    _probeTimer?.Dispose();
-                _probeTimer = null;
+                }
+                else if (_probeTimer is not null)
+                {
+                    _probeTimer.Dispose();
+                    _probeTimer = null;
+                }
             }
 
             if (started)

@@ -1939,8 +1939,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 });
             }
 
-            // Restart Smart Fan Mode if it was active before navigation away.
-            if (settings.EcSmartFanMode && _fan is not null)
+            // Restart Smart Fan Mode if it was active before navigation away - unless a
+            // stock preset owns the fans. It hands them to the firmware and locks this
+            // page; restarting the poller anyway wrote the page's curve over the preset
+            // (field, 2026-11-10: a stock/office boot ran the page's Full Speed curve).
+            if (settings.EcSmartFanMode && _fan is not null && !_deviceApplier.IsManualControlLocked)
             {
                 // If no provider yet, create one
                 if (_smartFanTempProvider == null)
