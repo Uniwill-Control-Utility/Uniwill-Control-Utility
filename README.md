@@ -363,11 +363,11 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 
 ## Installation
 
-### Recommended: installer (auto-updating)
+### Recommended: installer
 
 1. Head over to the [Releases](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases) page
-2. Download and run **Uniwill-Control-Utility-win.msi** (installs to Program Files; requires the .NET 10 Desktop Runtime, which the installer sets up). Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"`.
-3. Updating is the same route: download the newer release's **Uniwill-Control-Utility-win.msi** and run it over the installed copy. There is no in-app updater — the About page's **Check for updates** button queries GitHub and, when a newer release exists, offers a link to the release page where that MSI is downloaded.
+2. Download and run **Uniwill-Control-Utility-win-Setup.exe** (the installer bootstrapper: it installs the .NET 10 Desktop Runtime if the machine lacks it, then the app). Already have the runtime, or deploying from a script? **Uniwill-Control-Utility-win.msi** installs the app alone; it needs .NET 10 Desktop Runtime present. Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"`.
+3. Updating is the same route: download the newer release's installer (Setup.exe or the MSI) and run it over the installed copy. There is no in-app updater — the About page's **Check for updates** button queries GitHub and, when a newer release exists, offers a link to the release page.
 
 ### No portable build
 

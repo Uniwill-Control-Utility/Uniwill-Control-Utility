@@ -43,18 +43,11 @@ sequenceDiagram
 
 Implications:
 
-- Only the installer asset matters: `Uniwill-Control-Utility-win.msi` (and
-  `Uniwill-Control-Utility-win-Setup.exe` when vpk emits and the script keeps
-  it). The feed index and update packages are deleted by `pack.ps1` — see the
-  in-app updater note in "Current state".
-- No portable ZIP ships: the engine is a machine-wide service, so an unpacked
-  copy has no update or removal story. `vpk pack` still emits one; the script
-  deletes it (vpk 1.2.161 has no flag).
-- No deltas: with no `UpdateManager` there is no consumer for a delta package,
-  so `vpk pack` runs without `--delta` and the persistent `Releases\` seeding
-  step (`vpk download github`) is gone.
-- No in-app apply path: the About card can only report that a newer release
-  exists and link to it.
+- Two assets ship, and they are not alternatives to each other: `Uniwill-Control-Utility-win-Setup.exe` is vpk's installer **bootstrapper** (7 MB: it downloads and installs the .NET 10 Desktop Runtime the app is built against, then runs the MSI), and `Uniwill-Control-Utility-win.msi` is the per-machine install payload (46 MB, framework-dependent: it needs the .NET 10 Desktop Runtime already present). Upload both: the Setup exe is the "just works" path for a clean machine, the MSI is the route for admins, `msiexec` automation and `VELOPACK_INSTALLDIR` overrides. Shipping only the MSI turns every clean install into a missing-runtime support case.
+- The feed index and update packages (`releases.win.json`, `*.nupkg`, `RELEASES`) are deleted by `pack.ps1` — see the in-app updater note in "Current state".
+- No portable ZIP ships: the engine is a machine-wide service, so an unpacked copy has no update or removal story. `vpk pack` still emits one; the script deletes it (vpk 1.2.161 has no flag).
+- No deltas: with no `UpdateManager` there is no consumer for a delta package, so `vpk pack` runs without `--delta` and the persistent `Releases\` seeding step (`vpk download github`) is gone.
+- No in-app apply path: the About card can only report that a newer release exists and link to it.
 
 ## Build and publish commands
 
