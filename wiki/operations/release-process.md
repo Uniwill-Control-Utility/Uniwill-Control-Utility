@@ -8,7 +8,7 @@ The repository now owns its packaging end to end:
   (Velopack) to produce the per-machine MSI.
 - `vpk` is pinned in `dotnet-tools.json` (`dotnet tool restore`).
 - There is **no in-app updater**: installed builds update by downloading and running the release's `Uniwill-Control-Utility-win.msi`. The About card's `Check for updates` button only queries the GitHub latest-release API (`UpdateChecker`) and links to the release page. `VelopackUpdateService`, its two settings and `UCU.Updater.exe` were deleted on 2026-11-10; an installed build must never build Velopack's `UpdateManager` in-process.
-- vpk's update-package assets (`*-full.nupkg`, `*-delta.nupkg`, `releases.win.json`, `assets.win.json`) and its portable zip are **deleted by the script**: nothing in the product reads them any more, so they are neither shipped nor uploaded.
+- vpk's outputs are shipped selectively: the **full nupkg** and `releases.win.json` stay, because `Uniwill-Control-Utility-win-Setup.exe` is a downloader that installs from that package (deleting them leaves the bootstrapper with nothing to install). The **delta** nupkg, `assets.win.json`, the Squirrel-era `RELEASES` and the portable zip are deleted — nothing reads them, since the app has no in-app updater.
 - Version has a single source of truth: `<Version>` in `Directory.Build.props`
   (3-part `a.b.c` — Velopack rejects 4-part versions).
 - Releases are published manually: run the script, upload the printed
@@ -43,12 +43,11 @@ sequenceDiagram
 
 Implications:
 
-- Two assets ship: `Uniwill-Control-Utility-win-Setup.exe` is vpk's installer **bootstrapper** (7 MB: it downloads and installs the .NET 10 Desktop Runtime the app is built against, then runs the MSI), and `Uniwill-Control-Utility-win.msi` is the per-machine install payload (46 MB, framework-dependent). Upload both: the Setup exe is the "just works" path for a clean machine; the MSI serves admins, `msiexec` automation and `VELOPACK_INSTALLDIR` overrides. The .NET 10 Desktop Runtime is documented in the README's Prerequisites with the official download link, so the MSI alone is viable for a user who reads it - but dropping the Setup exe turns "install succeeded, app won't launch" into a support case for everyone who does not.
-- The feed index and update packages (`releases.win.json`, `*.nupkg`, `RELEASES`) are deleted by `pack.ps1` — see the in-app updater note in "Current state".
-- No portable ZIP ships: the engine is a machine-wide service, so an unpacked copy has no update or removal story. `vpk pack` still emits one; the script deletes it (vpk 1.2.161 has no flag).
-- No deltas: with no `UpdateManager` there is no consumer for a delta package, so `vpk pack` runs without `--delta` and the persistent `Releases\` seeding step (`vpk download github`) is gone.
+- Four assets ship, forming two install routes rather than alternatives: **Setup.exe** (7 MB, the user-facing installer) installs the .NET 10 Desktop Runtime when missing and then **downloads the release's full nupkg and installs from it** - so the **full nupkg + releases.win.json** are its payload and must sit in the same release; the **MSI** (46 MB) is the direct per-machine route for admins, msiexec automation and VELOPACK_INSTALLDIR, and needs the runtime already present (README Prerequisites links it).
+- The two failure shapes to avoid: MSI-only leaves the runtime prerequisite to the user (launch-failure prompt is the only safety net), and Setup-only-without-its-nupkg/feed is worse - a bootstrapper with nothing to download.
+- The feed index here is Setup's install source, not an update channel: the app has no UpdateManager.
+- No portable ZIP ships, and no deltas are built: nothing consumes a delta without an updater, so vpk pack runs without --delta, the persistent Releases\ seeding step (vpk download github) is gone, and the script deletes the delta/assets/RELEASES leftovers.
 - No in-app apply path: the About card can only report that a newer release exists and link to it.
-
 ## Build and publish commands
 
 ```powershell

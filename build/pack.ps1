@@ -8,10 +8,11 @@
     Produces the GitHub release asset for Uniwill-Control-Utility/Uniwill-Control-Utility:
       Releases\Uniwill-Control-Utility-win.msi   per-machine installer (Program Files)
 
-    vpk also emits its update-package assets (full/delta nupkg, releases.win.json,
-    a portable zip). None of them are shipped: UCU has no in-app updater - an
-    installed copy updates by running the new release's MSI - so the script
-    deletes them, the same way it deletes the portable zip.
+    vpk also emits its update-package assets. The **full** nupkg and
+    releases.win.json are kept: Setup.exe is a downloader and installs from that
+    package, so they are the installer's payload. The delta nupkg, the deploy
+    assets file and the Squirrel-era RELEASES are deleted - nothing reads them
+    (the app has no in-app updater).
 
     No portable zip is produced: the engine runs as a machine-wide service
     created on first launch, so an unpacked copy has no update or removal
@@ -164,15 +165,17 @@ if (Test-Path $vpkPortable) {
     Write-Host "Removed vpk's portable zip (not a shipped asset)" -ForegroundColor DarkGray
 }
 
-# The update-package assets exist for Velopack's UpdateManager, which the app no
-# longer has (an installed copy updates by running the new MSI). Shipping them
-# would advertise an update channel nothing reads, so they are removed here -
-# unless a future release brings a real updater back.
+# Setup.exe is a downloader, not a self-contained bundle: it fetches the
+# release's FULL nupkg (that is where the app payload lives) and installs from
+# it. The feed index (releases.<channel>.json) and the full package therefore
+# have to ship alongside it - they are the installer's payload, not an updater's.
+# Only what nothing reads any more is removed: the delta nupkg (no UpdateManager
+# consumes deltas), the deploy-tool assets file, and the Squirrel-era RELEASES.
 Get-ChildItem $releasesDir -File |
-    Where-Object { $_.Name -match '\.nupkg$' -or $_.Name -eq 'releases.win.json' -or $_.Name -eq 'assets.win.json' -or $_.Name -eq 'RELEASES' } |
+    Where-Object { $_.Name -match '-delta\.nupkg$' -or $_.Name -eq 'assets.win.json' -or $_.Name -eq 'RELEASES' } |
     ForEach-Object {
         Remove-Item $_.FullName -Force
-        Write-Host "Removed $($_.Name) (Velopack update asset - no in-app updater)" -ForegroundColor DarkGray
+        Write-Host "Removed $($_.Name) (nothing consumes it: no in-app updater, no deploy tooling)" -ForegroundColor DarkGray
     }
 
 # --- 4a. Rebind the MSI's Add/Remove Programs entry to Uninstall.exe ------
@@ -342,5 +345,5 @@ if ($setupExe) {
 # --- 5. Upload manifest ---
 Write-Host "`nUpload these assets to the GitHub release tagged v$version :" -ForegroundColor Green
 Get-ChildItem $releasesDir |
-    Where-Object { $_.Name -match "\.msi$|win-Setup\.exe$" } |
+    Where-Object { $_.Name -match "\.msi$|win-Setup\.exe$" -or $_.Name -eq "releases.win.json" -or $_.Name -match "-full\.nupkg$" } |
     ForEach-Object { Write-Host "  $($_.Name)" }
