@@ -11,7 +11,7 @@
 
        3-part SemVer2 (Velopack rejects 4-part). Bump it here, nowhere else. -->
   <PropertyGroup>
-    <Version>0.9.7</Version>
+    <Version>0.9.8</Version>
   </PropertyGroup>
 
 </Project>
