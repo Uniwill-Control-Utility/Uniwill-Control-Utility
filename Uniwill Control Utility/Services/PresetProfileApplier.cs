@@ -144,6 +144,74 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// True when the active profile owns the fans, so the Fan Control page's
+        /// saved settings must NOT be written to the EC: a stock preset hands them
+        /// to the firmware's per-mode table, a Custom preset carries its own fan
+        /// block. One rule, shared by every page-settings writer (the startup
+        /// apply and the Adaptive override lift), because each used to answer the
+        /// question for itself and two of them answered "the page owns them" -
+        /// the field symptom being fans running the page's Full Speed curve under
+        /// a preset that says otherwise (2026-11-10).
+        /// </summary>
+        public static bool ActiveProfileOwnsFans() =>
+            IsBuiltInProfile(Settings.Default.presetProfile) ||
+            ActiveCustomPresetHasFanChanges(Settings.Default.presetProfile);
+
+        /// <summary>
+        /// True when the active profile's Custom slot carries fan values of its
+        /// own, which makes that preset the startup owner of the fans.
+        ///
+        /// The startup fan apply (MainWindow.ApplyEcSettingsOnStart) writes the
+        /// Fan Control page's saved settings, and it used to skip only for the
+        /// STOCK presets. A Custom preset never reached its own fan block on the
+        /// boot path at all (ApplyCustomOnStart applied the SMU command, the V-F
+        /// curve and the EC limits, not the fans), so the EC got the page's
+        /// values while the toast said "Custom N Applied" - field, 2026-11-10,
+        /// PCSpecialist Recoil 3 16 (Intel): the page held "Full Speed", a fixed
+        /// EC preset, so the fans ran Full Speed and the editor was read-only.
+        /// It hid on other machines because PresetProfileApplier copies a
+        /// preset's fan values into the page's store on every interactive
+        /// apply, so the page usually holds the preset's own values.
+        ///
+        /// Slot resolution mirrors the boot restore exactly (keyed
+        /// "Custom N (Boost)", the legacy "Custom" key against the saved slot,
+        /// and the first-changed-slot fallback), because the gate and the apply
+        /// must agree on WHICH preset is active or both writers fire.
+        /// </summary>
+        public static bool ActiveCustomPresetHasFanChanges(string profileName)
+        {
+            (int slot, Models.PresetMode mode) = TryParseCustomSlotExtended(profileName);
+
+            if (slot < 0 && !string.Equals(profileName, "Custom", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            Models.PresetMode resolvedMode = slot >= 0
+                ? mode
+                : (Settings.Default.EnablePowerBoostMode ? Models.PresetMode.Boost : Models.PresetMode.Normal);
+
+            var presets = CustomPresetStore.Load(resolvedMode);
+            int resolvedSlot = slot >= 0
+                ? slot
+                : (resolvedMode == Models.PresetMode.Boost
+                    ? Settings.Default.customPresetSlotBoost
+                    : Settings.Default.customPresetSlot);
+
+            if (resolvedSlot < 0 || resolvedSlot >= presets.Length || !presets[resolvedSlot].HasChanges)
+            {
+                for (int i = 0; i < presets.Length; i++)
+                {
+                    if (presets[i].HasChanges)
+                    {
+                        resolvedSlot = i;
+                        break;
+                    }
+                }
+            }
+
+            return resolvedSlot >= 0 && resolvedSlot < presets.Length && presets[resolvedSlot].HasFanChanges;
+        }
+
+        /// <summary>
         /// Maps a stock preset to OpenRevo's mode-apply case selector (0=Office,
         /// 1=Balance, 2=Beast). This is NOT the value written to 0x7AB: the per-mode
         /// signal is the literal written to 0x751 plus the 0x45B flag and the 0x7AB

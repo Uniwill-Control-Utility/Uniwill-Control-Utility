@@ -44,6 +44,16 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
     internal class NvTuning
     {
+        /// <summary>
+        /// The engine's GPU tuning capability (LocalSystem). NVAPI clock and voltage
+        /// writes are privilege-gated: an asInvoker caller is answered
+        /// NVAPI_INVALID_USER_PRIVILEGE (0xFFFFFF77) and the curve never lands
+        /// (field, 2026-11-10). The write therefore asks the engine first; the
+        /// local NVAPI path below stays for a machine whose engine is not
+        /// answering, or an elevated dev run.
+        /// </summary>
+        internal static UCU.Contracts.Capabilities.IGpuTuningCapability? Tuning { get; set; }
+
         public const int MinCoreOffset = -900;
         public const int MinMemoryOffset = -900;
         public const int MaxCoreOffset = 4000;
@@ -129,6 +139,30 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             if (GpuInteropGuard.IsBlocked) return 0;
 
+            // Same privilege gate as the V-F curve: an asInvoker pstate write is
+            // answered NVAPI_INVALID_USER_PRIVILEGE (the field log's
+            // "SetClocks: EXCEPTION NVIDIAApiException"), so the engine goes first.
+            if (Tuning != null)
+            {
+                try
+                {
+                    var engine = Tuning.SetClocksAsync(core, memory).GetAwaiter().GetResult();
+                    if (engine.Succeeded)
+                    {
+                        DiagnosticLogger.LogInfo($"SetClocks: engine applied core={core}MHz memory={memory}MHz");
+                        return 1;
+                    }
+
+                    DiagnosticLogger.LogWarning(
+                        $"SetClocks: engine refused 0x{engine.Status:X} ({engine.Detail}) - trying the local NVAPI write");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogWarning(
+                        $"SetClocks: engine unavailable ({ex.Message}) - trying the local NVAPI write");
+                }
+            }
+
             try
             {
                 PhysicalGPU? internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
@@ -179,6 +213,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             {
                 // NvAPI may throw SEHException or AccessViolationException on driver errors.
                 DiagnosticLogger.LogInfo($"SetClocks: EXCEPTION {ex.GetType().Name}: {ex.Message}");
+                if (ex.Message.Contains("INVALID_USER_PRIVILEGE", StringComparison.Ordinal))
+                    DiagnosticLogger.LogWarning("SetClocks: the driver refused the write for lack of privilege - the core/memory offsets are NOT applied");
                 return -1;
             }
         }
@@ -909,6 +945,33 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             if (GpuInteropGuard.IsBlocked) return 0;
 
             DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: {offsetsMHz.Count} points");
+
+            if (Tuning != null)
+            {
+                try
+                {
+                    var engine = Tuning.ApplyVfCurveAsync(offsetsMHz).GetAwaiter().GetResult();
+                    if (engine.Succeeded)
+                    {
+                        DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: engine applied {engine.AppliedPoints} points");
+                        return engine.AppliedPoints;
+                    }
+
+                    DiagnosticLogger.LogWarning(
+                        $"ApplyVfCurveOffsets_ClockBoostTable: engine refused 0x{engine.Status:X} ({engine.Detail}) - trying the local NVAPI write");
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogWarning(
+                        $"ApplyVfCurveOffsets_ClockBoostTable: engine unavailable ({ex.Message}) - trying the local NVAPI write");
+                }
+            }
+
+            return ApplyVfCurveOffsets_ClockBoostTableLocal(offsetsMHz);
+        }
+
+        private static int ApplyVfCurveOffsets_ClockBoostTableLocal(Dictionary<int, int> offsetsMHz)
+        {
             try
             {
                 if (!NvApiPrivate.TryGetFirstGpuHandle(out IntPtr gpu)) return -1;
@@ -963,7 +1026,14 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 int status = setControl(gpu, buffer);
                 DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: setControl returned 0x{status:X}");
-                return status == 0 ? offsetsMHz.Count : -1;
+                if (status != 0)
+                {
+                    DiagnosticLogger.LogWarning(
+                        $"ApplyVfCurveOffsets_ClockBoostTable: the local write was refused 0x{status:X}{RefusalHint(status)} - the V-F curve is NOT applied");
+                    return -1;
+                }
+
+                return offsetsMHz.Count;
             }
             catch (Exception ex)
             {
@@ -971,6 +1041,16 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 return -1;
             }
         }
+
+        /// <summary>
+        /// Names the refusal a support log can act on. 0xFFFFFF77 is
+        /// NVAPI_INVALID_USER_PRIVILEGE - the driver's "run me elevated" answer,
+        /// which is why the write routes through the engine.
+        /// </summary>
+        private static string RefusalHint(int status) =>
+            status == unchecked((int)0xFFFFFF77)
+                ? " (NVAPI_INVALID_USER_PRIVILEGE: the driver needs an elevated caller)"
+                : string.Empty;
 
         /// <summary>
         /// Applies per-point frequency offsets using NvAPI_GPU_SetClockBoostLock (0x39442CFB).

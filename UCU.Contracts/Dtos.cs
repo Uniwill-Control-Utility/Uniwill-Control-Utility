@@ -576,4 +576,46 @@ namespace UCU.Contracts
         /// <summary>One human-readable line per mutation, journal order.</summary>
         public List<string> Actions { get; init; } = new();
     }
+
+    /// <summary>Per-point V-F curve offsets (point index -> frequency delta in MHz).</summary>
+    public sealed record VfCurveOffsetsDto
+    {
+        public Dictionary<int, int> OffsetsMhz { get; init; } = new();
+    }
+
+    /// <summary>Outcome of a privileged GPU tuning write: the raw NVAPI status is kept for the log.</summary>
+    public sealed record GpuTuningResultDto
+    {
+        public bool Succeeded { get; init; }
+
+        /// <summary>The untouched NVAPI status code (0 = accepted; 0xFFFFFF77 is
+        /// NVAPI_INVALID_USER_PRIVILEGE, the app-side refusal this verb exists
+        /// to route around). -1 when no NVAPI call was made at all.</summary>
+        public int Status { get; init; }
+
+        /// <summary>Curve points the buffer carried (0 for a refused write).</summary>
+        public int AppliedPoints { get; init; }
+
+        public string? Detail { get; init; }
+    }
+
+    public enum DrsGpuPreference
+    {
+        Auto = 0,
+        Integrated = 1,
+        Discrete = 2,
+    }
+
+    public sealed record DrsPreferenceDto
+    {
+        public DrsGpuPreference Preference { get; init; }
+    }
+
+    /// <summary>Core and memory clock offsets in MHz (the tuning sliders).</summary>
+    public sealed record SetClocksDto
+    {
+        public int CoreOffsetMhz { get; init; }
+
+        public int MemoryOffsetMhz { get; init; }
+    }
 }

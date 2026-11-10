@@ -88,6 +88,29 @@ namespace UCU.Contracts
             public const string GetModuleId = "mux.get_module_id";
         }
 
+        /// <summary>
+        /// Privileged NVIDIA tuning writes. NVAPI refuses the clock/voltage
+        /// writes to an unelevated token: the asInvoker app's
+        /// NvAPI_GPU_SetClockBoostTable answers NVAPI_INVALID_USER_PRIVILEGE
+        /// (0xFFFFFF77), so the V-F curve apply and the DRS GPU preference are
+        /// dead there (field log, V-F write refused). The engine performs the
+        /// same interop as LocalSystem, where the write is accepted. The reads
+        /// stay app-side: they answer unelevated and the app must not depend on
+        /// the engine for its telemetry.
+        /// </summary>
+        public static class Gpu
+        {
+            public const string ApplyVfCurve = "gpu.apply_vf_curve";
+            public const string SetDrsPreference = "gpu.set_drs_preference";
+
+            /// <summary>The core/memory offset sliders. Same privilege gate as the
+            /// curve: the wrapped NvAPI call throws NVAPI_INVALID_USER_PRIVILEGE on
+            /// an unelevated token (field logs: 12 calls today, 42 since 04 Nov,
+            /// and the driver's "performance states read-only" line never
+            /// appears - so this is the token, not the driver flag).</summary>
+            public const string SetClocks = "gpu.set_clocks";
+        }
+
         public static class Keyboard
         {
             public const string SetColor = "keyboard.set_color";

@@ -433,30 +433,6 @@ namespace Uniwill_Control_Utility.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool UpdateCheck {
-            get {
-                return ((bool)(this["UpdateCheck"]));
-            }
-            set {
-                this["UpdateCheck"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool AutoUpdateApply {
-            get {
-                return ((bool)(this["AutoUpdateApply"]));
-            }
-            set {
-                this["AutoUpdateApply"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool GuardianEnabled {
             get {

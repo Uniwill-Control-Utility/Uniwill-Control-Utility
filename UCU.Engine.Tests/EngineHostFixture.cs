@@ -17,13 +17,14 @@ public sealed class EngineHostFixture : IAsyncDisposable
 {
     private readonly IHost _host;
 
-    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport, List<string> rtssLaunches, FakeOemTakeoverService oem)
+    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport, List<string> rtssLaunches, FakeOemTakeoverService oem, FakeGpuTuningService gpu)
     {
         _host = host;
         Options = options;
         Transport = transport;
         RtssLaunches = rtssLaunches;
         FakeOem = oem;
+        FakeGpu = gpu;
         Client = new EngineClient(options.PipeName);
         Fan = new FanCapability(Client);
         Power = new PowerCapability(Client);
@@ -37,6 +38,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         IntelMsr = new IntelMsrCapability(Client);
         Rtss = new RtssCapability(Client);
         Oem = new OemCapability(Client);
+        Gpu = new GpuTuningCapability(Client);
     }
 
     public EngineRuntimeOptions Options { get; }
@@ -56,8 +58,14 @@ public sealed class EngineHostFixture : IAsyncDisposable
     public RtssCapability Rtss { get; }
     public OemCapability Oem { get; }
 
+    /// <summary>NVIDIA tuning writes (privileged: V-F curve, DRS preference).</summary>
+    public GpuTuningCapability Gpu { get; }
+
     /// <summary>The scripted OEM machine the takeover verbs run against.</summary>
     public FakeOemTakeoverService FakeOem { get; }
+
+    /// <summary>The scripted NVAPI the gpu.* verbs run against.</summary>
+    public FakeGpuTuningService FakeGpu { get; }
 
     /// <summary>Images the rtss.start verb asked the (overridden) session launcher to start.</summary>
     public IReadOnlyList<string> RtssLaunches { get; }
@@ -71,6 +79,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
 
         var rtssLaunches = new List<string>();
         var oem = new FakeOemTakeoverService();
+        var gpu = new FakeGpuTuningService();
 
         var overrides = new EngineRuntimeOptions
         {
@@ -110,6 +119,9 @@ public sealed class EngineHostFixture : IAsyncDisposable
             // disables REAL tasks, rewrites REAL HKLM run keys and kills REAL
             // processes. Tests script the machine through configure.
             OemTakeoverOverride = oem,
+            // Hermetic default: the production service writes REAL NVAPI clock
+            // and voltage tables. Tests script the answer through configure.
+            GpuTuningOverride = gpu,
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 
@@ -118,7 +130,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         IHost host = EngineHostFactory.CreateHost(Array.Empty<string>(), isService: false, overrides);
         await host.StartAsync().ConfigureAwait(false);
 
-        return new EngineHostFixture(host, overrides, overrides.TransportOverride!, rtssLaunches, oem);
+        return new EngineHostFixture(host, overrides, overrides.TransportOverride!, rtssLaunches, oem, gpu);
     }
 
     public FakeEcTransport Fake => (FakeEcTransport)Transport;

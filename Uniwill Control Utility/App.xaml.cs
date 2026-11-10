@@ -67,9 +67,8 @@ namespace Uniwill_Control_Utility
         /// Custom entry point required by Velopack: runs the Velopack bootstrap
         /// (install/update hooks, package cleanup) before any WPF object exists,
         /// then starts the application. On portable (non-installed) layouts,
-        /// VelopackApp.Run() is a no-op. Auto-apply on startup is disabled —
-        /// updates are applied on exit (title-bar card / graceful quit), never
-        /// as a surprise restart under the user.
+        /// VelopackApp.Run() is a no-op. This is the packaged entry point, not an
+        /// updater: installed builds update by running the release's Setup.exe.
         /// </summary>
         [STAThread]
         public static void Main(string[] args)
@@ -100,7 +99,6 @@ namespace Uniwill_Control_Utility
             VelopackApp.Build()
                 .SetAppUserModelId(AppUserModelId)
                 .SetAutoApplyOnStartup(false)
-                .OnRestarted(_ => RestartedByVelopack = true)
                 .Run();
 
             var app = new App();
@@ -147,9 +145,9 @@ namespace Uniwill_Control_Utility
 
         /// <summary>
         /// Command-line arguments captured in Main before the WPF app exists.
-        /// Used for --from-update (Velopack restart) and --from-guardian
-        /// (supervisor relaunch; the name is the app's historical marker for
-        /// "relaunched after a crash", and the engine's supervisor passes it).
+        /// Used for --from-guardian (supervisor relaunch; the name is the app's
+        /// historical marker for "relaunched after a crash", and the engine's
+        /// supervisor passes it).
         /// </summary>
         internal static string[] StartupArgs { get; private set; } = Array.Empty<string>();
 
@@ -159,12 +157,6 @@ namespace Uniwill_Control_Utility
         /// the tray, so the recovery never interrupts what the user is doing.
         /// </summary>
         internal static bool GuardianRestart { get; private set; }
-
-        /// <summary>
-        /// Set by the Velopack OnRestarted hook when Update.exe relaunched us
-        /// after applying an update (VELOPACK_RESTART environment variable).
-        /// </summary>
-        internal static bool RestartedByVelopack;
 
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
@@ -272,6 +264,8 @@ namespace Uniwill_Control_Utility
                     Directory.CreateDirectory(LOGS_FOLDER);
                     loggerConfiguration.WriteTo.File(LOGS_FOLDER + "ucu_log.txt",
                         fileSizeLimitBytes: 8 * 1024 * 1024, // 8MB
+                        rollOnFileSizeLimit: true,
+                        retainedFileCountLimit: 14,
                         rollingInterval: RollingInterval.Day
                     );
                 }
@@ -399,9 +393,6 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<INavigationService, NavigationService>();
                         services.AddSingleton<PresetsNavigationRequest>();
 
-                        // Velopack update engine (GitHub Releases feed; no-op on portable layouts).
-                        services.AddSingleton<VelopackUpdateService>();
-
                         // The EC CPU temperature is the fallback sensor source for the CPU
                         // metric: the CPU's own MSR sensor needs the PawnIO driver, whose
                         // device ACL admits System + Administrators, so the asInvoker app
@@ -478,6 +469,7 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IBatteryCapability, BatteryCapability>();
                         services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
                         services.AddSingleton<IDeviceCapability, DeviceCapability>();
+                        services.AddSingleton<IGpuTuningCapability, GpuTuningCapability>();
                         services.AddSingleton<IAmdSmuCapability, AmdSmuCapability>();
                         services.AddSingleton<IIntelMsrCapability, IntelMsrCapability>();
                         services.AddSingleton<IEngineCapability, EngineCapability>();
@@ -667,6 +659,18 @@ namespace Uniwill_Control_Utility
                     Scripts.Misc.MiniLedAccess.Devices = deviceCapability;
                 }
 
+                // The GPU tuning rows (V-F curve, NVIDIA DRS preference) are
+                // privilege-gated NVAPI writes: an asInvoker caller is answered
+                // NVAPI_INVALID_USER_PRIVILEGE (0xFFFFFF77) and the write never
+                // lands, so these statics ask the LocalSystem engine first. Wired
+                // here, before any startup preset apply can reach the curve.
+                var gpuTuningCapability = _host.Services.GetService<IGpuTuningCapability>();
+                if (gpuTuningCapability != null)
+                {
+                    Scripts.GPUs.NVIDIA.NvTuning.Tuning = gpuTuningCapability;
+                    Scripts.GPUs.NVIDIA.GpuPowerSaving.Tuning = gpuTuningCapability;
+                }
+
                 // The SMU rows (Curve Optimizer, preset power commands) actuate
                 // through the engine's cpu capability: PawnIO's device ACL admits
                 // System/Administrators, so the app's own driver open is
@@ -683,8 +687,6 @@ namespace Uniwill_Control_Utility
                 if (intelMsrCapability != null)
                     Scripts.Intel_Backend.IntelManagement.Msr = intelMsrCapability;
 
-                var updateService = _host.Services.GetRequiredService<VelopackUpdateService>();
-
                 var phase1TasksList = new[]
                 {
                     ("Detecting hardware", true),
@@ -692,7 +694,6 @@ namespace Uniwill_Control_Utility
                     ("Connecting devices", Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi),
                     ("Applying startup settings", true),
                     ("Loading game library", true),
-                    ("Checking for updates", Settings.Default.UpdateCheck && updateService.IsInstalled),
                 };
 
                 // Wait for any queued pre-Phase-1 animations to finish so the tracker
@@ -785,54 +786,6 @@ namespace Uniwill_Control_Utility
                 {
                     await SyncGameLibraryWithBudgetAsync();
                     _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
-                }));
-
-                // Check the GitHub Releases feed for a new Velopack package. The
-                // check is gated to 10 seconds so a slow network call never stalls
-                // the splash — if it runs long, the decision continues in the
-                // background. A found update is downloaded silently (fire-and-
-                // forget) when automatic updates are on; the title-bar card
-                // tracks progress and the package applies on graceful exit.
-                phase1Tasks.Add(Task.Run(async () =>
-                {
-                    try
-                    {
-                        var checkTask = updateService.CheckForUpdatesAsync();
-                        var winner = await Task.WhenAny(checkTask, Task.Delay(TimeSpan.FromSeconds(10)));
-
-                        if (winner == checkTask)
-                        {
-                            _ = await checkTask;
-                            if (UpdatePolicy.ShouldSilentDownload(updateService.IsInstalled,
-                                    Settings.Default.UpdateCheck, Settings.Default.AutoUpdateApply, updateService.State))
-                                SafeFireAndForget(updateService.DownloadAsync(null));
-                        }
-                        else
-                        {
-                            _ = checkTask.ContinueWith(t =>
-                            {
-                                try
-                                {
-                                    if (t.IsCompletedSuccessfully && t.Result is not null &&
-                                        UpdatePolicy.ShouldSilentDownload(updateService.IsInstalled,
-                                            Settings.Default.UpdateCheck, Settings.Default.AutoUpdateApply, updateService.State))
-                                        SafeFireAndForget(updateService.DownloadAsync(null));
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger?.LogWarning(ex, "Background update check failed");
-                                }
-                            }, TaskScheduler.Default);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "Update check failed");
-                    }
-                    finally
-                    {
-                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(5));
-                    }
                 }));
 
                 // Save install path on first boot (runs inline, near-instant).
@@ -1387,14 +1340,6 @@ namespace Uniwill_Control_Utility
         {
             try
             {
-                // Relaunched by Velopack after "Update and restart" (title-bar card).
-                if (StartupArgs.Contains("--from-update"))
-                {
-                    var newVersion = Assembly.GetEntryAssembly()?.GetName().Version;
-                    ToastNotification.ShowToastNotification("Update installed",
-                        LocalizationService.Format("Updated to version {0}", newVersion), category: ToastCategory.Settings);
-                }
-
                 var isInternetAvailable = await Task.Run(IsInternetAvailable);
 
                 if (isInternetAvailable && PawnIoDetectionService.ShouldOpenInstaller())
@@ -2052,16 +1997,6 @@ namespace Uniwill_Control_Utility
             try
             {
                 App._host?.Services.GetService<BetterRgbStreamService>()?.StopEngine("shutdown");
-            }
-            catch { /* best-effort during teardown */ }
-
-            // Apply a downloaded update on graceful exit. ApplyUpdatesAndExit
-            // terminates the process, so this must run after all synchronous
-            // hardware teardown above (SMU / Flydigi / BetterRGB) — it skips
-            // the async host stop below, which is best-effort by design.
-            try
-            {
-                App._host?.Services.GetService<VelopackUpdateService>()?.TryApplyOnExit();
             }
             catch { /* best-effort during teardown */ }
 

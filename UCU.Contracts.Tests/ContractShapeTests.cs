@@ -153,7 +153,7 @@ public sealed class ContractShapeTests
         {
             string[] parts = verb.Split('.');
             Assert.Equal(2, parts.Length);
-            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "cpu", "telemetry", "engine", "rtss", "oem" });
+            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "cpu", "telemetry", "engine", "rtss", "oem", "gpu" });
             Assert.Equal(verb, verb.ToLowerInvariant());
             Assert.Matches("^[a-z_]+$", parts[1]);
         }
@@ -175,6 +175,7 @@ public sealed class ContractShapeTests
             + typeof(IDeviceCapability).GetMethods().Length
             + typeof(IAmdSmuCapability).GetMethods().Length
             + typeof(IIntelMsrCapability).GetMethods().Length
+            + typeof(IGpuTuningCapability).GetMethods().Length
             + typeof(IEcTelemetryCapability).GetMethods().Length
             + typeof(IEngineCapability).GetMethods().Length
             + typeof(IRtssCapability).GetMethods().Length
@@ -219,6 +220,7 @@ public sealed class ContractShapeTests
             typeof(IKeyboardCapability), typeof(IBatteryCapability), typeof(IDeviceCapability),
             typeof(IAmdSmuCapability), typeof(IIntelMsrCapability),
             typeof(IEcTelemetryCapability), typeof(IEngineCapability),
+            typeof(IGpuTuningCapability),
             typeof(IOemCapability),
         };
 
@@ -267,6 +269,7 @@ public sealed class ContractShapeTests
             new RegisterValueDto(), new RegisterBytesDto(),
             new EngineInfoDto(),
             new OemStatusDto(), new OemActionDto(),
+            new GpuTuningResultDto(),
         };
 
         foreach (object result in results)

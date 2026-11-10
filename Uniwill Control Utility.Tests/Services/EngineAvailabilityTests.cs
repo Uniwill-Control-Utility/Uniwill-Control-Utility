@@ -181,6 +181,33 @@ public sealed class EngineAvailabilityTests
         Assert.Equal(1, started);
     }
 
+    [Fact]
+    public void AccessDenied_RepeatedReads_KeepOneProbeLoop()
+    {
+        // A guarded machine reads the SCM on every gate call (2 s TTL), and each
+        // read used to allocate a fresh 5 s probe timer while orphaning the last
+        // one - timers accumulated and every one of them kept pinging the pipe.
+        // One probe loop per EngineAvailability is the contract.
+        int probes = 0;
+        var availability = new EngineAvailability(
+            () => EngineServiceState.AccessDenied,
+            async () =>
+            {
+                Interlocked.Increment(ref probes);
+                await Task.Delay(1);
+                return true;
+            },
+            ttl: TimeSpan.Zero);
+
+        for (int i = 0; i < 20; i++)
+            _ = availability.IsRunning;
+
+        // The immediate first tick of ONE timer lands in this window; twenty
+        // orphaned timers would land twenty.
+        Thread.Sleep(300);
+        Assert.InRange(probes, 1, 3);
+    }
+
     private static bool WaitFor(Func<bool> condition, TimeSpan timeout)
     {
         DateTime deadline = DateTime.UtcNow + timeout;
