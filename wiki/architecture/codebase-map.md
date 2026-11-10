@@ -61,7 +61,7 @@
 | `EngineDomainQueues.cs`, `SerialExecutor.cs` | Per-domain FIFO executors, depth/timeout limits. |
 | `EcEngineGate.cs` | EC engine init/availability, `\\.\ACPIDriver` handle lifetime. |
 | `EcRawWriteGuard.cs` | Raw-verb chokepoint: address/GUID allowlist over the raw register + NVRAM write verbs (`EcWriteGatePolicy`). |
-| `Verbs/*.cs` | The verb handlers per domain (fan, power, mux, keyboard, battery, telemetry, engine). |
+| `Verbs/*.cs` | The verb handlers per domain (fan, power, mux, keyboard, battery, gpu, telemetry, engine). |
 | `EngineWatchdog.cs` | Fail-fast on wedged queues. |
 | `AppSupervision.cs`, `AppSessionLauncher.cs` | Crash relaunch of the app into the user session. |
 | `EngineInstaller.cs` | `sc` install/uninstall/self-heal passes, service DACL. |
@@ -78,7 +78,7 @@
 | Smart control | `EcSmartFanControl`, `FlydigiSmartControl`, `FlydigiBs1SmartControl` | Temperature-driven periodic control. |
 | Profiles | `PresetArbiter`, `PresetProfileApplier`, `AdaptivePresetManager`, `PresetBackupService`, `DeviceApplier`, `PowerContractStore`, `PowerGuardianService` | Intent arbitration (serialization, boot grace, Adaptive ownership, debounce), profile storage, translation, application, override, import/export, and the persisted applied-power contract with its opt-in drift-healing guardian. |
 | Overlay/performance | `OverlayManagerService`, `OverlaySettingsStore`, `Performance/*` | Overlay lifecycle, telemetry and FPS sources. |
-| App support | `LocalizationService`, `VelopackUpdateService`, `PawnIoDetectionService`, `ScheduledTaskService`, `LastAppliedSettingsService`, `Scripts/Misc/ElevatedProcess` | Translation, updates, prerequisites, autostart task, last-applied state, per-operation elevation. |
+| App support | `LocalizationService`, `PawnIoDetectionService`, `ScheduledTaskService`, `LastAppliedSettingsService`, `Scripts/Misc/ElevatedProcess` | Translation, prerequisites, autostart task, last-applied state, per-operation elevation. |
 
 ## Backend scripts (app-side)
 

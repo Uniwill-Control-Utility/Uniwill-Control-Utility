@@ -42,7 +42,7 @@ The app project (25 packages) keeps the product surface:
 | GPU/performance | `LLT.NvAPIWrapper.Net`, `Microsoft.Diagnostics.Tracing.TraceEvent` | NVIDIA wrapper and ETW FPS fallback. |
 | Device/data | `hidlibrary`, `Newtonsoft.Json`, `Accord.Math` | HID devices, JSON models, numeric utilities. |
 | Discovery/content | `GameLib.NET`, `craftersmine.SteamGridDB.Net`, `FuzzyStrings.NetStandard` | Game discovery, artwork, name matching. |
-| Notifications/update | `Microsoft.Toolkit.Uwp.Notifications`, `Octokit`, `Velopack` | Toasts, GitHub release API, per-machine MSI auto-update. |
+| Notifications/update | `Microsoft.Toolkit.Uwp.Notifications`, `Velopack` | Toasts; Velopack is packaging/bootstrap only (`VelopackApp` + the `--velopackuninstall` hook, and the MSI it generates) - there is no in-app updater. |
 
 `TaskScheduler` 2.12.2 spells the limited run level `TaskRunLevel.LUA` (not `Limited`). `System.Management` rides an `11.0.0-preview` line while the app targets .NET 10; release validation should record the resolved package graph.
 
@@ -67,7 +67,7 @@ to the project directory yields `projectDir\C:\path`, which MSBuild fails with
 MSB3191 - that broke the MSI route (no engine payload in the publish dir) while
 the F5 layout, where `OutDir` is relative, hid it. The engine
 `ProjectReference` carries `ReferenceOutputAssembly="false"` (build order only).
-- **Shims compiled at pack time** by `build\pack.ps1` with the .NET Framework `csc` (GAC only, C# 5 syntax): `Uninstall.exe` (uninstall chain, `requireAdministrator`) and `UCU.Updater.exe` (elevated update apply, same manifest).
+- **Shims compiled at pack time** by `build\pack.ps1` with the .NET Framework `csc` (GAC only, C# 5 syntax): `Uninstall.exe` (uninstall chain, `requireAdministrator`). The `UCU.Updater.exe` shim was retired with the in-app updater (2026-11-10).
 - **Verified payload:** pack step 2c fails the build when the engine payload (`Service\Uniwill Control Utility Engine.exe/.dll/.deps/.runtimeconfig`, `UCU.Core/Contracts/Hardware.dll`, hosting, Serilog hosting sink) is missing from the publish dir. Step 2c' then fails it when the staged engine is stale: `FileVersion` not matching the release version, or a build older than the app exe beside it - a `Service\` binary from an earlier build ships an engine that speaks an older verb set, which the client answers with `Unsupported`. Step 2a publishes into a cleaned layout and step 2c'' fails the pack when a *retired* service/bridge assembly name is present: the publish dir is reused, `dotnet publish` never deletes a deleted project's files, and the templates ship every file in the dir - which is how the pre-engine service survived the migration in the payload.
 
 ## Tracked binary payload

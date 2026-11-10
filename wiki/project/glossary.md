@@ -29,7 +29,7 @@
 | TCC / TjMax | Processor thermal-control parameters. |
 | UCU | Uniwill Control Utility. |
 | UXTU | Universal x86 Tuning Utility, the historical foundation of this repository. |
-| V-F curve | NVIDIA voltage-frequency curve; UCU stores point-index-to-offset mappings and applies them through a private NVAPI path. |
+| V-F curve | NVIDIA voltage-frequency curve; UCU stores point-index-to-offset mappings and applies them through a private NVAPI path, which is a privilege-gated write and therefore rides the engine's `gpu.apply_vf_curve` verb. |
 | WMI | Windows Management Instrumentation, used for system discovery and selected OEM controls. |
 
 [Back to documentation index](../README.md)

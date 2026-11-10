@@ -65,22 +65,22 @@ have been said by accident; proceed only on an explicit yes.
 - `dotnet tool restore`
 - `powershell -NoProfile -File build/pack.ps1` (machine policy — never
   `-ExecutionPolicy Bypass`, it is denied).
-- The script publishes, stages native payload, runs `dotnet vpk pack`
-  (per-machine MSI + full/delta nupkgs + releases.win.json) and zips the
-  portable artifact into `Releases\`.
+- The script publishes, stages native payload and runs `dotnet vpk pack`
+  (per-machine MSI). vpk's update-package assets (nupkgs, `releases.win.json`)
+  and the portable zip are **deleted by the script**: the product has no
+  in-app updater, so nothing reads or ships them.
 - Report the printed upload manifest to the user.
 - The script asserts the staged engine payload is fresh (step 2c': the engine
   dll/exe in `artifacts\publish\Service\` must not be older than the app exe,
   and its file version must equal the release version). If it throws, the
   staging target skipped its copy: fix that, never ship the payload.
 - After packing, hand the user wiki/operations/release-process.md section 5
-  (Release validation): the MSI pass, the portable pass and the in-app update
-  flow are the release-scenario gate, and the debug F5 layout covers none of
-  them.
+  (Release validation): the MSI pass and the About card's update check are the
+  release-scenario gate, and the debug F5 layout covers neither.
 
 ## 4. Hand off
 
 Never push and never create the GitHub release yourself. Tell the user: tag
-`v<version>`, upload the manifest assets, paste the changelog. Expect the
-first pack on a fresh Releases\ to have no delta (built once a previous full
-nupkg is on GitHub).
+`v<version>`, upload the printed manifest asset(s) (the MSI, plus `Setup` when
+emitted), paste the changelog. There are no deltas any more - the script runs
+`vpk pack` without `--delta` and keeps no delta base.

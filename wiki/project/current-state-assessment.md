@@ -17,7 +17,7 @@ This verdict is narrower than “the application does not work.” The code cont
 | Product implementation | About 60,800 C# + 14,500 XAML lines in the app projects plus 5,700 in the engine-era libraries; complete pages/services for profiles, Adaptive Mode, EC, HID, BLE, monitoring, overlay, OEM takeover, shortcut map, diagnostics and display extras | Broad implementation exists. |
 | Runtime architecture | Generic Host, DI, structured logs, single-instance handling, device reconnect, resume reapplication, cleanup paths | Operational concerns are explicitly handled. |
 | Build definition | One valid SDK-style WPF project targeting .NET 10/Windows 22621; native/content payload declared | Build intent is clear. |
-| Build proof | Clean Release build at the known-warning baseline (130 warnings, 0 errors) with the .NET 10 SDK; `build\pack.ps1` produces the MSI, nupkgs and portable zip | Build is reproducible locally and gated per change. |
+| Build proof | Clean Release build at the known-warning baseline with the .NET 10 SDK; `build\pack.ps1` produces the per-machine MSI (vpk's update-package assets and portable zip are deleted by design) | Build is reproducible locally and gated per change. |
 | Automated tests | Five xUnit projects (Contracts, Core, Engine, Hardware, app) with 1,020 tests green at this revision; every commit gate requires all five suites | Regressions in the tested surface are machine-gated. |
 | Hardware qualification | Detector/SKU/protocol lists exist; no versioned execution matrix or captured results | Enumeration is not proof of operation. |
 | Release engineering | Self-contained publish properties exist; no installer source, release workflow, tags, or checksums | Release cannot be reproduced from the repository alone. |

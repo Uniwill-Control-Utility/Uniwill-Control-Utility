@@ -366,8 +366,8 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 ### Recommended: installer (auto-updating)
 
 1. Head over to the [Releases](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases) page
-2. Download and run **Uniwill-Control-Utility-win.msi** (installs to Program Files; requires the .NET 10 Desktop Runtime, which the installer sets up). Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"` — auto-update follows the app wherever it lives.
-3. UCU checks for updates on startup, downloads them silently, and installs them when you close the app — an accent card appears in the title bar when an update is ready. You can also use **Check for Updates** in Settings.
+2. Download and run **Uniwill-Control-Utility-win.msi** (installs to Program Files; requires the .NET 10 Desktop Runtime, which the installer sets up). Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"`.
+3. Updating is the same route: download the newer release's **Uniwill-Control-Utility-win.msi** and run it over the installed copy. There is no in-app updater — the About page's **Check for updates** button queries GitHub and, when a newer release exists, offers a link to the release page where that MSI is downloaded.
 
 ### No portable build
 
@@ -375,7 +375,7 @@ There is no zip download. The engine runs as a machine-wide Windows service (`UC
 
 ### Upgrading
 
-Install the newer **Uniwill-Control-Utility-win.msi** over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`). The in-app updater performs the same install from the downloaded package when you close the app.
+Install the newer **Uniwill-Control-Utility-win.msi** over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`).
 
 Two cases still need a manual uninstall first:
 
@@ -409,7 +409,7 @@ dotnet tool restore
 .\build\pack.ps1
 ```
 
-The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the GitHub release assets: the per-machine MSI, Velopack full and delta packages, the `Setup` bootstrapper, and the `releases.win.json` feed index. There is no portable zip - the engine is a machine-wide service, so an unpacked copy has no update or removal story. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
+The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the release asset: the per-machine **Uniwill-Control-Utility-win.msi** (plus the `Setup` bootstrapper when vpk emits it). vpk's update packages and feed index are deleted by the script — the product has no in-app updater, and installed copies update by running that MSI. There is no portable zip either - the engine is a machine-wide service, so an unpacked copy has no update or removal story. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
 
 ## Optional
 For those who want to use color correction profiles, you need to:

@@ -60,10 +60,22 @@ Profiles are converted to a space-separated internal command language. `RyzenAdj
 For NVIDIA custom profiles with curve offsets:
 
 1. GPU power/EC ceiling is set.
-2. Curve offsets are applied through the private clock-boost-table path.
+2. Curve offsets are applied through the private clock-boost-table path — as the engine's `gpu.apply_vf_curve` verb, because the NVAPI write is privilege-gated (see [Hardware integration](hardware-integration.md)). The app's local NVAPI write is the fallback.
 3. GPU power is set again in case the driver altered the EC ceiling.
 
 The ordinary NVIDIA power command is omitted from the translated command when a V-F curve is active, preventing two competing application paths.
+
+### Fan ownership at startup
+
+One writer owns the fans, and the active profile decides which:
+
+| Active profile | Fan owner | Writer |
+| --- | --- | --- |
+| Office / Gaming / Turbo | firmware per-mode table | `ApplyOemStockMode`, nobody else |
+| Custom slot **with** fan values (`HasFanChanges`) | the preset | `ApplyCustomOnStart` → `PresetProfileApplier.ApplyFanSettingsFromPreset` |
+| Custom slot **without** fan values | the Fan Control page | `ApplyEcSettingsOnStart` (the page's saved settings) |
+
+`PresetProfileApplier.ActiveProfileOwnsFans()` is the single rule; the startup fan apply, the Adaptive override lift (`DeviceApplier.DisableEcFanOverride`) and the Fan Control page's Smart Fan restart on load all stand down behind it. The boot custom path applies the preset's fan block itself and syncs it into `fancontrol_settings.json`, so the page — and the next boot — show the preset's values rather than drifting from them. History and the discriminating log lines: runbook, "A preset applied at startup, but the fans ran the Fan Control page's values".
 
 ## Preset arbiter
 
