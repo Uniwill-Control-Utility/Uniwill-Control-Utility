@@ -278,7 +278,6 @@
   "Hardware MCU": "Hardware MCU",
   "Hardware monitoring is not available.": "Hardware monitoring is not available.",
   "Hardware sensor monitoring library": "Hardware sensor monitoring library",
-  "Head to the settings menu to easily download the new Uniwill Control Utility update!": "Head to the settings menu to easily download the new Uniwill Control Utility update!",
   "Healthy": "Healthy",
   "entered": "entered",
   "entered or exited": "entered or exited",
@@ -344,7 +343,6 @@
   "MUX": "MUX",
   "MVVM helpers, observables, and source generators": "MVVM helpers, observables, and source generators",
   "N/A": "N/A",
-  "New Update Available!": "New Update Available!",
   "Newtonsoft.Json": "Newtonsoft.Json",
   "No change": "No change",
   "None": "None",
@@ -539,5 +537,12 @@
   "Memory Integrity is blocking the driver": "Memory Integrity is blocking the driver",
   "Windows Memory Integrity (Core Isolation) is blocking the PawnIO driver, so it cannot start and the hardware controls it powers are unavailable.\n\nMemory Integrity does NOT need to be turned off for UCU: the latest PawnIO release is signed to load with Memory Integrity enabled, and this installer always downloads the latest official release. Run the installer again to update the driver, then restart UCU.\n\nIf Windows keeps blocking the driver, this machine's Code Integrity policy blocks it, and the PawnIO-backed controls stay unavailable.\n\nInstaller exit code: {0}": "Windows Memory Integrity (Core Isolation) is blocking the PawnIO driver, so it cannot start and the hardware controls it powers are unavailable.\n\nMemory Integrity does NOT need to be turned off for UCU: the latest PawnIO release is signed to load with Memory Integrity enabled, and this installer always downloads the latest official release. Run the installer again to update the driver, then restart UCU.\n\nIf Windows keeps blocking the driver, this machine's Code Integrity policy blocks it, and the PawnIO-backed controls stay unavailable.\n\nInstaller exit code: {0}",
   "Open Windows Security": "Open Windows Security",
-  "… and {0} more": "… and {0} more"
+  "… and {0} more": "… and {0} more",
+  "Updates ship as Uniwill-Control-Utility-win.msi.": "Updates ship as Uniwill-Control-Utility-win.msi.",
+  "Check for updates": "Check for updates",
+  "Checking for updates...": "Checking for updates...",
+  "You're on the latest release (v{0}).": "You're on the latest release (v{0}).",
+  "v{0} is available. Download and run the installer.": "v{0} is available. Download and run the installer.",
+  "Download installer": "Download installer",
+  "Could not check for updates.": "Could not check for updates."
 }
