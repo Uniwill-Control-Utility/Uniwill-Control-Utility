@@ -860,7 +860,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 selectProfile("Custom", apply: false);
             }
 
-        private void selectProfile(string profile, bool apply = false)
+        private async void selectProfile(string profile, bool apply = false)
         {
             string oldProfile = _currentProfile;
 
@@ -1043,13 +1043,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                             // Fallback: restore saved Custom fan settings and apply to EC
                             FanControlSettingsService.Save(_savedCustomFanSettings);
                             DebugLog($"selectProfile: Restored and applying saved Custom fan settings");
-                            ApplyCustomFanCurveFromSettings(_savedCustomFanSettings);
+                            await ApplyCustomFanCurveFromSettingsAsync(_savedCustomFanSettings).ConfigureAwait(true);
                         }
                         else
                         {
                             // No saved Custom fan settings — apply default Balanced curve
                             DebugLog($"selectProfile: No saved Custom fan settings, applying default Balanced");
-                            ApplyFanCurveFromPreset("Balanced");
+                            await ApplyFanCurveFromPresetAsync("Balanced").ConfigureAwait(true);
                         }
                     }
                     else if (profile != "Custom")
@@ -1932,7 +1932,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// Applies a Custom fan curve from saved FanControlSettings to the EC.
         /// Used when switching to the Custom power profile.
         /// </summary>
-        private void ApplyCustomFanCurveFromSettings(FanControlSettings settings)
+        private async Task ApplyCustomFanCurveFromSettingsAsync(FanControlSettings settings)
         {
             if (_deviceApplier is null) return;
 
@@ -1948,7 +1948,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     presetName = "Custom";
                 }
 
-                _deviceApplier.ApplyEcFanFromPreset(
+                await _deviceApplier.ApplyEcFanFromPresetAsync(
                     unifiedMode: true,
                     presetName: presetName,
                     customDuties: customDuties,
@@ -1970,7 +1970,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     gpuDuties = settings.GpuDuties;
 
                 // For split mode, use the CPU preset name as the base
-                _deviceApplier.ApplyEcFanFromPreset(
+                await _deviceApplier.ApplyEcFanFromPresetAsync(
                     unifiedMode: false,
                     presetName: settings.CpuPreset,
                     customDuties: null,
@@ -1987,7 +1987,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// Applies a fan curve preset to the EC from a power profile switch.
         /// Maps profile names to fan presets: Office→Silent, Gaming→Balanced, Turbo→Performance.
         /// </summary>
-        private void ApplyFanCurveFromPreset(string fanPresetName)
+        private async Task ApplyFanCurveFromPresetAsync(string fanPresetName)
         {
             if (_deviceApplier is null) return;
 
@@ -2000,7 +2000,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             FanControlSettingsService.Save(settings);
 
             // Apply to EC immediately via DeviceApplier
-            _deviceApplier.ApplyEcFanFromPreset(
+            await _deviceApplier.ApplyEcFanFromPresetAsync(
                 unifiedMode: true,
                 presetName: fanPresetName,
                 customDuties: null,

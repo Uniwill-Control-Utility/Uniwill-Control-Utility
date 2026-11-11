@@ -1221,7 +1221,7 @@ namespace Uniwill_Control_Utility
             // translation varies. Running them concurrently hides all latency.
             await Task.WhenAll(
                 Views.Windows.MainWindow.ApplyOnStart(),
-                Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStart),
+                Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStartAsync),
                 Views.Windows.MainWindow.AsyncApplyKeyboardOnStart());
         }
 
@@ -1335,7 +1335,7 @@ namespace Uniwill_Control_Utility
 
             try
             {
-                await Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStart);
+                await Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStartAsync);
             }
             catch (Exception ex)
             {

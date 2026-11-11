@@ -1011,7 +1011,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// marked pending when the engine service is not running, then applied once
         /// when it reaches Running.
         /// </summary>
-        internal static void ApplyEcSettingsOnStart()
+        internal static async Task ApplyEcSettingsOnStartAsync()
         {
             // Availability gate. Every EC call below is a pipe connect, and a connect
             // to the missing pipe of a stopped engine costs the full 5 s connect
@@ -1114,12 +1114,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"WARN | MainWindow: Smart Fan Mode auto-start failed: {ex.Message}");
-                        fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                        await fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).ConfigureAwait(false);
                     }
                 }
                 else if (!fansOwnedByPreset)
                 {
-                    fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                    await fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).ConfigureAwait(false);
                     System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-applied on startup");
                 }
                 else
@@ -1137,10 +1137,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             try
             {
                 int savedMode = Properties.Settings.Default.BatteryMode;
-                int currentMode = battery.GetModeAsync().GetAwaiter().GetResult();
+                int currentMode = await battery.GetModeAsync();
                 if (savedMode != currentMode)
                 {
-                    battery.SetModeAsync(savedMode).GetAwaiter().GetResult();
+                    await battery.SetModeAsync(savedMode).ConfigureAwait(false);
                     System.Diagnostics.Debug.WriteLine($"INFO | MainWindow: Restored battery charge limit to mode {savedMode} (was {currentMode})");
                 }
             }
@@ -1541,13 +1541,13 @@ namespace Uniwill_Control_Utility.Views.Windows
                             {
                                 var battery = App.GetService<IBatteryCapability>();
                                 var engine = App.GetService<IEngineCapability>();
-                                if (battery != null && engine != null && engine.IsHardwareAvailableAsync().GetAwaiter().GetResult())
+                                if (battery != null && engine != null && await engine.IsHardwareAvailableAsync())
                                 {
                                     int savedMode = Settings.Default.BatteryMode;
-                                    int currentMode = battery.GetModeAsync().GetAwaiter().GetResult();
+                                    int currentMode = await battery.GetModeAsync();
                                     if (savedMode != currentMode)
                                     {
-                                        battery.SetModeAsync(savedMode).GetAwaiter().GetResult();
+                                        await battery.SetModeAsync(savedMode).ConfigureAwait(false);
                                         Debug.WriteLine($"[Resume] Battery mode reverted from {currentMode} to saved {savedMode}");
                                     }
                                 }
@@ -1642,7 +1642,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     }
                                     else
                                     {
-                                        fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                                        await fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).ConfigureAwait(false);
                                         Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
                                     }
                                 }
@@ -1689,7 +1689,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                         {
                                             Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
                                             flydigiService.DisconnectAsync();
-                                            Task.Delay(500).Wait();
+                                            await Task.Delay(500);
                                         }
 
                                         flydigiService.ResumeBackgroundServices();
@@ -2756,7 +2756,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         #region Fan Control Tray Handlers
 
-        private void TrayFanUnified_Click(object? sender, RoutedEventArgs e)
+        private async void TrayFanUnified_Click(object? sender, RoutedEventArgs e)
         {
             if (sender is not MenuItem item)
                 return;
@@ -2773,13 +2773,13 @@ namespace Uniwill_Control_Utility.Views.Windows
                 var curve = GetFanPresetCurve(settings.UnifiedPreset);
                 if (enabled)
                 {
-                    fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures).GetAwaiter().GetResult();
+                    await fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures).ConfigureAwait(false);
                 }
                 else
                 {
                     var cpuCurve = GetFanPresetCurve(settings.CpuPreset);
                     var gpuCurve = GetFanPresetCurve(settings.GpuPreset);
-                    fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
+                    await fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).ConfigureAwait(false);
                 }
             }
 
@@ -2787,7 +2787,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             UpdateTrayFanProfileVisibility();
         }
 
-        private void TrayFanProfile_Click(object? sender, RoutedEventArgs e)
+        private async void TrayFanProfile_Click(object? sender, RoutedEventArgs e)
         {
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
@@ -2818,16 +2818,16 @@ namespace Uniwill_Control_Utility.Views.Windows
                     : GetFanPresetCurve(presetName);
                 if (settings.UnifiedMode)
                 {
-                    fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures).GetAwaiter().GetResult();
+                    await fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures).ConfigureAwait(false);
                 }
                 else
                 {
-                    fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
+                    await fan.ApplyCurveAsync(curve.ToCurveDto(), curve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).ConfigureAwait(false);
                 }
             }
         }
 
-        private void TrayFanCpuProfile_Click(object? sender, RoutedEventArgs e)
+        private async void TrayFanCpuProfile_Click(object? sender, RoutedEventArgs e)
         {
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
@@ -2854,11 +2854,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Models.EcFanCurve gpuCurve = settings.GpuPreset == "Custom"
                     ? GetFanCustomCurve(settings.GpuDuties)
                     : GetFanPresetCurve(settings.GpuPreset);
-                fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
+                await fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).ConfigureAwait(false);
             }
         }
 
-        private void TrayFanGpuProfile_Click(object? sender, RoutedEventArgs e)
+        private async void TrayFanGpuProfile_Click(object? sender, RoutedEventArgs e)
         {
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
@@ -2885,7 +2885,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Models.EcFanCurve gpuCurve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.GpuDuties)
                     : GetFanPresetCurve(presetName);
-                fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).GetAwaiter().GetResult();
+                await fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures).ConfigureAwait(false);
             }
         }
 
@@ -2923,7 +2923,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static bool IsFanCustomizationAllowed() =>
             !PresetProfileApplier.IsBuiltInProfile(Settings.Default.presetProfile);
 
-        private void TrayFanSmartMode_Click(object? sender, RoutedEventArgs e)
+        private async void TrayFanSmartMode_Click(object? sender, RoutedEventArgs e)
         {
             if (sender is not MenuItem item)
                 return;
@@ -2969,7 +2969,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     ? cpuTemps
                     : (settings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
 
-                fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                await fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).ConfigureAwait(false);
             }
         }
 
@@ -3306,7 +3306,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
                 var ec = Scripts.RyzenAdj_To_UCU.EcService;
-                ec?.ApplyCpuPowerLimitsAsync((int)p.CpuSustained, (int)p.CpuBoost).GetAwaiter().GetResult();
+                if (ec is not null) await ec.ApplyCpuPowerLimitsAsync((int)p.CpuSustained, (int)p.CpuBoost);
 
                 // The contract note (U-107): boot/tray custom-slot applies
                 // establish the guardian's contract too.

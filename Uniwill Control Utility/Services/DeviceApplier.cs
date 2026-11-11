@@ -416,7 +416,7 @@ namespace Uniwill_Control_Utility.Services
         /// Applies an EC Fan curve from Adaptive Mode.
         /// Fires EcFanPresetApplied so the Fan Control page can sync its UI.
         /// </summary>
-        public void ApplyEcFanFromPreset(
+        public async Task ApplyEcFanFromPresetAsync(
             bool unifiedMode,
             string presetName,
             int[]? customDuties,
@@ -456,7 +456,7 @@ namespace Uniwill_Control_Utility.Services
                         : GetPresetCurve(presetName);
                 }
 
-                _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), finalCpuTemps, finalGpuTemps).GetAwaiter().GetResult();
+                await _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), finalCpuTemps, finalGpuTemps).ConfigureAwait(false);
 
                 var args = new EcFanPresetAppliedEventArgs(
                     unifiedMode, presetName, customDuties, cpuPresetDuties, gpuPresetDuties, cpuTemps, gpuTemps);

@@ -1506,7 +1506,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     await ApplyWatercoolerIfNeeded();
                     await ApplyBs2ProIfNeeded();
-                    ApplyEcFanIfNeeded();
+                    await ApplyEcFanIfNeededAsync().ConfigureAwait(true);
                     ApplyKeyboardIfNeeded();
                     ApplyCpuIfNeeded();
                     ApplyGpuIfNeeded();
@@ -1711,7 +1711,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             };
         }
 
-        private void ApplyEcFanIfNeeded()
+        private async Task ApplyEcFanIfNeededAsync()
         {
             if (!(cbxEcFanEnabled.IsChecked ?? false) || _deviceApplier == null)
                 return;
@@ -1733,7 +1733,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var cpuCurve = GetEcFanPresetCurve(unifiedPreset);
                 var cpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.CpuTemperatures;
 
-                _deviceApplier.ApplyEcFanFromPreset(true, unifiedPreset,
+                await _deviceApplier.ApplyEcFanFromPresetAsync(true, unifiedPreset,
                     cpuCurve.Duties.ToArray(), null, null,
                     cpuTemps, cpuTemps);
 
@@ -1746,7 +1746,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var cpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.CpuTemperatures;
                 var gpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.GpuTemperatures;
 
-                _deviceApplier.ApplyEcFanFromPreset(false, cpuPreset,
+                await _deviceApplier.ApplyEcFanFromPresetAsync(false, cpuPreset,
                     null, cpuCurve.Duties.ToArray(), gpuCurve.Duties.ToArray(),
                     cpuTemps, gpuTemps);
 
