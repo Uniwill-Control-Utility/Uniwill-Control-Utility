@@ -4,6 +4,74 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              FlowDirection="LeftToRight">
 
+    <UserControl.Resources>
+        <!-- Track filler: no visuals and not hit-testable, so a click next to a point
+             does nothing instead of jumping the value. -->
+        <Style x:Key="CurvePointTrackFillerStyle" TargetType="RepeatButton">
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Zone slider reduced to a dot: the only interactive part is the 20 px Thumb,
+             which travels between its own half-height and height minus half-height. -->
+        <Style x:Key="CurvePointSliderStyle" TargetType="Slider">
+            <Setter Property="Orientation" Value="Vertical"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="IsSnapToTickEnabled" Value="True"/>
+            <Setter Property="TickFrequency" Value="1"/>
+            <!-- Dot fill; read-only mode overwrites this from code-behind. -->
+            <Setter Property="Foreground" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Track x:Name="PART_Track" Orientation="Vertical">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource CurvePointTrackFillerStyle}"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Width="20" Height="20" Focusable="False">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Grid Background="Transparent">
+                                                <Ellipse x:Name="Dot"
+                                                         Width="20" Height="20"
+                                                         Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Slider}}}"
+                                                         Stroke="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                                         StrokeThickness="3"/>
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Dot" Property="Stroke"
+                                                            Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsDragging" Value="True">
+                                                    <Setter TargetName="Dot" Property="Stroke"
+                                                            Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource CurvePointTrackFillerStyle}"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid x:Name="RootGrid" Margin="0,4,0,4">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -45,12 +113,14 @@
         </Grid>
 
         <!-- Graph area (named for overlay VisualBrush source) -->
-        <Grid x:Name="GraphArea" Grid.Row="0" Grid.Column="1" Height="180" MouseLeave="GraphArea_MouseLeave">
+        <Grid x:Name="GraphArea" Grid.Row="0" Grid.Column="1" Height="180"
+              SizeChanged="GraphArea_SizeChanged"
+              MouseLeave="GraphArea_MouseLeave">
             <Border BorderBrush="{DynamicResource TextFillColorDisabledBrush}"
                     BorderThickness="1,0,0,1"/>
-            <!-- Canvas for curve line and fill -->
-            <Canvas x:Name="_canvas"/>
-            <!-- Vertical sliders overlay (11 columns for EC zones 0-10) -->
+            <!-- Decorative layer: grid lines + curve, drawn under the point handles -->
+            <Canvas x:Name="_canvas" IsHitTestVisible="False"/>
+            <!-- Slider overlay (11 columns for EC zones 0-10); each slider is a lone dot -->
             <Grid x:Name="_slidersGrid">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>

@@ -58,13 +58,8 @@ public sealed class EcFanCurveEditorAlignmentTests
 
     private static void AssertCurveMatchesThumbCentres(Canvas canvas, Slider[] sliders)
     {
-        var curvePath = Assert.IsType<System.Windows.Shapes.Path>(canvas.Children[0]);
-        var geometry = Assert.IsType<PathGeometry>(curvePath.Data);
-        var figure = Assert.Single(geometry.Figures);
-        Point[] curvePoints = [
-            figure.StartPoint,
-            .. figure.Segments.Cast<LineSegment>().Select(segment => segment.Point)
-        ];
+        var curveLine = Assert.Single(canvas.Children.OfType<System.Windows.Shapes.Polyline>());
+        Point[] curvePoints = [.. curveLine.Points];
 
         Assert.Equal(sliders.Length, curvePoints.Length);
 

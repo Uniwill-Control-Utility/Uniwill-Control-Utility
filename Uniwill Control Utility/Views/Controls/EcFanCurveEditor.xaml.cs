@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
+using Wpf.Ui.Appearance;
 
 namespace Uniwill_Control_Utility.Views.Controls
 {
@@ -16,9 +17,19 @@ namespace Uniwill_Control_Utility.Views.Controls
     /// Visual fan curve editor for the Uniwill EC with 11 vertical sliders
     /// matching the EC zone IDs 0-10. Zone 0 is disabled (always 0% duty).
     /// Zones 1-10 map to temperature thresholds from the XMG Control Center UserFanTables.
+    /// The sliders are templated down to a single dot; the curve and the 25% grid
+    /// lines are drawn on a canvas behind them.
     /// </summary>
     public partial class EcFanCurveEditor : UserControl
     {
+        /// <summary>Edge length of the dot thumb in device-independent pixels; also the travel inset at both ends.</summary>
+        private const double ThumbSize = 20;
+
+        private const double ThumbHalf = ThumbSize / 2;
+
+        /// <summary>Used only when a WPF-UI theme brush cannot be resolved (e.g. no Application).</summary>
+        private static readonly Brush GuidelineFallbackBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 };
+
         public event EventHandler? CurveChanged;
 
         private readonly List<Slider> _sliders = new();
@@ -51,20 +62,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             set
             {
                 _isReadOnly = value;
-                foreach (var slider in _sliders)
-                {
-                    // Zone 0 is always disabled regardless.
-                    if (slider.Tag is int index && index == 0)
-                        continue;
-                    if (value)
-                    {
-                        slider.Foreground = Application.Current.Resources["TextFillColorSecondaryBrush"] as Brush;
-                    }
-                    else
-                    {
-                        slider.Foreground = null;
-                    }
-                }
+                UpdateDotBrushes();
             }
         }
 
@@ -80,6 +78,12 @@ namespace Uniwill_Control_Utility.Views.Controls
         {
             InitializeComponent();
             InitializeSliders();
+            UpdateDotBrushes();
+
+            // A theme switch swaps the resource dictionaries, so the cached dot fills
+            // and the brushes baked into the drawing have to be resolved again.
+            Loaded += (_, _) => ApplicationThemeManager.Changed += OnThemeChanged;
+            Unloaded += (_, _) => ApplicationThemeManager.Changed -= OnThemeChanged;
         }
 
         private void InitializeSliders()
@@ -88,13 +92,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 var slider = new Slider
                 {
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Orientation = Orientation.Vertical,
-                    IsSnapToTickEnabled = true,
-                    TickFrequency = 1,
-                    Maximum = 100,
-                    Minimum = 0,
-                    Value = 0,
+                    Style = (Style)FindResource("CurvePointSliderStyle"),
                     Tag = i,
                 };
 
@@ -102,7 +100,6 @@ namespace Uniwill_Control_Utility.Views.Controls
                 if (i == 0)
                 {
                     slider.IsEnabled = false;
-                    slider.Foreground = Application.Current.Resources["TextFillColorDisabledBrush"] as Brush;
                 }
 
                 slider.PreviewMouseDown += Slider_PreviewMouseDown;
@@ -116,6 +113,19 @@ namespace Uniwill_Control_Utility.Views.Controls
             InvalidateArrange();
         }
 
+        /// <summary>Dot fill per zone: disabled for OFF, dimmed while read-only, accent when editable.</summary>
+        private void UpdateDotBrushes()
+        {
+            var accent = FindBrush("AccentFillColorDefaultBrush", Brushes.Gray);
+            var secondary = FindBrush("TextFillColorSecondaryBrush", Brushes.Gray);
+            var disabled = FindBrush("TextFillColorDisabledBrush", Brushes.Gray);
+
+            for (int i = 0; i < _sliders.Count; i++)
+            {
+                _sliders[i].Foreground = i == 0 ? disabled : _isReadOnly ? secondary : accent;
+            }
+        }
+
         private void UpdateTemperatureLabels()
         {
             _xAxisLabels.Children.Clear();
@@ -124,7 +134,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 var label = new TextBlock
                 {
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    Foreground = Application.Current.Resources["TextFillColorSecondaryBrush"] as Brush,
+                    Foreground = FindBrush("TextFillColorSecondaryBrush", Brushes.Gray),
                     FontSize = 10,
                     Text = i == 0 ? "OFF" : $"{_temperatures[i]}°",
                 };
@@ -139,6 +149,8 @@ namespace Uniwill_Control_Utility.Views.Controls
             DrawGraph();
             return size;
         }
+
+        private void GraphArea_SizeChanged(object sender, SizeChangedEventArgs e) => DrawGraph();
 
         private void GraphArea_MouseLeave(object sender, MouseEventArgs e)
         {
@@ -265,11 +277,30 @@ namespace Uniwill_Control_Utility.Views.Controls
             }, DispatcherPriority.Background);
         }
 
+        private void OnThemeChanged(ApplicationTheme theme, Color accent)
+        {
+            UpdateDotBrushes();
+            DrawGraph();
+        }
+
+        /// <summary>Resolves a WPF-UI theme brush right now (so a theme switch can recolour a redraw).</summary>
+        private Brush FindBrush(string key, Brush fallback) =>
+            Application.Current?.TryFindResource(key) as Brush
+            ?? TryFindResource(key) as Brush
+            ?? fallback;
+
+        /// <summary>
+        /// Dot centre for a duty value. The thumb travels between its own half-height
+        /// and height minus half-height, so 0 % and 100 % are not clipped.
+        /// </summary>
+        private static double DutyToY(int duty, double height) =>
+            ThumbHalf + ((100 - Math.Clamp(duty, 0, 100)) / 100.0 * (height - ThumbSize));
+
+        private double GetPointX(Slider slider) =>
+            slider.TranslatePoint(new Point(slider.ActualWidth * 0.5, 0), _canvas).X;
+
         private void DrawGraph()
         {
-            var color = Application.Current.Resources["ControlFillColorDefaultBrush"] as SolidColorBrush;
-            if (color == null) return;
-
             // Skip if sliders aren't measured yet — avoid clearing the canvas
             // with (0,0) points during early layout passes.
             if (!(_sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0)))
@@ -278,63 +309,46 @@ namespace Uniwill_Control_Utility.Views.Controls
                 return;
             }
 
-            _canvas.Children.Clear();
-
-            var points = _sliders
-                .Select(GetThumbLocation)
-                .Select(p => new Point(p.X, p.Y))
-                .ToArray();
-
-            if (points.Length == 0) return;
-
-            // Line
-            var segments = new PathSegmentCollection();
-            foreach (var point in points.Skip(1))
-                segments.Add(new LineSegment { Point = point });
-
-            var figure = new PathFigure
+            double width = _canvas.ActualWidth;
+            double height = _canvas.ActualHeight;
+            if (width <= 0 || height <= 0)
             {
-                StartPoint = points[0],
-                Segments = segments
-            };
-
-            _canvas.Children.Add(new Path
-            {
-                StrokeThickness = 2,
-                Stroke = color,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round,
-                Data = new PathGeometry { Figures = new PathFigureCollection { figure } }
-            });
-
-            // Shaded fill
-            var fillPoints = new PointCollection { new(points[0].X, _canvas.ActualHeight - 1) };
-            foreach (var p in points) fillPoints.Add(p);
-            fillPoints.Add(new(points[^1].X, _canvas.ActualHeight - 1));
-
-            _canvas.Children.Add(new Polygon
-            {
-                Fill = color,
-                Opacity = 0.25,
-                Points = fillPoints
-            });
-        }
-
-        private Point GetThumbLocation(Slider slider)
-        {
-            slider.ApplyTemplate();
-            if (slider.Template.FindName("PART_Track", slider) is Track track &&
-                track.Thumb is { ActualWidth: > 0, ActualHeight: > 0 } thumb)
-            {
-                return thumb.TranslatePoint(
-                    new Point(thumb.ActualWidth * 0.5, thumb.ActualHeight * 0.5),
-                    _canvas);
+                ScheduleFallbackRedraw();
+                return;
             }
 
-            var ratio = slider.Value / (slider.Maximum - slider.Minimum);
-            var y = slider.ActualHeight - (slider.ActualHeight * ratio);
-            var x = slider.ActualWidth * 0.5;
-            return slider.TranslatePoint(new(x, y), _canvas);
+            _canvas.Children.Clear();
+
+            var guidelineBrush = FindBrush("DividerStrokeColorDefaultBrush", GuidelineFallbackBrush);
+            foreach (var percent in new[] { 0, 25, 50, 75, 100 })
+            {
+                var y = DutyToY(percent, height);
+                _canvas.Children.Add(new Line
+                {
+                    X1 = 0,
+                    X2 = width,
+                    Y1 = y,
+                    Y2 = y,
+                    Stroke = guidelineBrush,
+                    StrokeThickness = 1
+                });
+            }
+
+            var points = _sliders
+                .Select(s => new Point(GetPointX(s), DutyToY((int)Math.Round(s.Value), height)))
+                .ToArray();
+
+            if (points.Length < 2) return;
+
+            _canvas.Children.Add(new Polyline
+            {
+                StrokeThickness = 2,
+                Stroke = FindBrush("AccentFillColorDefaultBrush", Brushes.Gray),
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round,
+                Points = new PointCollection(points)
+            });
         }
     }
 }
