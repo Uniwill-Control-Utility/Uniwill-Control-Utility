@@ -109,14 +109,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ = Tablet.TabletDevices;
         }
 
-        public Task OnNavigatedToAsync()
+        public async Task OnNavigatedToAsync()
         {
             try
             {
                 // Subscribe to DiagnosticLogger events so deep code (EC, NVML) posts to our UI log
                 DiagnosticLogger.OnMessage += DiagnosticLogger_OnMessage;
 
-                applyPlatformVisibility();
+                await applyPlatformVisibilityAsync().ConfigureAwait(true);
                 applyPowerLimits();
                 setProfileTooltips();
                 loadSavedProfile();
@@ -175,8 +175,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // initialization issue (missing resources, null controls, etc.).
                 _logger.LogError(ex, "Failed to navigate to Presets page");
             }
-
-            return Task.CompletedTask;
         }
 
         private void OpenRequestedTuningSection()
@@ -449,7 +447,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             lblNvMem.Text = $"{sdNvMem.Value:F0} MHz";
         }
 
-        private void applyPlatformVisibility()
+        private async Task applyPlatformVisibilityAsync()
         {
             // Hide AMD-specific controls on Intel
             if (Family.TYPE == Family.ProcessorType.Intel)
@@ -481,7 +479,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 try
                 {
-                    var snapshot = _gpuInventory.GetSnapshotAsync().GetAwaiter().GetResult();
+                    var snapshot = await _gpuInventory.GetSnapshotAsync().ConfigureAwait(true);
                     hasNvidia = snapshot.NvidiaCount > 0;
                 }
                 catch
@@ -1265,7 +1263,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var ecGate = RyzenAdj_To_UCU.EcService;
                     if (ecGate != null)
                     {
-                        ecGate.ApplyOemStockModeAsync(PresetProfileApplier.OemModeIndexFor(_currentProfile)).GetAwaiter().GetResult();
+                        await ecGate.ApplyOemStockModeAsync(PresetProfileApplier.OemModeIndexFor(_currentProfile)).ConfigureAwait(true);
 
                         // The contract yields with the values (U-107): the
                         // guardian must not heal custom bytes over a stock
@@ -1332,7 +1330,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         int pl1 = (int)sdSustained.Value;
                         int pl2 = (int)sdBoost.Value;
                         DebugLog($"  Applying EC CPU power limits: PL1={pl1}W PL2={pl2}W");
-                        ec.ApplyCpuPowerLimitsAsync(pl1, pl2).GetAwaiter().GetResult();
+                        await ec.ApplyCpuPowerLimitsAsync(pl1, pl2).ConfigureAwait(true);
                         Services.PowerContractStore.NoteCpuApplied(pl1, pl2);
                         DebugLog($"  EC CPU power limits applied");
 
