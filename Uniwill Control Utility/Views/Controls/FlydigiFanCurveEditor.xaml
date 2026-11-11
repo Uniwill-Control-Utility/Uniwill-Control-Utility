@@ -153,7 +153,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Label Grid.Column="0" HorizontalAlignment="Left" VerticalContentAlignment="Center"
+                <Label Grid.Column="0" HorizontalAlignment="Center" VerticalContentAlignment="Center"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}">0°</Label>
                 <Label Grid.Column="1" HorizontalAlignment="Center" VerticalContentAlignment="Center"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}">10°</Label>
@@ -173,7 +173,7 @@
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}">80°</Label>
                 <Label Grid.Column="9" HorizontalAlignment="Center" VerticalContentAlignment="Center"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}">90°</Label>
-                <Label Grid.Column="10" HorizontalAlignment="Right" VerticalContentAlignment="Center"
+                <Label Grid.Column="10" HorizontalAlignment="Center" VerticalContentAlignment="Center"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}">100°</Label>
             </Grid>
         </Grid>
