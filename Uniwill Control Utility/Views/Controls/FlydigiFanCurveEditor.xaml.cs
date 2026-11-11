@@ -9,16 +9,29 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Services;
+using Wpf.Ui.Appearance;
 
 namespace Uniwill_Control_Utility.Views.Controls
 {
     /// <summary>
-     /// Visual fan curve editor with vertical sliders at fixed temperature intervals (0-100°C).
-     /// Draws a connected line graph on a canvas with shaded fill underneath.
-     /// Adapted from LenovoLegionToolkit's FanCurveControl design.
-     /// </summary>
+    /// Visual fan curve editor with vertical sliders at fixed temperature intervals (0-100°C).
+    /// Draws a connected line graph on a canvas with shaded fill underneath.
+    /// Adapted from LenovoLegionToolkit's FanCurveControl design.
+    ///
+    /// The sliders are templated down to a dot, and the curve, area fill and rails are
+    /// drawn on a canvas behind them — the same presentation as <see cref="EcFanCurveEditor"/>.
+    /// </summary>
     public partial class FlydigiFanCurveEditor : UserControl
     {
+        /// <summary>Edge length of the dot thumb in device-independent pixels; also the travel inset at both ends.</summary>
+        private const double ThumbSize = 20;
+
+        private const double ThumbHalf = ThumbSize / 2;
+
+        /// <summary>Used only when a WPF-UI theme brush cannot be resolved (e.g. no Application).</summary>
+        private static readonly Brush GuidelineFallbackBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 };
+
         private readonly List<Slider> _sliders = new();
         private readonly InfoTooltip _customToolTip = new();
         private DispatcherOperation? _pendingFallbackRedraw;
@@ -33,13 +46,31 @@ namespace Uniwill_Control_Utility.Views.Controls
         {
             InitializeComponent();
             InitializeSliders();
+
+            // "Fan Speed" is the existing catalog key (all 26 shipped cultures), so the
+            // bottom axis label needs no new translation entry.
+            FanSpeedAxisLabel.Content = LocalizationService.Get("Fan Speed");
+
+            // A theme switch swaps the resource dictionaries, so the brushes baked into
+            // the drawing have to be resolved again.
+            Loaded += (_, _) => ApplicationThemeManager.Changed += OnThemeChanged;
+            Unloaded += (_, _) => ApplicationThemeManager.Changed -= OnThemeChanged;
         }
 
         private void InitializeSliders()
         {
             for (int i = 0; i < Temperatures.Length; i++)
             {
-                var slider = GenerateSlider(i);
+                var slider = new Slider
+                {
+                    Style = (Style)FindResource("CurvePointSliderStyle"),
+                    Tag = i,
+                };
+
+                slider.MouseMove += Slider_MouseMove;
+                slider.ValueChanged += Slider_OnValueChanged;
+
+                Grid.SetColumn(slider, i);
                 _sliders.Add(slider);
                 _slidersGrid.Children.Add(slider);
             }
@@ -49,6 +80,8 @@ namespace Uniwill_Control_Utility.Views.Controls
         {
             _customToolTip.IsOpen = false;
         }
+
+        private void OnThemeChanged(ApplicationTheme theme, Color accent) => DrawGraph();
 
         protected override Size ArrangeOverride(Size arrangeBounds)
         {
@@ -73,12 +106,8 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _sliders[i].Value = percent;
             }
 
-            // Clear the old curve line immediately so it doesn't persist while
-            // slider thumbs animate to their new positions. Then defer the redraw
-            // to Background priority so the layout system has fully processed all
-            // value changes and thumbs are at their final positions before DrawGraph
-            // samples them. Using InvalidateArrange directly would fire ArrangeOverride
-            // before the thumbs reposition, drawing a line at the stale curve shape.
+            // Clear the old curve immediately so it doesn't persist while the thumbs
+            // move, then redraw at Background priority once layout has settled.
             _canvas.Children.Clear();
 
             Dispatcher.InvokeAsync(() => InvalidateArrange(), DispatcherPriority.Background);
@@ -112,37 +141,6 @@ namespace Uniwill_Control_Utility.Views.Controls
                 Id = Guid.NewGuid().ToString(),
                 Points = points
             };
-        }
-
-        private Slider GenerateSlider(int index)
-        {
-            // Use a 0-100 percentage range so each 1% step is ~2px of travel,
-            // matching EcFanCurveEditor and giving smooth drag feel.
-            // The percentage is mapped to RPM in GetCurve() / SetCurve().
-            var slider = new Slider
-            {
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Orientation = Orientation.Vertical,
-                IsSnapToTickEnabled = true,
-                TickFrequency = 1,
-                Maximum = 100,
-                Minimum = 0,
-                Tag = index,
-            };
-
-            slider.PreviewMouseDown += Slider_PreviewMouseDown;
-            slider.MouseMove += Slider_MouseMove;
-            slider.ValueChanged += Slider_OnValueChanged;
-
-            Grid.SetColumn(slider, index);
-
-            return slider;
-        }
-
-        private void Slider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            // No-op: ensures the slider receives the mouse event before the template
-            // processes it. Unlike EcFanCurveEditor, this editor is always editable.
         }
 
         private void Slider_MouseMove(object sender, MouseEventArgs e)
@@ -240,20 +238,42 @@ namespace Uniwill_Control_Utility.Views.Controls
             }
         }
 
+        /// <summary>Resolves a WPF-UI theme brush right now (so a theme switch can recolour a redraw).</summary>
+        private Brush FindBrush(string key, Brush fallback) =>
+            Application.Current?.TryFindResource(key) as Brush
+            ?? TryFindResource(key) as Brush
+            ?? fallback;
+
+        /// <summary>
+        /// Dot centre for a percentage. The thumb travels between its own half-height
+        /// and height minus half-height, so 0 % and 100 % are not clipped.
+        /// </summary>
+        private static double PercentToY(double percent, double height) =>
+            ThumbHalf + ((100 - Math.Clamp(percent, 0, 100)) / 100.0 * (height - ThumbSize));
+
+        /// <summary>
+        /// The 0 % line: the 1 px axis border at the bottom of the graph area. Sits one
+        /// pixel above the plot edge so a fill that ends here meets the border instead
+        /// of covering it.
+        /// </summary>
+        private static double AxisY(double height) => height - 1;
+
+        private double GetPointX(Slider slider) =>
+            slider.TranslatePoint(new Point(slider.ActualWidth * 0.5, 0), _canvas).X;
+
         private void DrawGraph()
         {
-            // Try multiple brush sources: app resources, then Foreground, then fallback.
-            SolidColorBrush color = (Application.Current.Resources["ControlFillColorDefaultBrush"] as SolidColorBrush)
-                ?? (this.FindResource("ControlFillColorDefaultBrush") as SolidColorBrush)
-                ?? (this.Foreground as SolidColorBrush)
-                ?? new SolidColorBrush(Colors.Gray);
-            if (color == null)
+            // Skip if sliders aren't measured yet — avoid clearing the canvas
+            // with (0,0) points during early layout passes.
+            if (!(_sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0)))
+            {
+                ScheduleFallbackRedraw();
                 return;
+            }
 
-            // Check if sliders are actually measured yet. If not, skip drawing to
-            // avoid clearing the canvas with (0,0) points during early layout passes.
-            bool allMeasured = _sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0);
-            if (!allMeasured)
+            double width = _canvas.ActualWidth;
+            double height = _canvas.ActualHeight;
+            if (width <= 0 || height <= 0)
             {
                 ScheduleFallbackRedraw();
                 return;
@@ -262,64 +282,61 @@ namespace Uniwill_Control_Utility.Views.Controls
             _canvas.Children.Clear();
 
             var points = _sliders
-                .Select(GetThumbLocation)
-                .Select(p => new Point(p.X, p.Y))
+                .Select(s => new Point(GetPointX(s), PercentToY(s.Value, height)))
                 .ToArray();
 
             if (points.Length == 0)
                 return;
 
-            // Line
-            var pathSegmentCollection = new PathSegmentCollection();
-            foreach (var point in points.Skip(1))
-                pathSegmentCollection.Add(new LineSegment { Point = point });
+            var curveBrush = FindBrush("AccentFillColorDefaultBrush", Brushes.Gray);
+            var railBrush = FindBrush("DividerStrokeColorDefaultBrush", GuidelineFallbackBrush);
 
-            var pathFigure = new PathFigure
+            // Area under the curve down to the temperature axis, before the rails and
+            // the polyline so both stay legible on top of it.
+            if (points.Length > 1)
             {
-                StartPoint = points[0],
-                Segments = pathSegmentCollection
-            };
+                var baseline = AxisY(height);
+                var areaPoints = new List<Point>(points.Length + 2)
+                {
+                    new(points[0].X, baseline)
+                };
+                areaPoints.AddRange(points);
+                areaPoints.Add(new Point(points[^1].X, baseline));
 
-            var path = new Path
-            {
-                StrokeThickness = 2,
-                Stroke = color,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round,
-                Data = new PathGeometry { Figures = new PathFigureCollection { pathFigure } }
-            };
-            _canvas.Children.Add(path);
-
-            // Shaded fill
-            var pointCollection = new PointCollection { new(points[0].X, _canvas.ActualHeight - 1) };
-            foreach (var point in points)
-                pointCollection.Add(point);
-            pointCollection.Add(new(points[^1].X, _canvas.ActualHeight - 1));
-
-            var polygon = new Polygon
-            {
-                Fill = color,
-                Opacity = 0.3,
-                Points = pointCollection
-            };
-            _canvas.Children.Add(polygon);
-        }
-
-        private Point GetThumbLocation(Slider slider)
-        {
-            slider.ApplyTemplate();
-            if (slider.Template.FindName("PART_Track", slider) is Track track &&
-                track.Thumb is { ActualWidth: > 0, ActualHeight: > 0 } thumb)
-            {
-                return thumb.TranslatePoint(
-                    new Point(thumb.ActualWidth * 0.5, thumb.ActualHeight * 0.5),
-                    _canvas);
+                _canvas.Children.Add(new Polygon
+                {
+                    Fill = curveBrush,
+                    Opacity = 0.18,
+                    Points = new PointCollection(areaPoints),
+                    IsHitTestVisible = false
+                });
             }
 
-            var ratio = slider.Value / (slider.Maximum - slider.Minimum);
-            var y = slider.ActualHeight - (slider.ActualHeight * ratio);
-            var x = slider.ActualWidth * 0.5;
-            return slider.TranslatePoint(new(x, y), _canvas);
+            // One rail per zone, at the x the dots and the curve use.
+            foreach (var slider in _sliders)
+            {
+                var x = GetPointX(slider);
+                _canvas.Children.Add(new Line
+                {
+                    X1 = x,
+                    X2 = x,
+                    Y1 = ThumbHalf,
+                    Y2 = height - ThumbHalf,
+                    Stroke = railBrush,
+                    StrokeThickness = 1,
+                    Opacity = 0.6
+                });
+            }
+
+            _canvas.Children.Add(new Polyline
+            {
+                StrokeThickness = 2,
+                Stroke = curveBrush,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round,
+                Points = new PointCollection(points)
+            });
         }
 
         /// <summary>Converts an RPM value to a 0-100 percentage for the slider.</summary>

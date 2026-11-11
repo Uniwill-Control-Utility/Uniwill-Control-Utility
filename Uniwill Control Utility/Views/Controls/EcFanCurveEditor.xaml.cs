@@ -368,22 +368,6 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             var guidelineBrush = FindBrush("DividerStrokeColorDefaultBrush", GuidelineFallbackBrush);
 
-            // 0 % is the axis itself (the bottom border below), so it is not drawn
-            // again as a grid line.
-            foreach (var percent in new[] { 25, 50, 75, 100 })
-            {
-                var y = DutyToY(percent, height);
-                _canvas.Children.Add(new Line
-                {
-                    X1 = 0,
-                    X2 = width,
-                    Y1 = y,
-                    Y2 = y,
-                    Stroke = guidelineBrush,
-                    StrokeThickness = 1
-                });
-            }
-
             var points = sliders
                 .Select(s => new Point(GetPointX(s), DutyToY((int)Math.Round(s.Value), height)))
                 .ToArray();
