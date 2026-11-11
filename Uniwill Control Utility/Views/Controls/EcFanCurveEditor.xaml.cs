@@ -27,6 +27,12 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         private const double ThumbHalf = ThumbSize / 2;
 
+        /// <summary>
+        /// Lowest duty the EC acts on (50 on its 0-200 scale). Sliders 1-10 start here;
+        /// zone 0 stays at 0 as the "fan off" marker.
+        /// </summary>
+        private const int MinEditableDuty = 25;
+
         /// <summary>Used only when a WPF-UI theme brush cannot be resolved (e.g. no Application).</summary>
         private static readonly Brush GuidelineFallbackBrush = new SolidColorBrush(Colors.Gray) { Opacity = 0.3 };
 
@@ -78,12 +84,29 @@ namespace Uniwill_Control_Utility.Views.Controls
         {
             InitializeComponent();
             InitializeSliders();
+            ApplyTrackHeights(GraphArea.Height);
             UpdateDotBrushes();
 
             // A theme switch swaps the resource dictionaries, so the cached dot fills
             // and the brushes baked into the drawing have to be resolved again.
             Loaded += (_, _) => ApplicationThemeManager.Changed += OnThemeChanged;
             Unloaded += (_, _) => ApplicationThemeManager.Changed -= OnThemeChanged;
+        }
+
+        /// <summary>
+        /// Sliders stop at the 25 % floor, so their track spans only the upper
+        /// (100 − floor) % of the plot: on that shorter track one duty percent is the
+        /// same step as on the full scale, which puts the dot at the floor exactly on
+        /// the 25 % line and leaves the dead band empty. Zone 0 keeps the full height
+        /// so the OFF marker still sits on the 0 % line.
+        /// </summary>
+        private void ApplyTrackHeights(double plotHeight)
+        {
+            if (double.IsNaN(plotHeight) || plotHeight <= ThumbSize) return;
+
+            var trackHeight = ThumbSize + ((plotHeight - ThumbSize) * (100 - MinEditableDuty) / 100.0);
+            for (int i = 0; i < _sliders.Count; i++)
+                _sliders[i].Height = i == 0 ? plotHeight : trackHeight;
         }
 
         private void InitializeSliders()
@@ -93,6 +116,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 var slider = new Slider
                 {
                     Style = (Style)FindResource("CurvePointSliderStyle"),
+                    Minimum = i == 0 ? 0 : MinEditableDuty,
                     Tag = i,
                 };
 
@@ -150,7 +174,11 @@ namespace Uniwill_Control_Utility.Views.Controls
             return size;
         }
 
-        private void GraphArea_SizeChanged(object sender, SizeChangedEventArgs e) => DrawGraph();
+        private void GraphArea_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            ApplyTrackHeights(e.NewSize.Height);
+            DrawGraph();
+        }
 
         private void GraphArea_MouseLeave(object sender, MouseEventArgs e)
         {
@@ -162,7 +190,9 @@ namespace Uniwill_Control_Utility.Views.Controls
         {
             for (int i = 0; i < _sliders.Count && i < curve.Duties.Count; i++)
             {
-                _sliders[i].Value = curve.Duties[i];
+                // A saved curve can predate the 25 % EC floor; those duties are raised
+                // to the slider minimum on load (zone 0 keeps its own minimum of 0).
+                _sliders[i].Value = Math.Clamp(curve.Duties[i], (int)_sliders[i].Minimum, 100);
             }
 
             // Clear the old curve line immediately so it doesn't persist while
@@ -320,6 +350,22 @@ namespace Uniwill_Control_Utility.Views.Controls
             _canvas.Children.Clear();
 
             var guidelineBrush = FindBrush("DividerStrokeColorDefaultBrush", GuidelineFallbackBrush);
+            var boundaryBrush = FindBrush("ControlStrokeColorDefaultBrush", GuidelineFallbackBrush);
+
+            // The EC ignores anything under 25 %, so the dead band below the floor is
+            // shaded rather than explained in text. The divider token is already
+            // near-transparent, so it is used as-is.
+            var floorY = DutyToY(MinEditableDuty, height);
+            var deadBand = new Rectangle
+            {
+                Width = width,
+                Height = Math.Max(0, DutyToY(0, height) - floorY),
+                Fill = guidelineBrush,
+                IsHitTestVisible = false
+            };
+            Canvas.SetTop(deadBand, floorY);
+            _canvas.Children.Add(deadBand);
+
             foreach (var percent in new[] { 0, 25, 50, 75, 100 })
             {
                 var y = DutyToY(percent, height);
@@ -329,8 +375,25 @@ namespace Uniwill_Control_Utility.Views.Controls
                     X2 = width,
                     Y1 = y,
                     Y2 = y,
-                    Stroke = guidelineBrush,
+                    // The floor is the one line that has to read as a boundary.
+                    Stroke = percent == MinEditableDuty ? boundaryBrush : guidelineBrush,
                     StrokeThickness = 1
+                });
+            }
+
+            // One rail per zone, at the x the dots and the curve use.
+            foreach (var slider in _sliders)
+            {
+                var x = GetPointX(slider);
+                _canvas.Children.Add(new Line
+                {
+                    X1 = x,
+                    X2 = x,
+                    Y1 = ThumbHalf,
+                    Y2 = height - ThumbHalf,
+                    Stroke = guidelineBrush,
+                    StrokeThickness = 1,
+                    Opacity = 0.6
                 });
             }
 

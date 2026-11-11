@@ -33,7 +33,7 @@ public sealed class EcFanCurveEditorAlignmentTests
             };
             var curve = new EcFanCurve { Name = "Alignment test" };
             curve.Duties.Clear();
-            curve.Duties.AddRange([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+            curve.Duties.AddRange([0, 30, 45, 60, 75, 90, 100, 100, 100, 100, 100]);
 
             editor.SetCurve(curve);
             window.Show();
@@ -52,6 +52,20 @@ public sealed class EcFanCurveEditorAlignmentTests
             editor.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
 
             AssertCurveMatchesThumbCentres(canvas, sliders);
+
+            // The EC ignores duties under 25 %: a stored curve is raised on load,
+            // while zone 0 keeps its 0 % ("fan off") marker.
+            var floored = new EcFanCurve { Name = "Floor test" };
+            floored.Duties.Clear();
+            floored.Duties.AddRange([0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70]);
+            editor.SetCurve(floored);
+            editor.UpdateLayout();
+            editor.Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+
+            Assert.Equal(0, (int)sliders[0].Value);
+            Assert.All(sliders.Skip(1), slider => Assert.InRange(slider.Value, 25.0, 100.0));
+            AssertCurveMatchesThumbCentres(canvas, sliders);
+
             window.Close();
         });
     }
@@ -72,8 +86,10 @@ public sealed class EcFanCurveEditorAlignmentTests
                 new Point(track.Thumb.ActualWidth / 2, track.Thumb.ActualHeight / 2),
                 canvas);
 
-            Assert.InRange(Math.Abs(curvePoints[index].X - thumbCentre.X), 0, 0.5);
-            Assert.InRange(Math.Abs(curvePoints[index].Y - thumbCentre.Y), 0, 0.5);
+            Assert.True(Math.Abs(curvePoints[index].X - thumbCentre.X) <= 0.5,
+                $"point {index} x={curvePoints[index].X:F2} thumbX={thumbCentre.X:F2} duty={slider.Value}");
+            Assert.True(Math.Abs(curvePoints[index].Y - thumbCentre.Y) <= 0.5,
+                $"point {index} y={curvePoints[index].Y:F2} thumbY={thumbCentre.Y:F2} duty={slider.Value} min={slider.Minimum}");
         }
     }
 
