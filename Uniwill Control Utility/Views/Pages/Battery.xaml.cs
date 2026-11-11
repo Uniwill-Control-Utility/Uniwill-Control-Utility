@@ -54,25 +54,29 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             _battery = App.GetService<IBatteryCapability>();
             _engine = App.GetService<IEngineCapability>();
-            if (_battery is not null && _engine is not null)
-            {
-                try
-                {
-                    _isEcAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[Battery] Failed to initialize EC service: {ex.Message}");
-                    _isEcAvailable = false;
-                }
-            }
+
+            // No engine round trip here: a constructor runs on the UI thread and the
+            // hardware probe can wait for a starting service. OnNavigatedToAsync does it.
         }
 
       /// <inheritdoc />
         /// Only fires on the very first navigation (page creation).
         public async Task OnNavigatedToAsync()
         {
-            SyncFromEcAndStartTimer();
+            if (_battery is not null && _engine is not null)
+            {
+                try
+                {
+                    _isEcAvailable = await _engine.IsHardwareAvailableAsync().ConfigureAwait(true);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Battery] Failed to initialise the EC probe: {ex.Message}");
+                    _isEcAvailable = false;
+                }
+            }
+
+            await SyncFromEcAndStartTimerAsync().ConfigureAwait(true);
         }
 
         /// <inheritdoc />
@@ -107,7 +111,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// The tbChargeLimit textblock is XAML-bound to the combo box so it always
         /// reflects the current selection without needing separate code-behind updates.
         /// </summary>
-        private void SyncFromEcAndStartTimer()
+        private async Task SyncFromEcAndStartTimerAsync()
         {
             if (!_isEcAvailable)
             {
@@ -123,7 +127,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             int currentMode;
             try
             {
-                currentMode = _battery!.GetModeAsync().GetAwaiter().GetResult();
+                currentMode = await _battery!.GetModeAsync().ConfigureAwait(true);
             }
             catch (Exception ex)
             {
@@ -141,7 +145,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 try
                 {
-                    _battery!.SetModeAsync(savedMode).GetAwaiter().GetResult();
+                    await _battery!.SetModeAsync(savedMode).ConfigureAwait(true);
                     _lastUserApplyTime = DateTime.UtcNow;
                     Debug.WriteLine($"[Battery] Startup: EC mode ({currentMode}) differed from saved ({savedMode}), applied saved");
                 }
@@ -152,12 +156,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Sync UI and restart timer.
-            RefreshAll();
+            await RefreshAllAsync().ConfigureAwait(true);
             _refreshTimer.IsEnabled = true;
             _isLoaded = true;
         }
 
-        private void cbChargingLimit_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void cbChargingLimit_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!_isLoaded)
                 return;
@@ -168,7 +172,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                _battery!.SetModeAsync(mode).GetAwaiter().GetResult();
+                await _battery!.SetModeAsync(mode).ConfigureAwait(true);
                 Settings.Default.BatteryMode = mode;
                 Settings.Default.Save();
                 _lastUserApplyTime = DateTime.UtcNow;
@@ -178,7 +182,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _delayTimer?.Stop(); // Cancel any pending delay from a previous change
                 _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
                 {
-                    RefreshAll();
+                    _ = RefreshAllAsync();
                     ((DispatcherTimer)s!).Stop();
                     _delayTimer = null;
                 }, Dispatcher);
@@ -189,18 +193,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void OnRefreshTimerTick(object? sender, EventArgs e)
+        private async void OnRefreshTimerTick(object? sender, EventArgs e)
         {
             // Skip polling when the app is minimized.
             if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
                 return;
 
-            RefreshAll();
+            await RefreshAllAsync().ConfigureAwait(true);
         }
 
-        private void btnRefresh_Click(object sender, RoutedEventArgs e)
+        private async void btnRefresh_Click(object sender, RoutedEventArgs e)
         {
-            RefreshAll();
+            await RefreshAllAsync().ConfigureAwait(true);
         }
 
        /// <summary>
@@ -208,7 +212,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// The tbChargeLimit textblock is XAML-bound to cbChargingLimit.SelectedIndex,
         /// so we only need to sync the combo box here.
         /// </summary>
-        private void RefreshAll()
+        private async Task RefreshAllAsync()
         {
             if (_battery is null) return;
 
@@ -218,7 +222,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                int ecMode = _battery!.GetModeAsync().GetAwaiter().GetResult();
+                int ecMode = await _battery!.GetModeAsync().ConfigureAwait(true);
                 if (!withinGrace)
                 {
                     // Sync combo box to EC state without triggering SelectionChanged
@@ -239,8 +243,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Debug.WriteLine($"[Battery] Failed to read charge limit from EC: {ex.Message}");
             }
 
-            RefreshStatusRows();
-            RefreshTelemetry();
+            await RefreshStatusRowsAsync().ConfigureAwait(true);
+            await RefreshTelemetryAsync().ConfigureAwait(true);
         }
 
         /// <summary>
@@ -252,16 +256,16 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// verbs with UnsupportedVerb; the rows then hide for the session —
         /// the legacy charging-limit path keeps working untouched.
         /// </summary>
-        private void RefreshStatusRows()
+        private async Task RefreshStatusRowsAsync()
         {
             if (_battery is null || !_statusRowsSupported)
                 return;
 
             try
             {
-                bool gateActive = _battery.GetGateStatusAsync().GetAwaiter().GetResult();
-                BatteryThresholdsDto thresholds = _battery.GetThresholdsAsync().GetAwaiter().GetResult();
-                bool overrideActive = _battery.GetPlatformOverrideAsync().GetAwaiter().GetResult();
+                bool gateActive = await _battery.GetGateStatusAsync().ConfigureAwait(true);
+                BatteryThresholdsDto thresholds = await _battery.GetThresholdsAsync().ConfigureAwait(true);
+                bool overrideActive = await _battery.GetPlatformOverrideAsync().ConfigureAwait(true);
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -291,13 +295,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void RefreshTelemetry()
+        private async Task RefreshTelemetryAsync()
         {
             if (_battery is null) return;
 
             try
             {
-                BatteryTelemetryDto? telemetry = _battery.GetTelemetryAsync().GetAwaiter().GetResult();
+                BatteryTelemetryDto? telemetry = await _battery.GetTelemetryAsync().ConfigureAwait(true);
                 if (telemetry is not null)
                     Application.Current.Dispatcher.Invoke(() => UpdateTelemetryUi(telemetry));
             }
