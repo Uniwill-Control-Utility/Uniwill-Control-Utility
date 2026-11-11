@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Appearance;
 
 namespace Uniwill_Control_Utility.Views.Controls
@@ -86,6 +87,9 @@ namespace Uniwill_Control_Utility.Views.Controls
             InitializeSliders();
             ApplyTrackHeights(GraphArea.Height);
             UpdateDotBrushes();
+            // "Fan Speed" is the existing catalog key (all 26 shipped cultures), so the
+            // bottom axis label needs no new translation entry.
+            FanSpeedAxisLabel.Text = LocalizationService.Get("Fan Speed");
 
             // A theme switch swaps the resource dictionaries, so the cached dot fills
             // and the brushes baked into the drawing have to be resolved again.
@@ -93,20 +97,22 @@ namespace Uniwill_Control_Utility.Views.Controls
             Unloaded += (_, _) => ApplicationThemeManager.Changed -= OnThemeChanged;
         }
 
+        /// <summary>Zones that are drawn and editable — everything except the OFF zone.</summary>
+        private IEnumerable<Slider> VisibleSliders => _sliders.Skip(1);
+
         /// <summary>
         /// Sliders stop at the 25 % floor, so their track spans only the upper
         /// (100 − floor) % of the plot: on that shorter track one duty percent is the
         /// same step as on the full scale, which puts the dot at the floor exactly on
-        /// the 25 % line and leaves the dead band empty. Zone 0 keeps the full height
-        /// so the OFF marker still sits on the 0 % line.
+        /// the 25 % line.
         /// </summary>
         private void ApplyTrackHeights(double plotHeight)
         {
             if (double.IsNaN(plotHeight) || plotHeight <= ThumbSize) return;
 
             var trackHeight = ThumbSize + ((plotHeight - ThumbSize) * (100 - MinEditableDuty) / 100.0);
-            for (int i = 0; i < _sliders.Count; i++)
-                _sliders[i].Height = i == 0 ? plotHeight : trackHeight;
+            foreach (var slider in _sliders)
+                slider.Height = trackHeight;
         }
 
         private void InitializeSliders()
@@ -120,17 +126,20 @@ namespace Uniwill_Control_Utility.Views.Controls
                     Tag = i,
                 };
 
-                // Zone 0 is always 0 (fan off below threshold) — disable the slider.
+                _sliders.Add(slider);
+
+                // Zone 0 is always 0 (fan off below threshold). The EC needs the zone,
+                // but the graph does not draw it, so it never enters the visual tree.
                 if (i == 0)
                 {
                     slider.IsEnabled = false;
+                    continue;
                 }
 
                 slider.PreviewMouseDown += Slider_PreviewMouseDown;
                 slider.MouseMove += Slider_MouseMove;
                 slider.ValueChanged += Slider_OnValueChanged;
-                Grid.SetColumn(slider, i);
-                _sliders.Add(slider);
+                Grid.SetColumn(slider, i - 1);
                 _slidersGrid.Children.Add(slider);
             }
 
@@ -153,16 +162,17 @@ namespace Uniwill_Control_Utility.Views.Controls
         private void UpdateTemperatureLabels()
         {
             _xAxisLabels.Children.Clear();
-            for (int i = 0; i < _temperatures.Length; i++)
+            // Zone 0 has no column on the graph, so the labels start at zone 1.
+            for (int i = 1; i < _temperatures.Length; i++)
             {
                 var label = new TextBlock
                 {
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Foreground = FindBrush("TextFillColorSecondaryBrush", Brushes.Gray),
                     FontSize = 10,
-                    Text = i == 0 ? "OFF" : $"{_temperatures[i]}°",
+                    Text = $"{_temperatures[i]}°",
                 };
-                Grid.SetColumn(label, i);
+                Grid.SetColumn(label, i - 1);
                 _xAxisLabels.Children.Add(label);
             }
         }
@@ -231,9 +241,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             var temp = index < _temperatures.Length ? _temperatures[index] : 0;
             var duty = (int)slider.Value;
 
-            _tooltip.Content = index == 0
-                ? $"Fan OFF (below ~52°C)"
-                : $"{temp}°C → {duty}%";
+            _tooltip.Content = $"{temp}°C → {duty}%";
             Point pointer = e.GetPosition(_canvas);
             Point thumbTopLeft = track.Thumb.TranslatePoint(new Point(), _canvas);
             var thumbBounds = new Rect(
@@ -331,9 +339,11 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         private void DrawGraph()
         {
+            var sliders = VisibleSliders.ToArray();
+
             // Skip if sliders aren't measured yet — avoid clearing the canvas
             // with (0,0) points during early layout passes.
-            if (!(_sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0)))
+            if (!(sliders.Length > 0 && sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0)))
             {
                 ScheduleFallbackRedraw();
                 return;
@@ -350,21 +360,6 @@ namespace Uniwill_Control_Utility.Views.Controls
             _canvas.Children.Clear();
 
             var guidelineBrush = FindBrush("DividerStrokeColorDefaultBrush", GuidelineFallbackBrush);
-            var boundaryBrush = FindBrush("ControlStrokeColorDefaultBrush", GuidelineFallbackBrush);
-
-            // The EC ignores anything under 25 %, so the dead band below the floor is
-            // shaded rather than explained in text. The divider token is already
-            // near-transparent, so it is used as-is.
-            var floorY = DutyToY(MinEditableDuty, height);
-            var deadBand = new Rectangle
-            {
-                Width = width,
-                Height = Math.Max(0, DutyToY(0, height) - floorY),
-                Fill = guidelineBrush,
-                IsHitTestVisible = false
-            };
-            Canvas.SetTop(deadBand, floorY);
-            _canvas.Children.Add(deadBand);
 
             foreach (var percent in new[] { 0, 25, 50, 75, 100 })
             {
@@ -375,14 +370,37 @@ namespace Uniwill_Control_Utility.Views.Controls
                     X2 = width,
                     Y1 = y,
                     Y2 = y,
-                    // The floor is the one line that has to read as a boundary.
-                    Stroke = percent == MinEditableDuty ? boundaryBrush : guidelineBrush,
+                    Stroke = guidelineBrush,
                     StrokeThickness = 1
                 });
             }
 
+            var points = sliders
+                .Select(s => new Point(GetPointX(s), DutyToY((int)Math.Round(s.Value), height)))
+                .ToArray();
+
+            if (points.Length < 2) return;
+
+            // Area under the curve down to the 0 % line, drawn before the rails and
+            // the polyline so both stay legible on top of it.
+            var areaFill = FindBrush("AccentFillColorDefaultBrush", Brushes.Gray);
+            var areaPoints = new List<Point>(points.Length + 2)
+            {
+                new(points[0].X, DutyToY(0, height))
+            };
+            areaPoints.AddRange(points);
+            areaPoints.Add(new Point(points[^1].X, DutyToY(0, height)));
+
+            _canvas.Children.Add(new Polygon
+            {
+                Fill = areaFill,
+                Opacity = 0.18,
+                Points = new PointCollection(areaPoints),
+                IsHitTestVisible = false
+            });
+
             // One rail per zone, at the x the dots and the curve use.
-            foreach (var slider in _sliders)
+            foreach (var slider in sliders)
             {
                 var x = GetPointX(slider);
                 _canvas.Children.Add(new Line
@@ -397,16 +415,10 @@ namespace Uniwill_Control_Utility.Views.Controls
                 });
             }
 
-            var points = _sliders
-                .Select(s => new Point(GetPointX(s), DutyToY((int)Math.Round(s.Value), height)))
-                .ToArray();
-
-            if (points.Length < 2) return;
-
             _canvas.Children.Add(new Polyline
             {
                 StrokeThickness = 2,
-                Stroke = FindBrush("AccentFillColorDefaultBrush", Brushes.Gray),
+                Stroke = areaFill,
                 StrokeStartLineCap = PenLineCap.Round,
                 StrokeEndLineCap = PenLineCap.Round,
                 StrokeLineJoin = PenLineJoin.Round,

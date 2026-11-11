@@ -43,6 +43,9 @@ public sealed class EcFanCurveEditorAlignmentTests
             var canvas = Assert.IsType<Canvas>(editor.FindName("_canvas"));
             var slidersGrid = Assert.IsType<Grid>(editor.FindName("_slidersGrid"));
             Slider[] sliders = slidersGrid.Children.Cast<Slider>().ToArray();
+
+            // Zone 0 is data-only: the graph draws zones 1-10.
+            Assert.Equal(10, sliders.Length);
             AssertCurveMatchesThumbCentres(canvas, sliders);
 
             Slider changedSlider = sliders[5];
@@ -53,8 +56,9 @@ public sealed class EcFanCurveEditorAlignmentTests
 
             AssertCurveMatchesThumbCentres(canvas, sliders);
 
-            // The EC ignores duties under 25 %: a stored curve is raised on load,
-            // while zone 0 keeps its 0 % ("fan off") marker.
+            // The EC ignores duties under 25 %: a stored curve is raised on load.
+            // Zone 0 keeps its 0 % and is still part of the curve data, it is just
+            // no longer drawn.
             var floored = new EcFanCurve { Name = "Floor test" };
             floored.Duties.Clear();
             floored.Duties.AddRange([0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70]);
@@ -62,8 +66,11 @@ public sealed class EcFanCurveEditorAlignmentTests
             editor.UpdateLayout();
             editor.Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
 
-            Assert.Equal(0, (int)sliders[0].Value);
-            Assert.All(sliders.Skip(1), slider => Assert.InRange(slider.Value, 25.0, 100.0));
+            EcFanCurve reloaded = editor.GetCurve();
+            Assert.Equal(11, reloaded.Duties.Count);
+            Assert.Equal(0, reloaded.Duties[0]);
+            Assert.All(reloaded.Duties.Skip(1), duty => Assert.InRange(duty, 25, 100));
+            Assert.All(sliders, slider => Assert.InRange(slider.Value, 25.0, 100.0));
             AssertCurveMatchesThumbCentres(canvas, sliders);
 
             window.Close();

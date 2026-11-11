@@ -42,23 +42,20 @@
                                 <Thumb Width="20" Height="20" Focusable="False">
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Grid Width="20" Height="20" Background="Transparent">
-                                                <Ellipse x:Name="Halo"
+                                            <Grid Background="Transparent">
+                                                <Ellipse x:Name="Dot"
                                                          Width="20" Height="20"
-                                                         Fill="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                                         Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Slider}}}"
                                                          Stroke="{DynamicResource ControlStrokeColorDefaultBrush}"
-                                                         StrokeThickness="1"/>
-                                                <Ellipse x:Name="Core"
-                                                         Width="8" Height="8"
-                                                         Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Slider}}}"/>
+                                                         StrokeThickness="3"/>
                                             </Grid>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Halo" Property="Stroke"
+                                                    <Setter TargetName="Dot" Property="Stroke"
                                                             Value="{DynamicResource AccentFillColorDefaultBrush}"/>
                                                 </Trigger>
                                                 <Trigger Property="IsDragging" Value="True">
-                                                    <Setter TargetName="Halo" Property="Stroke"
+                                                    <Setter TargetName="Dot" Property="Stroke"
                                                             Value="{DynamicResource AccentFillColorDefaultBrush}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
@@ -112,8 +109,8 @@
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="10">40%</TextBlock>
             <TextBlock Grid.Row="8" HorizontalAlignment="Right" VerticalAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="10">20%</TextBlock>
-            <TextBlock Grid.Row="10" HorizontalAlignment="Right" VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="10">0%</TextBlock>
+            <TextBlock x:Name="FanSpeedAxisLabel" Grid.Row="10" HorizontalAlignment="Right" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="10"/>
         </Grid>
 
         <!-- Graph area (named for overlay VisualBrush source) -->
@@ -124,10 +121,11 @@
                     BorderThickness="1,0,0,1"/>
             <!-- Decorative layer: grid lines + curve, drawn under the point handles -->
             <Canvas x:Name="_canvas" IsHitTestVisible="False"/>
-            <!-- Slider overlay (11 columns for EC zones 0-10); each slider is a lone dot -->
+            <!-- Slider overlay (10 columns for EC zones 1-10); each slider is a lone dot.
+                 Zone 0 still exists in the slider list for the data path, but it is not
+                 drawn: the reference graph has no OFF marker. -->
             <Grid x:Name="_slidersGrid">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
@@ -145,7 +143,6 @@
         <!-- X-axis labels (Temperature °C) — populated from code-behind -->
         <Grid x:Name="_xAxisLabels" Grid.Row="1" Grid.Column="1" Margin="0,4,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
