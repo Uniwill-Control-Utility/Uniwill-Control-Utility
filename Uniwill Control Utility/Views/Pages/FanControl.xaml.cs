@@ -104,47 +104,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             _flydigiService.ConnectionStateChanged += (s, e) => UpdateBanner();
             _bs1Service.ConnectionStateChanged += (s, e) => UpdateBanner();
 
-            // Probe the engine service once so the page shows the EC panels only
-            // when the hardware is actually reachable.
-            bool uniwillAvailable = false;
-            if (_fan is not null && _engine is not null)
+            // The timer is created here because Page_Loaded only starts it; the hardware
+            // probe is NOT done here - a constructor runs on the UI thread and the probe
+            // can wait for a starting service. Page_Loaded probes asynchronously.
+            _statusTimer = new DispatcherTimer
             {
-                try
-                {
-                    uniwillAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
-                }
-                catch
-                {
-                    uniwillAvailable = false;
-                }
-            }
-
-            if (uniwillAvailable)
-            {
-                SetStatusText(LocalizationService.Get("Ready"));
-                UniwillAvailable.Visibility = Visibility.Visible;
-                UniwillUnavailable.Visibility = Visibility.Collapsed;
-
-                // Load persisted settings
-                var settings = FanControlSettingsService.Load();
-                _loadingSettings = true;
-                ApplySettings(settings);
-                InitializeTempThresholdInputs();
-                _loadingSettings = false;
-
-                // Start status polling timer (every 1 second)
-                _statusTimer = new DispatcherTimer
-                {
-                    Interval = TimeSpan.FromSeconds(1)
-                };
-                _statusTimer.Tick += StatusTimer_Tick;
-            }
-            else
-            {
-                SetStatusText(LocalizationService.Get("EC hardware not available"));
-                UniwillAvailable.Visibility = Visibility.Collapsed;
-                UniwillUnavailable.Visibility = Visibility.Visible;
-            }
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            _statusTimer.Tick += StatusTimer_Tick;
         }
 
         private void SetStatusText(string message)
@@ -1308,7 +1275,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _fan!.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                    await _fan!.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -1358,7 +1325,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _fan!.RestoreAutoControlAsync().GetAwaiter().GetResult();
+                    await _fan!.RestoreAutoControlAsync().ConfigureAwait(false);
                 }
                 finally
                 {
@@ -1537,7 +1504,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _fan!.ToggleTurboAsync().GetAwaiter().GetResult();
+                    await _fan!.ToggleTurboAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -1816,7 +1783,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _fan!.ResetStateAsync().GetAwaiter().GetResult();
+                    await _fan!.ResetStateAsync().ConfigureAwait(false);
                 }
                 finally
                 {
@@ -1884,14 +1851,41 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void Page_Loaded(object sender, RoutedEventArgs e)
+        private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
             _isUnloaded = false;
 
-            // Replace the canceled token source so background tasks aren't
-            // immediately canceled on the next navigation back.
+            // Replace the canceled token source first, so an early return below still
+            // leaves the page with a live token (background work would otherwise cancel).
             _pageCts.Dispose();
             _pageCts = new CancellationTokenSource();
+
+            // Availability is probed here, not in the constructor: this runs on the UI
+            // thread but can await, so a starting service never freezes the window.
+            bool uniwillAvailable = false;
+            if (_fan is not null && _engine is not null)
+            {
+                try
+                {
+                    uniwillAvailable = await _engine.IsHardwareAvailableAsync().ConfigureAwait(true);
+                }
+                catch
+                {
+                    uniwillAvailable = false;
+                }
+            }
+
+            if (!uniwillAvailable)
+            {
+                SetStatusText(LocalizationService.Get("EC hardware not available"));
+                UniwillAvailable.Visibility = Visibility.Collapsed;
+                UniwillUnavailable.Visibility = Visibility.Visible;
+                return;
+            }
+
+            SetStatusText(LocalizationService.Get("Ready"));
+            UniwillAvailable.Visibility = Visibility.Visible;
+            UniwillUnavailable.Visibility = Visibility.Collapsed;
 
             // Reload settings from disk — the Presets page may have changed
             // the fan curve while we were unloaded (e.g., applying a power
