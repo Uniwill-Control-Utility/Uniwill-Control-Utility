@@ -388,7 +388,6 @@
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="Holds the CPU at 50 W" />
-                                                   TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                                     <ui:TextBlock x:Name="lblThermalFailsafeCpuThreshold"
