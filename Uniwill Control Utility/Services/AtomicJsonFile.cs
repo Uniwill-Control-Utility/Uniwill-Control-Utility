@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -25,8 +26,25 @@ namespace Uniwill_Control_Utility.Services
 
             // A .tmp left by a previous crash is simply overwritten.
             string temp = path + ".tmp";
-            File.WriteAllText(temp, json);
-            File.Move(temp, path, overwrite: true);
+
+            // Flush the data to the volume *before* the rename. A rename is journaled,
+            // so without an explicit flush a power loss can leave the new name pointing
+            // at content that was never written (zero-length or partial), which is the
+            // one failure the .tmp dance does not cover on its own.
+            using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                writer.Write(json);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            // File.Replace needs an existing destination; the first save of a store has
+            // none, so fall back to a move.
+            if (File.Exists(path))
+                File.Replace(temp, path, destinationBackupFileName: null);
+            else
+                File.Move(temp, path);
         }
     }
 }

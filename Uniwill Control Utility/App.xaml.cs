@@ -444,6 +444,11 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.HydroUI>();
                         services.AddSingleton<HydroUIService>();
 
+                        // Keeps the EC's liquid-cooler flag (0x07C7 bit 1) in step with the
+                        // cooler's real connection state; starts with the host.
+                        services.AddSingleton<LiquidCoolerEcLink>();
+                        services.AddHostedService(provider => provider.GetRequiredService<LiquidCoolerEcLink>());
+
                         // One-shot "dashboard has real data" signal: gates the
                         // splash's final stage (see StartupProgressWindow use).
                         services.AddSingleton<Services.DashboardFirstFrameSignal>();
