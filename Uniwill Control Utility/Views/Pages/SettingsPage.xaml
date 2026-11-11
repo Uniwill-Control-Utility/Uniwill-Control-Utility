@@ -357,6 +357,12 @@
                                                    Text="Sustained GPU temperature at which power is held down; release needs 5 °C below it" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                                    <ui:TextBlock x:Name="lblThermalFailsafeThreshold"
+                                                  Margin="0,0,12,0"
+                                                  VerticalAlignment="Center"
+                                                  MinWidth="48"
+                                                  TextAlignment="Right"
+                                                  Text="" />
                                     <Slider x:Name="slThermalFailsafeThreshold"
                                             Width="170"
                                             Minimum="70"
@@ -365,11 +371,6 @@
                                             TickPlacement="Both"
                                             IsSnapToTickEnabled="True"
                                             ValueChanged="slThermalFailsafeThreshold_ValueChanged" />
-                                    <ui:TextBlock x:Name="lblThermalFailsafeThreshold"
-                                                  Margin="12,0,0,0"
-                                                  VerticalAlignment="Center"
-                                                  MinWidth="48"
-                                                  Text="" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
