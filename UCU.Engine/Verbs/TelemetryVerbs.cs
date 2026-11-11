@@ -1,4 +1,5 @@
 using UCU.Contracts;
+using UCU.Core.Ec;
 using UCU.Hardware.Ec;
 
 namespace UCU.Engine
@@ -30,16 +31,21 @@ namespace UCU.Engine
             });
 
             add(EngineVerbs.Telemetry.GetCpuTemperature, (p, ct) =>
-                Task.FromResult<object?>(gate.Acquire().GetCpuTemperature()));
+                Task.FromResult<object?>(EcSensorPlausibility.Temperature(gate.Acquire().GetCpuTemperature())));
 
             add(EngineVerbs.Telemetry.GetGpuTemperature, (p, ct) =>
-                Task.FromResult<object?>(gate.Acquire().GetGpuTemperature()));
+                Task.FromResult<object?>(EcSensorPlausibility.Temperature(gate.Acquire().GetGpuTemperature())));
 
             add(EngineVerbs.Telemetry.GetMainFanRpm, (p, ct) =>
-                Task.FromResult<object?>(gate.Acquire().GetMainFanRpm()));
+                Task.FromResult<object?>(EcSensorPlausibility.Rpm(gate.Acquire().GetMainFanRpm())));
 
             add(EngineVerbs.Telemetry.GetSecondFanRpm, (p, ct) =>
-                Task.FromResult<object?>(gate.Acquire().GetSecondFanRpm()));
+                Task.FromResult<object?>(EcSensorPlausibility.Rpm(gate.Acquire().GetSecondFanRpm())));
+
+            // Read-only support snapshot (US-10): identity, limits, cooling flags, sensors
+            // and the six fan tables. The app treats a timeout as "busy, skipped".
+            add(EngineVerbs.Telemetry.DumpState, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().DumpHardwareState()));
 
             add(EngineVerbs.Telemetry.GetProjectId, (p, ct) =>
                 Task.FromResult<object?>(gate.Acquire().GetProjectId()));

@@ -46,7 +46,10 @@ namespace UCU.Engine
         /// <summary>Gate one raw single-register write (telemetry domain).</summary>
         public void GateRegisterWrite(ushort address)
         {
-            Gate($"register 0x{address:X4}", () => EcWriteGatePolicy.IsRawWriteAllowed(address, 1));
+            // Fan tables are deliberately excluded: this verb runs on the telemetry queue,
+
+            // and a raw byte landing mid-plan leaves a half-written table (US-09).
+            Gate($"register 0x{address:X4}", () => EcWriteGatePolicy.IsRawWriteAllowed(address, 1, allowFanTables: false));
         }
 
         /// <summary>Gate one NVRAM write (device domain).</summary>

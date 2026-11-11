@@ -648,6 +648,7 @@ public sealed class WatcherHubServiceTests
         public Task<PowerLimitsDto> GetLimitsAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetPowerLimitAsync(PowerLimitKind kind, int watts, CancellationToken ct = default) => throw new NotSupportedException();
         public Task ApplyCpuPowerLimitsAsync(int pl1Watts, int pl2Watts, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> SetLiquidCoolerAttachedAsync(bool attached, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> GetTccOffsetAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetTccOffsetAsync(int offset, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> GetPerformanceModeAsync(CancellationToken ct = default) => throw new NotSupportedException();

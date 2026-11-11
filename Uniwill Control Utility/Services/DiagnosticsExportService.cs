@@ -50,6 +50,14 @@ namespace Uniwill_Control_Utility.Services
     {
         private const string EngineFolderName = "engine";
 
+        /// <summary>
+        /// Budget for the EC dump. The EC is single-locked at ~6 ms per byte and the dump
+        /// reads ~20 singles plus six 16-byte tables (~0.7 s) — but it can land behind a
+        /// fan plan, so the bound exists and a timeout is reported instead of failing the
+        /// export (the field case: a bug report is usually taken while the app is busy).
+        /// </summary>
+        private static readonly TimeSpan HardwareDumpBudget = TimeSpan.FromSeconds(4);
+
         private readonly IEngineCapability _engine;
         private readonly IOemCapability _oem;
 
@@ -94,6 +102,29 @@ namespace Uniwill_Control_Utility.Services
 
                 // The report lists what was actually collected.
                 await File.WriteAllTextAsync(reportPath, ComposeReport(snapshot, attachments), cancellationToken);
+
+                // EC hardware state (US-10). Best-effort and bounded: a busy or absent
+                // engine is written into the file as the reason, never an export failure.
+                EcHardwareDumpDto? dump = null;
+                string hardwareNote;
+                try
+                {
+                    using var dumpCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    dumpCts.CancelAfter(HardwareDumpBudget);
+                    dump = await _engine.DumpHardwareAsync(dumpCts.Token);
+                    hardwareNote = dump is null ? "engine answered null (EC unavailable)" : "collected";
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    hardwareNote = "skipped: engine busy (dump timed out)";
+                }
+                catch (Exception ex)
+                {
+                    hardwareNote = "unavailable (" + ex.GetType().Name + ")";
+                }
+
+                await File.WriteAllTextAsync(
+                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote), cancellationToken);
 
                 string? directory = Path.GetDirectoryName(targetZip);
                 if (!string.IsNullOrEmpty(directory))
@@ -158,6 +189,67 @@ namespace Uniwill_Control_Utility.Services
                 OemTakeover = oemLine,
                 OemSuspects = suspects,
             };
+        }
+
+        /// <summary>
+        /// The hardware file's text. Pure: the same dump produces the same bytes, and a
+        /// missing dump renders the reason instead of throwing.
+        /// </summary>
+        public static string ComposeHardware(EcHardwareDumpDto? dump, string note)
+        {
+            var text = new StringBuilder();
+            text.AppendLine("Uniwill Control Utility - EC hardware state");
+            text.AppendLine("Generated: " + DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+            text.AppendLine("Collection: " + (string.IsNullOrWhiteSpace(note) ? "unknown" : note));
+
+            if (dump is null)
+            {
+                text.AppendLine();
+                text.AppendLine("No EC state was read. The engine log names the reason; a busy engine");
+                text.AppendLine("(a fan curve or preset apply in flight) is the common case.");
+                return text.ToString();
+            }
+
+            text.AppendLine("EC version: " + dump.EcVersionMajor + "." + dump.EcVersionMinor);
+            text.AppendLine("Project ID 0x0740: 0x" + dump.ProjectIdRaw.ToString("X2"));
+            text.AppendLine("Sensors: CPU " + dump.CpuTemperature + " C, GPU " + dump.GpuTemperature +
+                            " C, fans " + dump.MainFanRpm + " / " + dump.SecondFanRpm +
+                            " rpm, duty " + dump.CpuFanDuty + " / " + dump.GpuFanDuty + " of 200");
+            text.AppendLine("CPU limits: PL1 " + dump.Pl1 + " W, PL2 " + dump.Pl2 + " W, PL4 " + dump.Pl4 + " W");
+            text.AppendLine("GPU bytes: enable 0x" + dump.GpuEnable.ToString("X2") +
+                            ", cTGP 0x" + dump.GpuCtgp.ToString("X2") +
+                            ", TPP 0x" + dump.GpuTpp.ToString("X2") +
+                            ", DB 0x" + dump.GpuDb.ToString("X2"));
+            text.AppendLine("Cooling: 0x07C7 0x" + dump.CoolingMode.ToString("X2") +
+                            " (LCSE " + ((dump.CoolingMode & 0x02) != 0) +
+                            ", OCPL " + ((dump.CoolingMode >> 2) & 0x07) + ")" +
+                            ", 0x07A4 0x" + dump.LiquidCoolingSupport.ToString("X2") +
+                            ", 0x0788 " + dump.ThermalBudget +
+                            ", 0x0787 0x" + dump.FanSwitchSpeed.ToString("X2"));
+            text.AppendLine("Mode: " + dump.PerformanceMode +
+                            ", custom profile " + dump.CustomProfileActive +
+                            ", fan control supported " + dump.FanControlSupported);
+            text.AppendLine();
+            text.AppendLine("Fan tables (16 bytes each; duty 0-200, temp 255 = inactive):");
+            text.AppendLine("  CPU tempUp   " + HexBytes(dump.CpuTempUp));
+            text.AppendLine("  CPU tempDown " + HexBytes(dump.CpuTempDown));
+            text.AppendLine("  CPU duty     " + HexBytes(dump.CpuDuty));
+            text.AppendLine("  GPU tempUp   " + HexBytes(dump.GpuTempUp));
+            text.AppendLine("  GPU tempDown " + HexBytes(dump.GpuTempDown));
+            text.AppendLine("  GPU duty     " + HexBytes(dump.GpuDuty));
+            return text.ToString();
+        }
+
+        private static string HexBytes(IReadOnlyList<byte> values)
+        {
+            var text = new StringBuilder();
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (i > 0)
+                    text.Append(' ');
+                text.Append(values[i].ToString("X2"));
+            }
+            return text.ToString();
         }
 
         /// <summary>The report text. Pure: the same snapshot produces the same

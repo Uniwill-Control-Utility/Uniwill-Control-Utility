@@ -26,16 +26,6 @@ public sealed class EcPowerCodecTests
     }
 
     [Fact]
-    public void ValidateTccOffset_BoundsAtTheEcRange()
-    {
-        EcPowerCodec.ValidateTccOffset(0);
-        EcPowerCodec.ValidateTccOffset(255);
-
-        Assert.Throws<ArgumentOutOfRangeException>(() => EcPowerCodec.ValidateTccOffset(-1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => EcPowerCodec.ValidateTccOffset(256));
-    }
-
-    [Fact]
     public void EncodePerformanceMode_PreservesFirmwareBits_AndArmsTheEngine()
     {
         // 0b1010_0001: high bits 0xA0 belong to the firmware.

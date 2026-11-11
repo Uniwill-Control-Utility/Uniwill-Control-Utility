@@ -153,6 +153,12 @@ namespace UCU.Hardware.Ec
         public const byte FAN_PROFILE_BEAST = EcVault.FAN_PROFILE_BEAST;    // TURBO
 
         // Last write in every OpenRevo stock body, never present in Custom (0x83 = 0x80|3).
+        /// <summary>
+        /// 0x83, the last write of every OEM stock-preset body. It is NOT a commit flag:
+        /// 0x0787 is bit 7 = enable, bits 0-6 = ramp time in 100 ms steps, so 0x83 means
+        /// "enabled, 300 ms". Measured 2026-11-10 on X6FR5xxY (readback 0x83) and seen
+        /// natively on X6AR558Y.
+        /// </summary>
         public const byte OEM_MODE_COMMIT = EcVault.OEM_MODE_COMMIT;
 
         // --- UNIVERSAL_FAN_CTRL bits ---
@@ -764,25 +770,12 @@ namespace UCU.Hardware.Ec
         /// See <see cref="GetGpuPowerControlState"/>.</summary>
         public sealed record GpuPowerControlStateBytes(byte Enable, byte Ctgp, byte Tpp, byte Db, bool CustomProfileActive);
 
-        /// <summary>
-        /// Gets the current TCC (Thermal Comfort Control) offset from the EC.
-        /// Returns the value of register 0x0786 (CPU TCC offset).
-        /// </summary>
-        public int GetTccOffset()
-        {
-            return ReadECRegister(REG_TCC_OFFSET);
-        }
-
-        /// <summary>
-        /// Sets the TCC offset on the EC (register 0x0786).
-        /// Value is offset from 95°C default. 0 = no offset (95°C), 10 = 85°C throttle.
-        /// </summary>
-        public void SetTccOffset(int value)
-        {
-            EcPowerCodec.ValidateTccOffset(value);
-            WriteECRegister(REG_TCC_OFFSET, (byte)value);
-        }
-
+        // 0x0786 is NOT a host TCC-offset control on these ECs. It is TCC only on
+        // universal-fan-control systems; on the RamFan1 layout our models use, it is
+        // L1_PWM_DEFAULT_MYFAN3 and writing it has produced a 20 W TDP lockup
+        // (Presets.xaml.cs:1340, :1735). GetTccOffset/SetTccOffset were removed rather
+        // than repaired: detecting the fan-table layout needs an ECSpec read, so
+        // failing closed is the correct default until that exists.
         #endregion
 
         #region GPU MUX / Direct Connect
@@ -1521,24 +1514,155 @@ namespace UCU.Hardware.Ec
         /// MechControl uses this register with encoding fan_switch_speed (100-12700 RPM).
         /// This may be the actual trigger that makes the EC apply fan speed changes.
         /// </summary>
-        public void SetFanSwitchSpeed(int rpm)
+        /// <summary>
+        /// Sets the EC fan ramp time in milliseconds (register 0x0787).
+        ///
+        /// The register is ONE byte: bit 7 = enable, bits 0-6 = time in 100 ms steps.
+        /// It is not a u16 RPM value. Measured 2026-11-10: writes of 0x83 and 0x8F echo
+        /// back exactly and leave 0x0788 untouched, and a second PCSpecialist board sits
+        /// natively at 0x83 (enabled, 300 ms) with the app merely running. The old u16
+        /// form wrote its high byte into 0x0788, the EC's cTGP offset - not a limit.
+        /// </summary>
+        public void SetFanSwitchSpeed(int milliseconds)
         {
-            // Report, don't clamp: the encoding's documented range (MechControl
-            // fan_switch_speed); an out-of-range RPM is refused, the register pair
-            // untouched.
-            if (rpm < 100 || rpm > 12700)
-                throw new ArgumentOutOfRangeException(nameof(rpm),
-                    $"Fan switch speed must be 100-12700 RPM, got {rpm}.");
+            if (milliseconds == 0)
+            {
+                WriteECRegister(REG_FAN_SWITCH_SPEED, 0x00);
+                DebugLog("[DIAG] EcEngine: fanSwitchSpeed(0x787) disabled");
+                return;
+            }
 
-            // fanSwitchSpeed is a u16 — write low byte then high byte
-            byte lo = (byte)(rpm & 0xFF);
-            byte hi = (byte)((rpm >> 8) & 0xFF);
+            if (milliseconds < 100 || milliseconds > 12700 || milliseconds % 100 != 0)
+                throw new ArgumentOutOfRangeException(nameof(milliseconds),
+                    $"Fan ramp must be 0 or 100-12700 ms in 100 ms steps, got {milliseconds}.");
 
-            WriteECRegister(REG_FAN_SWITCH_SPEED, lo);
-            WriteECRegister((ushort)(REG_FAN_SWITCH_SPEED + 1), hi);
-            DebugLog($"[DIAG] EcEngine: Set fanSwitchSpeed(0x787) = {rpm} (0x{rpm:X4})");
+            byte encoded = (byte)(0x80 | (milliseconds / 100));
+            WriteECRegister(REG_FAN_SWITCH_SPEED, encoded);
+            DebugLog($"[DIAG] EcEngine: fanSwitchSpeed(0x787) = {milliseconds} ms (0x{encoded:X2})");
         }
 
+        /// <summary>0x07A4 bit 7: the EC declares liquid-cooling support.</summary>
+        public const ushort REG_LIQUID_COOLING_SUPPORT = EcVault.REG_LIQUID_COOLING_SUPPORT;
+
+        /// <summary>0x0454 / 0x047D: the EC firmware version, reported as n.nn.</summary>
+        public const ushort REG_EC_VERSION_MAJOR = EcVault.REG_EC_VERSION_MAJOR;
+
+        public const ushort REG_EC_VERSION_MINOR = EcVault.REG_EC_VERSION_MINOR;
+
+        /// <summary>
+        /// Forgets that the activation handshake ran, so the next InitializeEc() writes it
+        /// again. Called when the EC reports 0x0741 bit 0 cleared (an EC reset) or after a
+        /// resume; the handshake is write-only and idempotent.
+        /// </summary>
+        public void ResetActivation()
+        {
+            lock (_lock)
+                _ecHandshakeDone = false;
+        }
+
+        /// <summary>
+        /// Reads the state a support report needs, in one pass.
+        ///
+        /// Diagnostics only: no writes, no interpretation, and every read takes the normal
+        /// lock, so a fan plan can interleave. A slightly inconsistent snapshot is
+        /// acceptable for support; the caller's timeout is what stops a dump from waiting
+        /// behind a long plan, which is why the app treats a timeout as "busy, skipped".
+        /// Budget: ~20 single reads plus six 16-byte tables, ~0.7 s of EC traffic.
+        /// </summary>
+        public UCU.Contracts.EcHardwareDumpDto DumpHardwareState()
+        {
+            EnsureInitialized();
+
+            GpuPowerControlStateBytes gpu = GetGpuPowerControlState();
+            EcFanDutySnapshot duty = ReadFanDutyTelemetry();
+            int tableLength = EcVault.EC_TABLE_LENGTH;
+
+            return new UCU.Contracts.EcHardwareDumpDto
+            {
+                EcVersionMajor = ReadECRegister(REG_EC_VERSION_MAJOR),
+                EcVersionMinor = ReadECRegister(REG_EC_VERSION_MINOR),
+                ProjectIdRaw = GetProjectId(),
+                CpuTemperature = GetCpuTemperature(),
+                GpuTemperature = GetGpuTemperature(),
+                MainFanRpm = GetMainFanRpm(),
+                SecondFanRpm = GetSecondFanRpm(),
+                CpuFanDuty = duty.CpuFanDuty,
+                GpuFanDuty = duty.GpuFanDuty,
+                Pl1 = GetPl1(),
+                Pl2 = GetPl2(),
+                Pl4 = GetPl4(),
+                GpuEnable = gpu.Enable,
+                GpuCtgp = gpu.Ctgp,
+                GpuTpp = gpu.Tpp,
+                GpuDb = gpu.Db,
+                CoolingMode = ReadECRegister(REG_FAN_CURVE_PARAM_7C7),
+                LiquidCoolingSupport = ReadECRegister(REG_LIQUID_COOLING_SUPPORT),
+                ThermalBudget = ReadECRegister(REG_PL5_SETTING),
+                FanSwitchSpeed = ReadECRegister(REG_FAN_SWITCH_SPEED),
+                PerformanceMode = GetPerformanceMode(),
+                CustomProfileActive = gpu.CustomProfileActive,
+                FanControlSupported = IsFanControlSupported(),
+                CpuTempUp = ReadECRegisters(REG_CPU_TEMP_END_TABLE, tableLength),
+                CpuTempDown = ReadECRegisters(REG_CPU_TEMP_START_TABLE, tableLength),
+                CpuDuty = ReadECRegisters(REG_CPU_FAN_SPEED_TABLE, tableLength),
+                GpuTempUp = ReadECRegisters(REG_GPU_TEMP_END_TABLE, tableLength),
+                GpuTempDown = ReadECRegisters(REG_GPU_TEMP_START_TABLE, tableLength),
+                GpuDuty = ReadECRegisters(REG_GPU_FAN_SPEED_TABLE, tableLength),
+            };
+        }
+
+        /// <summary>Bit 1 of 0x07C7: the OEM's liquid-cooler-attached (LCSE) flag.</summary>
+        public const byte COOLING_MODE_LC_ACTIVE = EcVault.COOLING_MODE_LC_ACTIVE;
+
+        /// <summary>
+        /// Tells the EC whether a liquid cooler is attached (0x07C7 bit 1, LCSE).
+        ///
+        /// Bit-only read-modify-write: bits 2-4 of the same byte are the EC's OCPL level
+        /// (3 = normal) and are firmware-owned, so a whole-byte write would corrupt them
+        /// (MechControl's own init has that bug). With the flag set the EC moves to its
+        /// cooler policy: cooler preset records (CPU 162/162/195 W instead of
+        /// 145/145/174 W on the MECHREVO firmware), higher CPU channel limits, moved
+        /// fan-table bases, and - independently confirmed - the Linux driver selects OEM
+        /// TDP profile index 3 instead of 2 for Performance.
+        ///
+        /// Refused when 0x07A4 bit 7 is clear, so a model without liquid cooling never
+        /// receives a stray bit. The EC clears the flag on power transitions, so the
+        /// caller re-asserts it after resume; the handshake's literal 0x0C also clears
+        /// it, so it must be re-sent after an engine restart.
+        ///
+        /// Returns true when the register ended up in the requested state (read back).
+        /// </summary>
+        public bool SetLiquidCoolerAttached(bool attached)
+        {
+            EnsureInitialized();
+
+            byte support = ReadECRegister(REG_LIQUID_COOLING_SUPPORT);
+            if ((support & 0x80) == 0)
+            {
+                DebugLog($"[DIAG] EcEngine: liquid cooler flag refused - 0x07A4=0x{support:X2} (bit 7 clear: model does not declare liquid cooling)");
+                return false;
+            }
+
+            byte previous = ReadECRegister(REG_FAN_CURVE_PARAM_7C7);
+            byte desired = attached
+                ? (byte)(previous | COOLING_MODE_LC_ACTIVE)
+                : (byte)(previous & ~COOLING_MODE_LC_ACTIVE);
+
+            if (desired == previous)
+            {
+                DebugLog($"[DIAG] EcEngine: liquid cooler flag already {(attached ? "set" : "clear")} (0x07C7=0x{previous:X2})");
+                return true;
+            }
+
+            WriteECRegister(REG_FAN_CURVE_PARAM_7C7, desired);
+
+            byte readback = ReadECRegister(REG_FAN_CURVE_PARAM_7C7);
+            bool applied = (readback & COOLING_MODE_LC_ACTIVE) ==
+                           (attached ? COOLING_MODE_LC_ACTIVE : (byte)0);
+            DebugLog($"[DIAG] EcEngine: liquid cooler flag {(attached ? "set" : "cleared")} " +
+                     $"(0x07C7 0x{previous:X2} -> 0x{readback:X2}, {(applied ? "verified" : "READBACK MISMATCH")})");
+            return applied;
+        }
         /// <summary>
         /// Applies pre-built fan curves to both CPU and GPU. Ensures the EC
         /// activation handshake is complete (calls InitializeEc(), which is
@@ -2075,25 +2199,12 @@ namespace UCU.Hardware.Ec
             WriteECRegister(REG_PL4_SETTING, (byte)watts);
         }
 
-        /// <summary>
-        /// Reads the CPU PL5 (sustained power limit) in watts.
-        /// This appears to be the authoritative power cap on AM5/FireRange.
-        /// </summary>
-        public int GetPl5()
-        {
-            return ReadECRegister(REG_PL5_SETTING);
-        }
-
-        /// <summary>
-        /// Sets the CPU PL5 power limit in watts.
-        /// On AM5/FireRange, this may be the actual enforced sustained power cap.
-        /// </summary>
-        public void SetPl5(int watts)
-        {
-            EcPowerCodec.ValidatePowerLimit(watts);
-            WriteECRegister(REG_PL5_SETTING, (byte)watts);
-        }
-
+        // 0x0788 is not a host power limit. Measured 2026-11-10 on X6FR5xxY: the byte
+        // equals NVML's enforced TGP minus 95 (the board's DefaultTGP), and follows
+        // 0x0744 within ~0.8 s. The Linux driver names it EC_ADDR_THERMAL_BUDGET and
+        // the ACPI handoff calls it CTWA (configurable-TGP offset) -- both EC-produced.
+        // GetPl5/SetPl5 were removed rather than repaired (see US-01 in
+        // artifacts/notes/ucu-mechcontrol-adoption-user-stories.md).
         /// <summary>
         /// Sets the OVERBOOST performance profile on the EC (0x0751 bit 4).
         /// From tuxedo_io::uw_set_performance_profile_v1(PROFILE_OVERBOOST):

@@ -1,4 +1,5 @@
 using UCU.Contracts;
+using UCU.Core.Ec;
 using UCU.Hardware.Ec;
 
 namespace UCU.Engine
@@ -17,10 +18,12 @@ namespace UCU.Engine
                 // queue hop and one consistent EC snapshot, not nine racing reads.
                 return Task.FromResult<object?>(new FanStatusDto
                 {
-                    CpuTemperature = ec.GetCpuTemperature(),
-                    GpuTemperature = ec.GetGpuTemperature(),
-                    MainFanRpm = ec.GetMainFanRpm(),
-                    SecondFanRpm = ec.GetSecondFanRpm(),
+                    // Plausibility-gated: a garbage EC byte must not read as a real temperature
+                    // on the page or in an overlay. -1 renders as "unknown".
+                    CpuTemperature = EcSensorPlausibility.Temperature(ec.GetCpuTemperature()),
+                    GpuTemperature = EcSensorPlausibility.Temperature(ec.GetGpuTemperature()),
+                    MainFanRpm = EcSensorPlausibility.Rpm(ec.GetMainFanRpm()),
+                    SecondFanRpm = EcSensorPlausibility.Rpm(ec.GetSecondFanRpm()),
                     CpuFanDuty = duty.CpuFanDuty,
                     GpuFanDuty = duty.GpuFanDuty,
                     TurboActive = ec.IsTurboActive(),
@@ -119,7 +122,7 @@ namespace UCU.Engine
             add(EngineVerbs.Fan.SetFanSwitchSpeed, (p, ct) =>
             {
                 FanSwitchSpeedDto dto = EngineSerializer.BindParams<FanSwitchSpeedDto>(p);
-                gate.Acquire().SetFanSwitchSpeed(dto.Rpm);
+                gate.Acquire().SetFanSwitchSpeed(dto.Milliseconds);
                 return Task.FromResult<object?>(null);
             });
 

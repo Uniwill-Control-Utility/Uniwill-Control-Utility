@@ -101,6 +101,8 @@ namespace UCU.Engine
 
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
+        // Keeps the EC activated (0x0741 bit 0) and re-initialises it after a resume.
+        services.AddHostedService<EcSupervisionService>();
                 services.AddHostedService<AppSupervision>();
 
                 // Service mode only: the app-contract DACL asserted from inside the

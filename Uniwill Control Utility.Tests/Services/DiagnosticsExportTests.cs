@@ -86,6 +86,14 @@ public sealed class DiagnosticsExportTests
             string text = reader.ReadToEnd();
             Assert.Contains("Uniwill Control Utility diagnostics", text);
             Assert.Contains("OEM Control Center: state Active", text);
+
+            // US-10: the hardware file rides the same bundle, even when the engine
+            // cannot answer (this fake returns no dump) - it explains itself instead.
+            ZipArchiveEntry hardware = Assert.Single(zip.Entries, e => e.FullName == "hardware.txt");
+            using var hardwareReader = new StreamReader(hardware.Open());
+            string hardwareText = hardwareReader.ReadToEnd();
+            Assert.Contains("EC hardware state", hardwareText);
+            Assert.Contains("No EC state was read", hardwareText);
         }
         finally
         {
@@ -94,6 +102,52 @@ public sealed class DiagnosticsExportTests
         }
     }
 
+    private static EcHardwareDumpDto Dump() => new()
+    {
+        EcVersionMajor = 116,
+        EcVersionMinor = 0,
+        ProjectIdRaw = 0x1A,
+        CpuTemperature = 61,
+        GpuTemperature = 44,
+        MainFanRpm = 1300,
+        SecondFanRpm = 1350,
+        CpuFanDuty = 50,
+        GpuFanDuty = 50,
+        Pl1 = 95,
+        Pl2 = 135,
+        Pl4 = 135,
+        CoolingMode = 0x0E,
+        LiquidCoolingSupport = 0x80,
+        ThermalBudget = 80,
+        FanSwitchSpeed = 0x83,
+        PerformanceMode = 2,
+        CustomProfileActive = true,
+        FanControlSupported = true,
+        CpuDuty = new byte[] { 0, 60, 64, 72 },
+        GpuDuty = new byte[] { 0, 60, 64, 72 },
+    };
+
+    [Fact]
+    public void HardwareComposer_RendersIdentitySensorsAndTables()
+    {
+        string text = DiagnosticsExportService.ComposeHardware(Dump(), "collected");
+
+        Assert.Contains("EC version: 116.0", text);
+        Assert.Contains("Collection: collected", text);
+        Assert.Contains("CPU 61 C", text);
+        Assert.Contains("LCSE True", text);
+        Assert.Contains("OCPL 3", text);
+        Assert.Contains("CPU duty     00 3C 40 48", text);
+    }
+
+    [Fact]
+    public void HardwareComposer_ExplainsAMissingDumpInsteadOfThrowing()
+    {
+        string text = DiagnosticsExportService.ComposeHardware(null, "skipped: engine busy (dump timed out)");
+
+        Assert.Contains("skipped: engine busy", text);
+        Assert.Contains("No EC state was read", text);
+    }
     private sealed class FakeEngine : IEngineCapability
     {
         public Task<bool> PingAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
@@ -108,6 +162,9 @@ public sealed class DiagnosticsExportTests
             });
 
         public Task<bool> IsHardwareAvailableAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+        public Task<EcHardwareDumpDto?> DumpHardwareAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<EcHardwareDumpDto?>(null);
 
         public Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
 

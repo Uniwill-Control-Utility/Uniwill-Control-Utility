@@ -109,7 +109,10 @@
     { "name": "REG_HANDSHAKE_708", "value": "0x0708", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 1: write HANDSHAKE_708_VALUE (EcEngine.cs:317-319)" },
     { "name": "REG_FEATURE_ENABLE_748", "value": "0x0748", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 3 'feature enable': write FEATURE_ENABLE_748_VALUE (EcEngine.cs:332-333)" },
     { "name": "REG_BIOS_CTRL_706", "value": "0x0706", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 8 'BIOS_CTRL': write BIOS_CTRL_706_VALUE (EcEngine.cs:377-378)" },
-    { "name": "REG_FAN_CURVE_PARAM_7C7", "value": "0x07C7", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 6 'fan curve parameter': write FAN_CURVE_PARAM_7C7_VALUE (EcEngine.cs:367-368)" }
+    { "name": "REG_FAN_CURVE_PARAM_7C7", "value": "0x07C7", "domain": "handshake", "evidence": "MechControl decompiled init sequence, step 6 'fan curve parameter': write FAN_CURVE_PARAM_7C7_VALUE (EcEngine.cs:367-368)" },
+    { "name": "REG_LIQUID_COOLING_SUPPORT", "value": "0x07A4", "access": "ro", "domain": "fan", "evidence": "probe 2026-11-10: 0x80 on X6FR5xxY (EC 116.0) and X6AR558Y (EC 90.0); MechControl reads it as IsSupportLiquidCooling, and the Linux driver gates its water-cooler feature on the same bit" },
+    { "name": "REG_EC_VERSION_MAJOR", "value": "0x0454", "access": "ro", "domain": "identity", "evidence": "probe 2026-11-10: 0x74 (116) on X6FR5xxY, 0x5A (90) on X6AR558Y; MechControl reports the same pair as the EC version" },
+    { "name": "REG_EC_VERSION_MINOR", "value": "0x047D", "access": "ro", "domain": "identity", "evidence": "probe 2026-11-10: 0x00 on both machines; the pair reads n.nn" }
   ],
 
   "value": [
@@ -184,7 +187,9 @@
     { "name": "HANDSHAKE_708_VALUE", "value": "0x01", "register": "REG_HANDSHAKE_708", "evidence": "MechControl decompiled init sequence, step 1 (EcEngine.cs:319)" },
     { "name": "FEATURE_ENABLE_748_VALUE", "value": "0x81", "register": "REG_FEATURE_ENABLE_748", "evidence": "MechControl decompiled init sequence, step 3 (EcEngine.cs:333)" },
     { "name": "BIOS_CTRL_706_VALUE", "value": "0x41", "register": "REG_BIOS_CTRL_706", "evidence": "MechControl decompiled init sequence, step 8 (EcEngine.cs:378)" },
-    { "name": "FAN_CURVE_PARAM_7C7_VALUE", "value": "0x0C", "register": "REG_FAN_CURVE_PARAM_7C7", "evidence": "MechControl decompiled init sequence, step 6 (EcEngine.cs:368)" }
+    { "name": "FAN_CURVE_PARAM_7C7_VALUE", "value": "0x0C", "register": "REG_FAN_CURVE_PARAM_7C7", "evidence": "MechControl decompiled init sequence, step 6 (EcEngine.cs:368)" },
+    { "name": "COOLING_MODE_LC_ACTIVE", "value": "0x02", "register": "REG_FAN_CURVE_PARAM_7C7", "evidence": "bit 1: MechControl decompile (OEM sets it on BLE connect) + Linux driver EC_ADDR_COOLING_MODE / COOLING_MODE_LC_ACTIVE; probe 2026-11-10: 0x07C7=0x0C idle (LCSE clear, OCPL=3)" },
+    { "name": "AP_OEM_ACTIVATION_BIT", "value": "0x01", "register": "REG_AP_OEM", "evidence": "DSDT APPE: bit 0 set by the activation handshake, cleared by the EC on its reset paths (probe 2026-11-10: 0x01 while the app owns manual control)" }
   ],
 
   "valueArray": [

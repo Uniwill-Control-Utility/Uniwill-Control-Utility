@@ -61,6 +61,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(FanDutySnapshotDto))]
     [JsonSerializable(typeof(MetricsSnapshotDto))]
     [JsonSerializable(typeof(PowerLimitsDto))]
+    [JsonSerializable(typeof(EcHardwareDumpDto))]
     [JsonSerializable(typeof(PowerContractTruthDto))]
     [JsonSerializable(typeof(MuxStateDto))]
     [JsonSerializable(typeof(BatteryTelemetryDto))]
@@ -117,6 +118,7 @@ namespace UCU.Contracts
             FanDutySnapshotDto v => ToParams(v),
             MetricsSnapshotDto v => ToParams(v),
             PowerLimitsDto v => ToParams(v),
+            EcHardwareDumpDto v => ToParams(v),
             PowerContractTruthDto v => ToParams(v),
             MuxModeDto v => ToParams(v),
             MuxStateDto v => ToParams(v),

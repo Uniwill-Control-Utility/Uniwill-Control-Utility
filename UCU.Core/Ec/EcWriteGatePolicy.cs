@@ -59,7 +59,7 @@ namespace UCU.Core.Ec
         /// block straddling an allow boundary is refused as a whole: the caller
         /// cannot smuggle a power byte into a fan-table write by length arithmetic.
         /// </summary>
-        public static bool IsRawWriteAllowed(ushort address, int length)
+        public static bool IsRawWriteAllowed(ushort address, int length, bool allowFanTables = true)
         {
             if (length <= 0)
                 return false;
@@ -71,6 +71,13 @@ namespace UCU.Core.Ec
 
             foreach ((ushort start, ushort stop) in AllowedRanges)
             {
+                // The fan tables are writable only from the fan queue. The single-register
+                // telemetry verb runs on another queue, so allowing it there lets a raw
+                // byte land between two blocks of a smart-fan plan and leaves the table
+                // half-written (US-09).
+                if (!allowFanTables && start == EcVault.REGION_FAN_TABLE_BLOCK_START)
+                    continue;
+
                 if (address >= start && end <= stop)
                     return true;
             }

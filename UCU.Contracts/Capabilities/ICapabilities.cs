@@ -49,7 +49,8 @@ namespace UCU.Contracts.Capabilities
 
         Task SetFanPwmBothAsync(int duty, CancellationToken cancellationToken = default);
 
-        Task SetFanSwitchSpeedAsync(int rpm, CancellationToken cancellationToken = default);
+        /// <summary>Sets the EC fan ramp: 0 disables, else 100-12700 ms in 100 ms steps (register 0x0787).</summary>
+        Task SetFanSwitchSpeedAsync(int milliseconds, CancellationToken cancellationToken = default);
 
         Task ApplySmartFanCurveAsync(SmartFanCurveDto curve, CancellationToken cancellationToken = default);
 
@@ -71,9 +72,11 @@ namespace UCU.Contracts.Capabilities
 
         Task ApplyCpuPowerLimitsAsync(int pl1Watts, int pl2Watts, CancellationToken cancellationToken = default);
 
-        Task<int> GetTccOffsetAsync(CancellationToken cancellationToken = default);
-
-        Task SetTccOffsetAsync(int offset, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Tells the EC whether a liquid cooler is attached (0x07C7 bit 1). Bit-only
+        /// write; refused (false) on models whose 0x07A4 bit 7 is clear.
+        /// </summary>
+        Task<bool> SetLiquidCoolerAttachedAsync(bool attached, CancellationToken cancellationToken = default);
 
         Task<int> GetPerformanceModeAsync(CancellationToken cancellationToken = default);
 
@@ -370,6 +373,12 @@ namespace UCU.Contracts.Capabilities
         /// the action path and the account itself.
         /// </summary>
         Task<bool> SetAutostartAsync(bool enabled, int delaySeconds, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Read-only EC snapshot for a support report: identity, limits, cooling flags,
+        /// sensors and the six fan tables. Null when the EC is unavailable or busy.
+        /// </summary>
+        Task<EcHardwareDumpDto?> DumpHardwareAsync(CancellationToken cancellationToken = default);
     }
 
     /// <summary>

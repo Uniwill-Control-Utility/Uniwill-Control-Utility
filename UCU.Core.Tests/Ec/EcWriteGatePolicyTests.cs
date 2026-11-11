@@ -30,6 +30,28 @@ public sealed class EcWriteGatePolicyTests
         Assert.True(EcWriteGatePolicy.IsRawWriteAllowed(0x0F5F, 1));
     }
 
+    // ---- US-09: the same tables are closed to the telemetry raw path ---------
+
+    [Theory]
+    [InlineData(EcFanRegisters.CpuFanSpeedTable)] // 0x0F20
+    [InlineData(0x0F00)]                          // CPU tempUp
+    [InlineData(0x0F5F)]                          // last GPU duty byte
+    public void FanTables_AreRefusedFromTheSingleRegisterScope(ushort address)
+    {
+        // telemetry.write_register runs on another queue than the fan planner; a raw
+        // byte landing between two plan blocks leaves the table half-written.
+        Assert.False(EcWriteGatePolicy.IsRawWriteAllowed(address, 1, allowFanTables: false));
+        Assert.True(EcWriteGatePolicy.IsRawWriteAllowed(address, 1));
+    }
+
+    [Theory]
+    [InlineData(0x1804)] // PWM write block, fan 1
+    [InlineData(0x07A6)] // battery charge mode
+    [InlineData(0x0769)] // keyboard red channel
+    public void NonTableRegisters_StayWritableFromBothScopes(ushort address)
+    {
+        Assert.True(EcWriteGatePolicy.IsRawWriteAllowed(address, 1, allowFanTables: false));
+    }
     // ---- power / mode / magic / mux are the denied domains --------------------
 
     [Theory]

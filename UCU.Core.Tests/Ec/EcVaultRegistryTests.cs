@@ -187,6 +187,11 @@ public sealed class EcVaultRegistryTests
                 ["REGION_KBD_STATUS_BLOCK_END"] = 0x078C, // HEAD EcWriteGatePolicy.cs:49
                 ["REGION_BATTERY_MODE_BLOCK_START"] = 0x07A6, // HEAD EcWriteGatePolicy.cs:51 (0x07A6, 0x07A6)
                 ["REGION_BATTERY_MODE_BLOCK_END"] = 0x07A6, // HEAD EcWriteGatePolicy.cs:51
+            ["REG_LIQUID_COOLING_SUPPORT"] = 0x07A4, // probe 2026-11-10: 0x80 on X6FR5xxY and X6AR558Y
+            ["COOLING_MODE_LC_ACTIVE"] = 0x02,       // 0x07C7 bit 1 (LCSE)
+            ["REG_EC_VERSION_MAJOR"] = 0x0454,   // probe 2026-11-10 (116 on X6FR5xxY, 90 on X6AR558Y)
+            ["REG_EC_VERSION_MINOR"] = 0x047D,   // probe 2026-11-10
+            ["AP_OEM_ACTIVATION_BIT"] = 0x01,   // 0x0741 bit 0 (DSDT APPE)
     };
 
     [Fact]

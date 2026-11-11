@@ -179,14 +179,14 @@ public sealed class RawWriteGateTests
         {
             ("fan.set_speed_percent", "{\"percent\":150}", "duty > 100 %"),
             ("power.set_power_limit", "{\"kind\":0,\"watts\":300}", "PL > 255 W"),
-            ("power.set_tcc_offset", "{\"value\":256}", "TCC > 255"),
+            ("power.set_power_limit", "{\"kind\":3,\"watts\":100}", "PL5 is not a host limit (0x0788 = cTGP offset)"),
             ("power.set_mode", "{\"mode\":7}", "mode outside 0-3"),
             ("power.apply_stock_mode", "{\"modeCase\":5}", "stock outside 0-2"),
             ("battery.set_mode", "{\"mode\":5}", "battery mode outside 0-2"),
             ("keyboard.set_brightness", "{\"brightness\":9}", "brightness outside 0-7"),
             ("keyboard.set_color", "{\"red\":51,\"green\":0,\"blue\":0}", "channel > 50"),
             ("fan.set_pwm", "{\"fanIndex\":0,\"duty\":201}", "EC duty > 200"),
-            ("fan.set_switch_speed", "{\"rpm\":50}", "RPM below 100"),
+            ("fan.set_switch_speed", "{\"milliseconds\":50}", "ramp below 100 ms"),
         };
 
         await using var host = await EngineHostFixture.StartAsync();
@@ -204,6 +204,27 @@ public sealed class RawWriteGateTests
                 $"{verb} ({why}) must be reported as InvalidValue, got {ex.Code}: {ex.Message}");
             Assert.Empty(host.Fake.Writes);
         }
+    }
+
+    [Fact]
+    public async Task TccOffsetVerbs_AreGone_RatherThanWritingAFanPwmRegister()
+    {
+        // 0x0786 is a CPU TCC-offset control only on universal-fan-control systems; on
+        // the RamFan1 layout our models use it is L1_PWM_DEFAULT_MYFAN3, and writing it
+        // locked the CPU to 20 W. The verbs were removed, so the wire answer is
+        // UnsupportedVerb and the EC is untouched.
+        await using var host = await EngineHostFixture.StartAsync();
+        await PrimeGateAsync(host);
+
+        JsonElement parameters = JsonDocument.Parse("{\"value\":10}").RootElement.Clone();
+        EngineException set = await Assert.ThrowsAsync<EngineException>(
+            () => host.Client.InvokeAsync<object>("power.set_tcc_offset", parameters));
+        EngineException get = await Assert.ThrowsAsync<EngineException>(
+            () => host.Client.InvokeAsync<object>("power.get_tcc_offset", parameters));
+
+        Assert.Equal(EngineErrorCode.UnsupportedVerb, set.Code);
+        Assert.Equal(EngineErrorCode.UnsupportedVerb, get.Code);
+        Assert.Empty(host.Fake.Writes);
     }
 
     [Fact]

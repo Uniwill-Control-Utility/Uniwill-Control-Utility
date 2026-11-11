@@ -38,8 +38,6 @@ namespace UCU.Contracts
             public const string GetLimits = "power.get_limits";
             public const string SetPowerLimit = "power.set_power_limit";
             public const string ApplyCpuPowerLimits = "power.apply_cpu_limits";
-            public const string GetTccOffset = "power.get_tcc_offset";
-            public const string SetTccOffset = "power.set_tcc_offset";
             public const string GetPerformanceMode = "power.get_mode";
             public const string SetPerformanceMode = "power.set_mode";
             public const string ApplyOemStockMode = "power.apply_stock_mode";
@@ -78,6 +76,7 @@ namespace UCU.Contracts
             /// </summary>
             public const string GetAcRecovery = "power.get_ac_recovery";
             public const string SetAcRecovery = "power.set_ac_recovery";
+            public const string SetLiquidCooler = "power.set_liquid_cooler";
         }
 
         public static class Mux
@@ -277,6 +276,7 @@ namespace UCU.Contracts
             public const string GetMainFanRpm = "telemetry.get_main_fan_rpm";
             public const string GetSecondFanRpm = "telemetry.get_second_fan_rpm";
             public const string GetProjectId = "telemetry.get_project_id";
+            public const string DumpState = "telemetry.dump_state";
             public const string ReadRegister = "telemetry.read_register";
             public const string ReadRegisters = "telemetry.read_registers";
             public const string WriteRegister = "telemetry.write_register";

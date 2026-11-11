@@ -223,8 +223,7 @@ namespace Uniwill_Control_Utility.Scripts
                                 if (ryzenAdjCommandString == "ec-pl1") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl1, ecValue).GetAwaiter().GetResult();
                                 else if (ryzenAdjCommandString == "ec-pl2") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl2, ecValue).GetAwaiter().GetResult();
                                 else if (ryzenAdjCommandString == "ec-pl4") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl4, ecValue).GetAwaiter().GetResult();
-                                else if (ryzenAdjCommandString == "ec-pl5") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl5, ecValue).GetAwaiter().GetResult();
-                                else if (ryzenAdjCommandString == "ec-tcc-offset") EcService.SetTccOffsetAsync(ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString is "ec-pl5" or "ec-tcc-offset") DiagnosticLogger.LogDebug($"EC command refused: {ryzenAdjCommandString} targets a register that is not a host limit on this EC (0x0788 = cTGP offset, 0x0786 = fan PWM on RamFan1)");
                                 else if (ryzenAdjCommandString == "ec-mode") EcService.SetPerformanceModeAsync(ecValue).GetAwaiter().GetResult();
                                 else DiagnosticLogger.LogDebug($"Unknown EC command: {ryzenAdjCommandString}");
 

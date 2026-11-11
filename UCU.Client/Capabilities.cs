@@ -74,8 +74,8 @@ namespace UCU.Client
         public Task SetFanPwmBothAsync(int duty, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Fan.SetFanPwmBoth, new FanPwmDto { Duty = duty }, cancellationToken);
 
-        public Task SetFanSwitchSpeedAsync(int rpm, CancellationToken cancellationToken = default) =>
-            _client.InvokeAsync(EngineVerbs.Fan.SetFanSwitchSpeed, new FanSwitchSpeedDto { Rpm = rpm }, cancellationToken);
+        public Task SetFanSwitchSpeedAsync(int milliseconds, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync(EngineVerbs.Fan.SetFanSwitchSpeed, new FanSwitchSpeedDto { Milliseconds = milliseconds }, cancellationToken);
 
         public Task ApplySmartFanCurveAsync(SmartFanCurveDto curve, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Fan.ApplySmartFanCurve, curve, cancellationToken);
@@ -109,11 +109,8 @@ namespace UCU.Client
         public Task ApplyCpuPowerLimitsAsync(int pl1Watts, int pl2Watts, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Power.ApplyCpuPowerLimits, new CpuPowerLimitsDto { Pl1Watts = pl1Watts, Pl2Watts = pl2Watts }, cancellationToken);
 
-        public Task<int> GetTccOffsetAsync(CancellationToken cancellationToken = default) =>
-            _client.InvokeAsync<int>(EngineVerbs.Power.GetTccOffset, cancellationToken);
-
-        public Task SetTccOffsetAsync(int offset, CancellationToken cancellationToken = default) =>
-            _client.InvokeAsync(EngineVerbs.Power.SetTccOffset, new IntValueDto { Value = offset }, cancellationToken);
+        public Task<bool> SetLiquidCoolerAttachedAsync(bool attached, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Power.SetLiquidCooler, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = attached }), cancellationToken);
 
         public Task<int> GetPerformanceModeAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<int>(EngineVerbs.Power.GetPerformanceMode, cancellationToken);
@@ -437,6 +434,9 @@ namespace UCU.Client
 
         public Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Engine.NotifyAppExit, cancellationToken);
+
+        public Task<EcHardwareDumpDto?> DumpHardwareAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<EcHardwareDumpDto?>(EngineVerbs.Telemetry.DumpState, cancellationToken);
 
         public Task<bool> SetAutostartAsync(bool enabled, int delaySeconds, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(

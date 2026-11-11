@@ -16,8 +16,6 @@ namespace UCU.Engine
                     Pl1 = ec.GetPl1(),
                     Pl2 = ec.GetPl2(),
                     Pl4 = ec.GetPl4(),
-                    Pl5 = ec.GetPl5(),
-                    TccOffset = ec.GetTccOffset(),
                 });
             });
 
@@ -40,8 +38,10 @@ namespace UCU.Engine
                         ec.SetPl4(dto.Watts);
                         break;
                     case PowerLimitKind.Pl5:
-                        ec.SetPl5(dto.Watts);
-                        break;
+                        // 0x0788 is the EC's cTGP offset (EC-produced), not a limit.
+                        // Refused rather than written: see US-01.
+                        throw new ArgumentOutOfRangeException(nameof(dto.Kind), dto.Kind,
+                            "PL5 is not a host-settable limit: 0x0788 is the EC's cTGP offset.");
                     default:
                         throw new ArgumentOutOfRangeException(nameof(dto.Kind), dto.Kind,
                             $"no EC power limit '{dto.Kind}'");
@@ -57,15 +57,10 @@ namespace UCU.Engine
                 return Task.FromResult<object?>(null);
             });
 
-            add(EngineVerbs.Power.GetTccOffset, (p, ct) =>
-                Task.FromResult<object?>(gate.Acquire().GetTccOffset()));
-
-            add(EngineVerbs.Power.SetTccOffset, (p, ct) =>
-            {
-                IntValueDto v = EngineSerializer.BindParams<IntValueDto>(p);
-                gate.Acquire().SetTccOffset(v.Value);
-                return Task.FromResult<object?>(null);
-            });
+            // 0x0786 (TCC offset) verbs were removed: the register is only a TCC
+            // control on universal-fan-control systems, and on the RamFan1 layout our
+            // models use it is an L1 fan-PWM default (writing it locked the CPU to
+            // 20 W). Reinstating it needs an ECSpec-derived fan-table format first.
 
             add(EngineVerbs.Power.GetPerformanceMode, (p, ct) =>
                 Task.FromResult<object?>(gate.Acquire().GetPerformanceMode()));
@@ -161,6 +156,16 @@ namespace UCU.Engine
             {
                 DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
                 return Task.FromResult<object?>(gate.Acquire().SetAcRecoveryEnabled(dto.Enabled));
+            });
+
+            // Liquid-cooler EC flag (US-04): bit 1 of 0x07C7. Rides the POWER domain so
+            // it is ordered against the handshake's 0x07C7 write and every other power
+            // register, and so the EC applies the new preset record with the rest of the
+            // contract. Bit-only RMW; refused where 0x07A4 bit 7 is clear.
+            add(EngineVerbs.Power.SetLiquidCooler, (p, ct) =>
+            {
+                DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
+                return Task.FromResult<object?>(gate.Acquire().SetLiquidCoolerAttached(dto.Enabled));
             });
         }
     }

@@ -8,6 +8,7 @@ namespace UCU.Contracts
         Pl1 = 0,
         Pl2 = 1,
         Pl4 = 2,
+        /// <summary>Reserved, refused: 0x0788 is the EC's cTGP offset, not a limit.</summary>
         Pl5 = 3,
     }
 
@@ -125,7 +126,8 @@ namespace UCU.Contracts
 
     public sealed record FanSwitchSpeedDto
     {
-        public int Rpm { get; init; }
+        /// <summary>Ramp time in milliseconds: 0 disables, otherwise 100-12700 in 100 ms steps.</summary>
+        public int Milliseconds { get; init; }
     }
 
     public sealed record SmartFanCurveDto
@@ -367,6 +369,76 @@ namespace UCU.Contracts
         public int ReadingAgeSeconds { get; init; }
     }
 
+    /// <summary>
+    /// The EC state a support report needs: identity, limits, cooling flags, sensors and
+    /// the six fan tables. Raw EC bytes, no interpretation, so two reports from different
+    /// builds can be compared directly.
+    /// </summary>
+    public sealed record EcHardwareDumpDto
+    {
+        public int EcVersionMajor { get; init; }
+
+        public int EcVersionMinor { get; init; }
+
+        public int ProjectIdRaw { get; init; }
+
+        public int CpuTemperature { get; init; }
+
+        public int GpuTemperature { get; init; }
+
+        public int MainFanRpm { get; init; }
+
+        public int SecondFanRpm { get; init; }
+
+        public int CpuFanDuty { get; init; }
+
+        public int GpuFanDuty { get; init; }
+
+        public int Pl1 { get; init; }
+
+        public int Pl2 { get; init; }
+
+        public int Pl4 { get; init; }
+
+        public int GpuEnable { get; init; }
+
+        public int GpuCtgp { get; init; }
+
+        public int GpuTpp { get; init; }
+
+        public int GpuDb { get; init; }
+
+        /// <summary>0x07C7: bit 1 = liquid cooler attached (LCSE), bits 2-4 = OCPL level.</summary>
+        public int CoolingMode { get; init; }
+
+        /// <summary>0x07A4: bit 7 = the EC declares liquid-cooling support.</summary>
+        public int LiquidCoolingSupport { get; init; }
+
+        /// <summary>0x0788: the EC's published cTGP offset (Linux driver: thermal budget).</summary>
+        public int ThermalBudget { get; init; }
+
+        /// <summary>0x0787: bit 7 = ramp enabled, bits 0-6 = time in 100 ms steps.</summary>
+        public int FanSwitchSpeed { get; init; }
+
+        public int PerformanceMode { get; init; }
+
+        public bool CustomProfileActive { get; init; }
+
+        public bool FanControlSupported { get; init; }
+
+        public byte[] CpuTempUp { get; init; } = System.Array.Empty<byte>();
+
+        public byte[] CpuTempDown { get; init; } = System.Array.Empty<byte>();
+
+        public byte[] CpuDuty { get; init; } = System.Array.Empty<byte>();
+
+        public byte[] GpuTempUp { get; init; } = System.Array.Empty<byte>();
+
+        public byte[] GpuTempDown { get; init; } = System.Array.Empty<byte>();
+
+        public byte[] GpuDuty { get; init; } = System.Array.Empty<byte>();
+    }
+
     public sealed record PowerLimitsDto
     {
         public int Pl1 { get; init; }
@@ -374,10 +446,6 @@ namespace UCU.Contracts
         public int Pl2 { get; init; }
 
         public int Pl4 { get; init; }
-
-        public int Pl5 { get; init; }
-
-        public int TccOffset { get; init; }
     }
 
     /// <summary>

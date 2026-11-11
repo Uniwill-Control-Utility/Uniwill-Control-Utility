@@ -3,7 +3,7 @@ using UCU.Core.Ec.Generated;
 namespace UCU.Core.Ec
 {
     /// <summary>
-    /// Encodes the EC power-mode registers: the CPU power limits, the TCC offset, the
+    /// Encodes the EC power-mode registers: the CPU power limits, the
     /// OEM performance-mode index, and the literal sequences the OEM "stock" presets
     /// write.
     ///
@@ -21,9 +21,6 @@ namespace UCU.Core.Ec
 
         /// <summary>Highest power limit the EC encodes (single byte), in watts.</summary>
         public const int MaxPowerWatts = 255;
-
-        /// <summary>Highest TCC offset the EC encodes (degrees below the default junction temp).</summary>
-        public const int MaxTccOffset = 255;
 
         /// <summary>Number of OEM performance modes: quiet, balanced, performance, battery saver.</summary>
         public const int PerformanceModeCount = 4;
@@ -86,13 +83,11 @@ namespace UCU.Core.Ec
         /// Commit value the OEM writes last in every stock-preset body (and never in a
         /// custom profile): 0x83.
         /// </summary>
+        /// <summary>0x83: the OEM's fan ramp time (enabled, 300 ms on 0x0787), not a commit.</summary>
         public const byte StockModeCommit = EcVault.OEM_MODE_COMMIT;
 
         /// <summary>Encodes a CPU power limit (PL1/PL2/PL4/PL5) in watts to its EC byte.</summary>
         public static byte EncodePowerLimit(int watts) => (byte)Math.Clamp(watts, MinPowerWatts, MaxPowerWatts);
-
-        /// <summary>Encodes a TCC offset to its EC byte.</summary>
-        public static byte EncodeTccOffset(int offset) => (byte)Math.Clamp(offset, 0, MaxTccOffset);
 
         /// <summary>
         /// Rejects a power limit the EC cannot represent. The engine calls this before
@@ -103,14 +98,6 @@ namespace UCU.Core.Ec
             if (watts < MinPowerWatts || watts > MaxPowerWatts)
                 throw new ArgumentOutOfRangeException(nameof(watts),
                     $"Power limit must be {MinPowerWatts}-{MaxPowerWatts} W, got {watts}.");
-        }
-
-        /// <summary>Rejects a TCC offset the EC cannot represent.</summary>
-        public static void ValidateTccOffset(int offset)
-        {
-            if (offset < 0 || offset > MaxTccOffset)
-                throw new ArgumentOutOfRangeException(nameof(offset),
-                    $"TCC offset must be 0-{MaxTccOffset}, got {offset}.");
         }
 
         /// <summary>

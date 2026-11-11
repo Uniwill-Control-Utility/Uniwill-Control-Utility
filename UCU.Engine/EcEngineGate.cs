@@ -76,6 +76,21 @@ namespace UCU.Engine
             }
         }
 
+        /// <summary>
+        /// Drops the initialized state so the next <see cref="Acquire"/> reopens the handle
+        /// and re-runs the activation handshake. The EC supervisor calls this after a resume
+        /// (the device state can be stale) and when 0x0741 shows bit 0 cleared (the EC reset
+        /// itself). The handshake is write-only and idempotent, so repeating it is safe.
+        /// </summary>
+        public void Invalidate()
+        {
+            lock (_gate)
+            {
+                _initialized = false;
+                _engine?.ResetActivation();
+            }
+        }
+
         /// <summary>The platform the engine resolved, initializing the engine if needed.</summary>
         public EcPlatform Platform => Acquire().Platform;
 
