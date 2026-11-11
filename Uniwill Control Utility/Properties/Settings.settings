@@ -113,6 +113,9 @@
     <Setting Name="ThermalFailsafeThreshold" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">88</Value>
     </Setting>
+    <Setting Name="ThermalFailsafeCpuThreshold" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">95</Value>
+    </Setting>
     <Setting Name="GuardianEnabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>

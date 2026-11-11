@@ -373,6 +373,40 @@
                                             ValueChanged="slThermalFailsafeThreshold_ValueChanged" />
                                 </StackPanel>
                             </Grid>
+
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <Grid x:Name="ThermalFailsafeCpuThresholdRow">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU trip temperature" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="CPUs run hotter than GPUs, so this trip point is higher. Reaching it raises the fans and holds the CPU at 50 W until it cools 5 degrees below."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                                    <ui:TextBlock x:Name="lblThermalFailsafeCpuThreshold"
+                                                  Margin="0,0,12,0"
+                                                  VerticalAlignment="Center"
+                                                  MinWidth="52"
+                                                  TextAlignment="Right"
+                                                  Text="" />
+                                    <Slider x:Name="slThermalFailsafeCpuThreshold"
+                                            Width="170"
+                                            Minimum="85"
+                                            Maximum="100"
+                                            TickFrequency="2"
+                                            TickPlacement="Both"
+                                            IsSnapToTickEnabled="True"
+                                            ValueChanged="slThermalFailsafeCpuThreshold_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
                     <!-- Feature control -->

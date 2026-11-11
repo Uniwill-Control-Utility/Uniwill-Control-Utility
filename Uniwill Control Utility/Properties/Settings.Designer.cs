@@ -439,6 +439,14 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("95")]
+        public int ThermalFailsafeCpuThreshold {
+            get { return ((int)(this["ThermalFailsafeCpuThreshold"])); }
+            set { this["ThermalFailsafeCpuThreshold"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("88")]
         public int ThermalFailsafeThreshold {
             get { return ((int)(this["ThermalFailsafeThreshold"])); }

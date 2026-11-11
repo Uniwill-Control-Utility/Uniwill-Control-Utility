@@ -119,6 +119,12 @@ namespace UCU.Engine
                 return Task.FromResult<object?>(null);
             });
 
+            // Thermal failsafe (US-11 v2): hardware fan boost as a set, not a toggle.
+            add(EngineVerbs.Fan.SetFanBoost, (p, ct) =>
+            {
+                DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
+                return Task.FromResult<object?>(gate.Acquire().SetFanBoost(dto.Enabled));
+            });
             add(EngineVerbs.Fan.SetFanSwitchSpeed, (p, ct) =>
             {
                 FanSwitchSpeedDto dto = EngineSerializer.BindParams<FanSwitchSpeedDto>(p);

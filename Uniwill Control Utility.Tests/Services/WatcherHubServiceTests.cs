@@ -628,6 +628,7 @@ public sealed class WatcherHubServiceTests
         public Task<bool> SetFanPwmAsync(int fanIndex, int duty, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetFanPwmBothAsync(int duty, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetFanSwitchSpeedAsync(int rpm, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> SetFanBoostAsync(bool enabled, CancellationToken ct = default) => throw new NotSupportedException();
         public Task ApplySmartFanCurveAsync(SmartFanCurveDto curve, CancellationToken ct = default) => throw new NotSupportedException();
         public Task ApplySmartFanDutyAsync(byte[] cpuDuty, byte[] gpuDuty, CancellationToken ct = default) => throw new NotSupportedException();
         public Task UnlockManualModeAsync(CancellationToken ct = default) => throw new NotSupportedException();

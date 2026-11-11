@@ -1089,6 +1089,34 @@ namespace UCU.Hardware.Ec
         /// fans to maximum speed. When disabled: restores saved EC state.
         /// Based on uniwill-laptop-driver fan mode 0 (full speed).
         /// </summary>
+        /// <summary>
+        /// Sets or clears the EC's hardware fan boost bit (0x0751 bit 6) and touches
+        /// nothing else.
+        ///
+        /// ToggleTurbo() also rewrites duty tables, which would fight a user curve, and it
+        /// is a toggle - a blind toggle on a matching state turns the fans OFF. The thermal
+        /// failsafe needs a set with known semantics, so the caller captures TurboActive
+        /// first and only undoes its own change. The EC also clears this bit by itself once
+        /// the machine is cool (~60 ticks, X6FR5 firmware review), so a stuck bit is not a
+        /// lasting state.
+        /// </summary>
+        public bool SetFanBoost(bool enabled)
+        {
+            EnsureInitialized();
+
+            byte previous = ReadECRegister(REG_MANUAL_FAN_CTRL);
+            byte desired = enabled
+                ? (byte)(previous | FAN_MODE_BOOST)
+                : (byte)(previous & ~FAN_MODE_BOOST);
+
+            if (desired != previous)
+                WriteECRegister(REG_MANUAL_FAN_CTRL, desired);
+
+            byte readback = ReadECRegister(REG_MANUAL_FAN_CTRL);
+            bool applied = ((readback & FAN_MODE_BOOST) != 0) == enabled;
+            DebugLog($"[DIAG] EcEngine: fan boost {(enabled ? "set" : "cleared")} (0x0751 0x{previous:X2} -> 0x{readback:X2}, {(applied ? "verified" : "READBACK MISMATCH")})");
+            return applied;
+        }
         public void ToggleTurbo()
         {
             InitializeEc();

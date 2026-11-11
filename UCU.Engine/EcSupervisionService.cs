@@ -35,6 +35,9 @@ namespace UCU.Engine
         /// <summary>How often 0x0741 is read to prove the EC is still activated.</summary>
         internal static readonly TimeSpan LivenessInterval = TimeSpan.FromSeconds(30);
 
+        /// <summary>Resume detection is armed only after this long: startup can delay a tick.</summary>
+        internal static readonly TimeSpan Warmup = TimeSpan.FromSeconds(60);
+
         /// <summary>Quiet period after repeated failures (no EC / dead driver).</summary>
         internal static readonly TimeSpan FailureBackoff = TimeSpan.FromSeconds(60);
 
@@ -52,7 +55,8 @@ namespace UCU.Engine
             // Wall clock, not a Stopwatch: the monotonic counter does not advance across
             // S3 sleep, which is exactly the gap this has to see. Measured 2026-11-11: a
             // real sleep/wake produced no resume with Stopwatch.Elapsed.
-            DateTime lastTick = DateTime.UtcNow;
+            DateTime startedAt = DateTime.UtcNow;
+            DateTime lastTick = startedAt;
             DateTime lastLiveness = DateTime.UtcNow;
             DateTime backoffUntil = DateTime.MinValue;
             int consecutiveFailures = 0;
@@ -72,8 +76,11 @@ namespace UCU.Engine
                 DateTime now = DateTime.UtcNow;
                 TimeSpan gap = now - lastTick;
 
-                // A backwards jump (NTP correction) is not a resume.
-                if (gap > TimeSpan.Zero && EcSupervisionPolicy.LooksLikeResume(gap, Tick))
+                // A backwards jump (NTP correction) is not a resume, and the first minute after
+                // start is excluded: a heavily loaded boot can delay a tick past the gap
+                // threshold, and a false resume cancels and re-runs the handshake.
+                bool warmedUp = now - startedAt > Warmup;
+                if (warmedUp && gap > TimeSpan.Zero && EcSupervisionPolicy.LooksLikeResume(gap, Tick))
                 {
                     _log.LogInformation(
                         "[Supervision] resume detected (tick gap {Gap:F0}s): re-initialising the EC",

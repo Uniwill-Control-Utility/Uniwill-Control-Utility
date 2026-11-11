@@ -1102,5 +1102,7 @@
   "Enable thermal failsafe": "Enable thermal failsafe",
   "Off by default: it costs performance by design": "Off by default: it costs performance by design",
   "Trip temperature": "Trip temperature",
-  "Sustained GPU temperature at which power is held down; release needs 5 below it": "Sustained GPU temperature at which power is held down; release needs 5 below it"
+  "Sustained GPU temperature at which power is held down; release needs 5 below it": "Sustained GPU temperature at which power is held down; release needs 5 below it",
+  "CPU trip temperature": "CPU trip temperature",
+  "CPUs run hotter than GPUs, so this trip point is higher. Reaching it raises the fans and holds the CPU at 50 W until it cools 5 degrees below.": "CPUs run hotter than GPUs, so this trip point is higher. Reaching it raises the fans and holds the CPU at 50 W until it cools 5 degrees below."
 }

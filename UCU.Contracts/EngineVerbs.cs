@@ -26,6 +26,7 @@ namespace UCU.Contracts
             public const string SetFanPwm = "fan.set_pwm";
             public const string SetFanPwmBoth = "fan.set_pwm_both";
             public const string SetFanSwitchSpeed = "fan.set_switch_speed";
+            public const string SetFanBoost = "fan.set_boost";
             public const string ApplySmartFanCurve = "fan.apply_smart_curve";
             public const string ApplySmartFanDuty = "fan.apply_smart_duty";
             public const string UnlockManualMode = "fan.unlock_manual_mode";

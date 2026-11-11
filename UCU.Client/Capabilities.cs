@@ -77,6 +77,9 @@ namespace UCU.Client
         public Task SetFanSwitchSpeedAsync(int milliseconds, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Fan.SetFanSwitchSpeed, new FanSwitchSpeedDto { Milliseconds = milliseconds }, cancellationToken);
 
+        public Task<bool> SetFanBoostAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Fan.SetFanBoost, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = enabled }), cancellationToken);
+
         public Task ApplySmartFanCurveAsync(SmartFanCurveDto curve, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Fan.ApplySmartFanCurve, curve, cancellationToken);
 

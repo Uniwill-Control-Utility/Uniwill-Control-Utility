@@ -31,6 +31,16 @@ namespace UCU.Core.Supervision
         /// <summary>Above this the trip point sits past the junction limit; refuse it.</summary>
         public const int MaxThresholdCelsius = 95;
 
+        /// <summary>
+        /// CPU trip band. CPUs run hotter than GPUs under sustained load (a 9955HX3D sits
+        /// in the high 80s in a game), so the CPU needs its own, higher trip point - a
+        /// shared one would hold CPU power down permanently.
+        /// </summary>
+        public const int MinCpuThresholdCelsius = 85;
+
+        public const int MaxCpuThresholdCelsius = 100;
+
+        public const int DefaultCpuThresholdCelsius = 95;
         /// <summary>Default trip point. Well below TjMax (105) so the hold lands before throttling.</summary>
         public const int DefaultThresholdCelsius = 88;
 
@@ -46,6 +56,10 @@ namespace UCU.Core.Supervision
         /// <summary>True when the value is a threshold the policy can use.</summary>
         public static bool IsValidThreshold(int threshold) =>
             threshold is >= MinThresholdCelsius and <= MaxThresholdCelsius;
+
+        /// <summary>True when the value is a CPU threshold the policy can use.</summary>
+        public static bool IsValidCpuThreshold(int threshold) =>
+            threshold is >= MinCpuThresholdCelsius and <= MaxCpuThresholdCelsius;
 
         /// <summary>
         /// One sample's verdict. <paramref name="tripped"/> is the persisted state, so a

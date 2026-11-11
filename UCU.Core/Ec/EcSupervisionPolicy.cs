@@ -16,10 +16,11 @@ namespace UCU.Core.Ec
     {
         /// <summary>
         /// A tick gap this many times the interval means the clock stopped — the machine
-        /// suspended. Three intervals leaves room for a slow tick (GC, IO stall) without
-        /// mistaking it for a resume.
+        /// suspended. Measured 2026-11-11: three intervals (15 s) is too small, because a
+        /// loaded host can delay a tick that long and a false resume re-runs the handshake;
+        /// six (30 s) still catches every real suspend, which are minutes.
         /// </summary>
-        public const int ResumeGapMultiplier = 3;
+        public const int ResumeGapMultiplier = 6;
 
         /// <summary>0x0741 bit 0: the EC's activation bit (APPE), set by the handshake.</summary>
         public const byte ActivationBit = Generated.EcVault.AP_OEM_ACTIVATION_BIT;

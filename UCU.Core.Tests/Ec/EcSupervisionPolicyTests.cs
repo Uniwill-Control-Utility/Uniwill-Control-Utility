@@ -14,7 +14,8 @@ public sealed class EcSupervisionPolicyTests
     [Theory]
     [InlineData(5, false)]    // normal tick
     [InlineData(14, false)]   // slow tick (GC, IO stall) - still not a resume
-    [InlineData(16, true)]    // past 3x: the clock stopped
+    [InlineData(29, false)]   // a loaded host can delay a tick this far without sleeping
+    [InlineData(31, true)]    // past 6x: the clock stopped
     [InlineData(3600, true)]  // an hour asleep
     public void LooksLikeResume_OnlyPastThreeIntervals(int elapsedSeconds, bool expected)
     {

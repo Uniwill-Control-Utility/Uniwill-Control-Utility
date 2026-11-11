@@ -52,6 +52,9 @@ namespace UCU.Contracts.Capabilities
         /// <summary>Sets the EC fan ramp: 0 disables, else 100-12700 ms in 100 ms steps (register 0x0787).</summary>
         Task SetFanSwitchSpeedAsync(int milliseconds, CancellationToken cancellationToken = default);
 
+        /// <summary>Sets or clears the hardware fan boost bit (0x0751 bit 6) without touching the tables.</summary>
+        Task<bool> SetFanBoostAsync(bool enabled, CancellationToken cancellationToken = default);
+
         Task ApplySmartFanCurveAsync(SmartFanCurveDto curve, CancellationToken cancellationToken = default);
 
         Task ApplySmartFanDutyAsync(byte[] cpuDuty, byte[] gpuDuty, CancellationToken cancellationToken = default);
