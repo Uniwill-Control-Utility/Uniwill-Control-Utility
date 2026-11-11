@@ -300,7 +300,7 @@ namespace Uniwill_Control_Utility.Services
         /// Disables Adaptive Mode override for EC Fan Control.
         /// Restores the previously saved user settings and re-applies them to the EC.
         /// </summary>
-        public void DisableEcFanOverride()
+        public async Task DisableEcFanOverrideAsync()
         {
             if (!IsEcFanOverridden)
                 return;
@@ -345,7 +345,7 @@ namespace Uniwill_Control_Utility.Services
                             // The capability call is fully asynchronous off-thread (bridge
                             // task pool / RPC), so blocking this worker keeps the pre-RPC
                             // synchronous flow without parking an EC sequence on the UI thread.
-                            _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
+                            await _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
@@ -736,12 +736,12 @@ namespace Uniwill_Control_Utility.Services
                             if (arg.StartsWith("--slow-limit="))
                             {
                                 if (int.TryParse(arg.Substring("--slow-limit=".Length), out int slow))
-                                    ec.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl1, slow / 1000).GetAwaiter().GetResult();
+                                    await ec.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl1, slow / 1000).ConfigureAwait(false);
                             }
                             else if (arg.StartsWith("--fast-limit="))
                             {
                                 if (int.TryParse(arg.Substring("--fast-limit=".Length), out int fast))
-                                    ec.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl2, fast / 1000).GetAwaiter().GetResult();
+                                    await ec.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl2, fast / 1000).ConfigureAwait(false);
                             }
                         }
                     }

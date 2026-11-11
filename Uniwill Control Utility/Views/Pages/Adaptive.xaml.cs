@@ -534,7 +534,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     {
                         _ = _deviceApplier.DisableFlydigiOverrideAsync();
                         _ = _deviceApplier.DisableWatercoolerOverrideAsync();
-                        _deviceApplier.DisableEcFanOverride();
+                        await _deviceApplier.DisableEcFanOverrideAsync().ConfigureAwait(true);
                         _deviceApplier.DisableKeyboardOverride();
                         _deviceApplier.DisableLightBarOverride();
                         _ = _deviceApplier.DisableCpuGpuOverrideAsync();
@@ -1339,7 +1339,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _ = _deviceApplier!.DisableWatercoolerOverrideAsync();
         }
 
-        private void cbxEcFanEnabled_Toggled(object sender, RoutedEventArgs e)
+        private async void cbxEcFanEnabled_Toggled(object sender, RoutedEventArgs e)
         {
             bool enabled = cbxEcFanEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveEcFanEnabled = enabled;
@@ -1358,7 +1358,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
-                _deviceApplier?.DisableEcFanOverride();
+                if (_deviceApplier is not null) await _deviceApplier.DisableEcFanOverrideAsync().ConfigureAwait(true);
             }
         }
 

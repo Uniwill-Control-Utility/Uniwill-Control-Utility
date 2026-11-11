@@ -121,7 +121,7 @@ namespace Uniwill_Control_Utility.ViewModels
                         if (deviceApplier.IsWatercoolerOverridden)
                             _ = deviceApplier.DisableWatercoolerOverrideAsync();
                         if (deviceApplier.IsEcFanOverridden)
-                            deviceApplier.DisableEcFanOverride();
+                            _ = deviceApplier.DisableEcFanOverrideAsync();
                         if (deviceApplier.IsKeyboardOverridden)
                             deviceApplier.DisableKeyboardOverride();
                         if (deviceApplier.IsLightBarOverridden)

@@ -248,7 +248,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     await _deviceApplier.DisableFlydigiOverrideAsync();
                     await _deviceApplier.DisableWatercoolerOverrideAsync();
-                    _deviceApplier.DisableEcFanOverride();
+                    await _deviceApplier.DisableEcFanOverrideAsync();
                     _deviceApplier.DisableKeyboardOverride();
                     _deviceApplier.DisableLightBarOverride();
                     await _deviceApplier.DisableCpuGpuOverrideAsync();

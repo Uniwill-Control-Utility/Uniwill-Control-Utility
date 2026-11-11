@@ -55,8 +55,8 @@ public sealed class FanStartupOwnershipTests
         // write the page's curve over a stock preset - the EC then ran Full Speed
         // while the UI claimed Office/Gaming/Turbo was driving the fans.
         string applier = ReadAppFile("Services", "DeviceApplier.cs");
-        int start = applier.IndexOf("public void DisableEcFanOverride", StringComparison.Ordinal);
-        Assert.True(start > 0, "DisableEcFanOverride not found");
+        int start = applier.IndexOf("public async Task DisableEcFanOverrideAsync", StringComparison.Ordinal);
+        Assert.True(start > 0, "DisableEcFanOverrideAsync not found");
         int end = applier.IndexOf("\n        }", start, StringComparison.Ordinal);
         string liftBody = applier.Substring(start, end - start);
 
