@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 using UCU.Contracts;
 using UCU.Core.Ec;
 using UCU.Hardware.Ec;
@@ -30,7 +29,7 @@ namespace UCU.Engine
     /// </summary>
     public sealed class EcSupervisionService : BackgroundService
     {
-        /// <summary>Tick cadence. Only a stopwatch compare on most ticks.</summary>
+        /// <summary>Tick cadence. Only a clock compare on most ticks.</summary>
         internal static readonly TimeSpan Tick = TimeSpan.FromSeconds(5);
 
         /// <summary>How often 0x0741 is read to prove the EC is still activated.</summary>
@@ -50,10 +49,12 @@ namespace UCU.Engine
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var clock = Stopwatch.StartNew();
-            TimeSpan lastTick = clock.Elapsed;
-            TimeSpan lastLiveness = clock.Elapsed;
-            TimeSpan backoffUntil = TimeSpan.Zero;
+            // Wall clock, not a Stopwatch: the monotonic counter does not advance across
+            // S3 sleep, which is exactly the gap this has to see. Measured 2026-11-11: a
+            // real sleep/wake produced no resume with Stopwatch.Elapsed.
+            DateTime lastTick = DateTime.UtcNow;
+            DateTime lastLiveness = DateTime.UtcNow;
+            DateTime backoffUntil = DateTime.MinValue;
             int consecutiveFailures = 0;
             bool sawActivation = false;
 
@@ -68,13 +69,15 @@ namespace UCU.Engine
                     return;
                 }
 
-                TimeSpan now = clock.Elapsed;
+                DateTime now = DateTime.UtcNow;
+                TimeSpan gap = now - lastTick;
 
-                if (EcSupervisionPolicy.LooksLikeResume(now - lastTick, Tick))
+                // A backwards jump (NTP correction) is not a resume.
+                if (gap > TimeSpan.Zero && EcSupervisionPolicy.LooksLikeResume(gap, Tick))
                 {
                     _log.LogInformation(
                         "[Supervision] resume detected (tick gap {Gap:F0}s): re-initialising the EC",
-                        (now - lastTick).TotalSeconds);
+                        gap.TotalSeconds);
                     Reinitialize("resume");
                     lastLiveness = now; // the resume path already proved the EC answers
                 }
