@@ -110,7 +110,7 @@ If none exist, EC access is unavailable.
 | `0x0751` | MANUAL_FAN_CTRL | Manual fan mode flags |
 | `0x075B` | PWM_1 | CPU fan PWM readback (0–200) |
 | `0x075C` | PWM_2 | GPU fan PWM readback (0–200) |
-| `0x0787` | FAN_SWITCH_SPEED | Target fan speed in RPM (u16, 100–12700) |
+| `0x0787` | FAN_SWITCH_SPEED | Fan ramp time: **one byte**, bit 7 = enable, bits 0-6 = 100 ms steps (0x83 = enabled/300 ms). Not a u16 RPM value - measured 2026-11-10 on X6FR5xxY and X6AR558Y |
 | `0x07C5` | UNIVERSAL_FAN_CTRL | Universal fan control flags |
 | `0x07C6` | AP_OEM_6 | Custom fan enable flag |
 | `0x07C7` | Fan curve parameter | Set to `0x0C` during handshake |
