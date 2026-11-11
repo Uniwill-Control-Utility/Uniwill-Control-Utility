@@ -641,11 +641,11 @@
   "Download installer": "Download installer",
   "Could not check for updates.": "Could not check for updates.",
   "Thermal failsafe": "Thermal failsafe",
-  "Hold the GPU at minimum power when it stays too hot, and restore it once it has cooled": "Hold the GPU at minimum power when it stays too hot, and restore it once it has cooled",
   "Enable thermal failsafe": "Enable thermal failsafe",
   "Off by default: it costs performance by design": "Off by default: it costs performance by design",
-  "Trip temperature": "Trip temperature",
-  "Sustained GPU temperature at which power is held down; release needs 5 below it": "Sustained GPU temperature at which power is held down; release needs 5 below it",
-  "CPU trip temperature": "CPU trip temperature",
-  "CPUs run hotter than GPUs, so this trip point is higher. Reaching it raises the fans and holds the CPU at 50 W until it cools 5 degrees below.": "CPUs run hotter than GPUs, so this trip point is higher. Reaching it raises the fans and holds the CPU at 50 W until it cools 5 degrees below."
+  "GPU Temperature threshold": "GPU Temperature threshold",
+  "Holds the GPU at its base power (Dynamic Boost off)": "Holds the GPU at its base power (Dynamic Boost off)",
+  "CPU Temperature threshold": "CPU Temperature threshold",
+  "Holds the CPU at 50 W": "Holds the CPU at 50 W",
+  "Holds the CPU or GPU down and the fans up when either stays too hot, restoring 5 degrees below the threshold": "Holds the CPU or GPU down and the fans up when either stays too hot, restoring 5 degrees below the threshold"
 }

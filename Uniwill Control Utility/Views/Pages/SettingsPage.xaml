@@ -312,7 +312,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Hold the GPU at minimum power when it stays too hot, and restore it once it has cooled"
+                                               Text="Holds the CPU or GPU down and the fans up when either stays too hot, restoring 5 degrees below the threshold"
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -350,11 +350,11 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <ui:TextBlock FontTypography="Body" Text="Trip temperature" />
+                                    <ui:TextBlock FontTypography="Body" Text="GPU Temperature threshold" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Sustained GPU temperature at which power is held down; release needs 5 °C below it" />
+                                                   Text="Holds the GPU at its base power (Dynamic Boost off)" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                                     <ui:TextBlock x:Name="lblThermalFailsafeThreshold"
@@ -383,11 +383,11 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <ui:TextBlock FontTypography="Body" Text="CPU trip temperature" />
+                                    <ui:TextBlock FontTypography="Body" Text="CPU Temperature threshold" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="CPUs run hotter than GPUs, so this trip point is higher. Reaching it raises the fans and holds the CPU at 50 W until it cools 5 degrees below."
+                                                   Text="Holds the CPU at 50 W" />
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
