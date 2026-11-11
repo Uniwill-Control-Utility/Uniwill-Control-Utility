@@ -45,9 +45,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// asks the engine's identity verb one time and caches the answer: the
         /// processor cannot change during a session.
         /// </summary>
-        private EcPlatform EcPlatformForNvram =>
-            _ecPlatform ??= _engine!.GetInfoAsync().GetAwaiter().GetResult().Platform;
+        private EcPlatform EcPlatformForNvram => _ecPlatform ?? EcPlatform.Amd;
         private bool _isEcAvailable;
+        private bool _isDgpuOnly;
         private bool _isLoaded;
         private bool _isAdministrator;
         private bool _isNvramAvailable;
@@ -96,18 +96,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             _mux = App.GetService<IGpuMuxCapability>();
             _telemetry = App.GetService<IEcTelemetryCapability>();
             _engine = App.GetService<IEngineCapability>();
-            if (_mux is not null && _engine is not null)
-            {
-                try
-                {
-                    _isEcAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[Display] Failed to initialize EC service: {ex.Message}");
-                    _isEcAvailable = false;
-                }
-            }
+
+            // No engine round trip here: a constructor runs on the UI thread and the probe
+            // can wait for a starting service. OnNavigatedToAsync does it.
 
             // Check if running as administrator (needed for NVRAM access)
             try
@@ -142,7 +133,21 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <inheritdoc />
         public async Task OnNavigatedToAsync()
         {
-            SyncFromEcAndRefresh();
+            if (_mux is not null && _engine is not null)
+            {
+                try
+                {
+                    _isEcAvailable = await _engine.IsHardwareAvailableAsync().ConfigureAwait(true);
+                    _ecPlatform = (await _engine.GetInfoAsync().ConfigureAwait(true)).Platform;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Display] Failed to initialise the EC probe: {ex.Message}");
+                    _isEcAvailable = false;
+                }
+            }
+
+            await SyncFromEcAndRefreshAsync().ConfigureAwait(true);
 
             // Keep the bottom-bar panel-model status live (WMI UserFriendlyName via PanelDatabase).
             _statusTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal,
@@ -184,7 +189,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// another tool changed the mode), the user sees the actual persisted value and
         /// can decide whether to re-apply it.
         /// </summary>
-        private void SyncFromEcAndRefresh()
+        private async Task SyncFromEcAndRefreshAsync()
         {
             if (!_isEcAvailable)
             {
@@ -210,7 +215,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // the mode. We show the NVRAM value and let the user decide.
                         try
                         {
-                            int ecMode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
+                            int ecMode = (int)await _mux!.GetModeAsync().ConfigureAwait(true);
+                            _isDgpuOnly = ecMode == (int)GpuMuxMode.DgpuOnly;
                             if (ecMode != mode)
                             {
                                 Debug.WriteLine($"[Display] EC mode ({ecMode}) differs from NVRAM ({mode}) — showing NVRAM value");
@@ -237,7 +243,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Fallback: read from EC if NVRAM is unavailable
                 try
                 {
-                    mode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
+                    mode = (int)await _mux!.GetModeAsync().ConfigureAwait(true);
                 }
                 catch (Exception ex)
                 {
@@ -270,7 +276,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             InitBrightnessRow();
 
-            RefreshAll();
+            await RefreshAllAsync().ConfigureAwait(true);
             _isLoaded = true;
         }
 
@@ -365,7 +371,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void btnGpuMode_Click(object sender, RoutedEventArgs e)
+        private async void btnGpuMode_Click(object sender, RoutedEventArgs e)
         {
             if (!_isLoaded)
                 return;
@@ -384,7 +390,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 // Write EC register
-                _mux!.SetModeAsync((GpuMuxMode)mode).GetAwaiter().GetResult();
+                await _mux!.SetModeAsync((GpuMuxMode)mode).ConfigureAwait(true);
                 _lastUserApplyTime = DateTime.UtcNow;
                 Debug.WriteLine($"[Display] Applied GPU mode: {(GpuMuxMode)mode}");
 
@@ -406,9 +412,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Delay refresh to let the EC process the change
                 _delayTimer?.Stop();
-                _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, ev) =>
+                _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, async (s, ev) =>
                 {
-                    RefreshAll();
+                    await RefreshAllAsync().ConfigureAwait(true);
                     ((DispatcherTimer)s!).Stop();
                     _delayTimer = null;
                 }, Dispatcher);
@@ -614,18 +620,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>True while the runtime mux mode is dGPU-only (unlocks the 300 Hz internal-panel mode).</summary>
-        private bool IsDgpuOnlyMode()
-        {
-            try
-            {
-                return _mux is not null
-                    && _mux.GetModeAsync().GetAwaiter().GetResult() == GpuMuxMode.DgpuOnly;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        private bool IsDgpuOnlyMode() => _isDgpuOnly;
 
         private List<int> AvailableRefreshRates()
         {
@@ -707,7 +702,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _refreshRateBusy = true;
 
             // The GDI mode switch can take ~1s — keep it off the UI thread.
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 int applied;
                 bool deferredSelection = false;
@@ -1017,7 +1012,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _colorCalBusy = true;
 
             // The ICM association reload can take ~1s — keep it off the UI thread.
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 string? applied;
                 bool deferredSelection = false;
@@ -1096,7 +1091,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void RefreshAll()
+        private async Task RefreshAllAsync()
         {
             if (_mux is null) return;
 
@@ -1116,7 +1111,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                     else
                     {
-                        mode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
+                        mode = (int)await _mux!.GetModeAsync().ConfigureAwait(true);
+                        _isDgpuOnly = mode == (int)GpuMuxMode.DgpuOnly;
                     }
                     UpdateGpuModeButtons(mode);
                 }
@@ -1269,11 +1265,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // WMI calls carry COM apartment affinity - they must run on a
             // dedicated thread (the route's local fallback does too).
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    bool success = SetLocalDimming(isOn);
+                    bool success = await SetLocalDimmingAsync(isOn).ConfigureAwait(false);
                     Debug.WriteLine($"[Display] Local Dimming {(isOn ? "enabled" : "disabled")}: {(success ? "success" : "failed")}");
 
                     Application.Current.Dispatcher.Invoke(() =>
@@ -1306,7 +1302,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             });
         }
 
-        private bool SetLocalDimming(bool enable)
+        private async Task<bool> SetLocalDimmingAsync(bool enable)
         {
             // The WMI handshake routes through MiniLedAccess: the engine's
             // device verb performs the OEM ACPI two-step pair as LocalSystem
@@ -1317,12 +1313,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!MiniLedAccess.SetLocalDimming(enable))
                 return false;
 
-            Thread.Sleep(100);
+            await Task.Delay(100).ConfigureAwait(false);
 
             // Verify via EC readback (the telemetry verb, already engine-routed).
             if (_telemetry != null && _isEcAvailable)
             {
-                byte ecValue = _telemetry.ReadRegisterAsync(EcLocalDimmingRegister).GetAwaiter().GetResult();
+                byte ecValue = await _telemetry.ReadRegisterAsync(EcLocalDimmingRegister).ConfigureAwait(false);
                 bool actualState = (ecValue & EcLocalDimmingBit) != 0;
 
                 if (actualState != enable)

@@ -108,7 +108,7 @@ namespace Uniwill_Control_Utility.Services
                         continue;
                     }
 
-                    FanStatusDto status = await ReadStatusAsync().ConfigureAwait(false);
+                    FanStatusDto? status = await ReadStatusAsync().ConfigureAwait(false);
                     if (status is null)
                         continue;
 
