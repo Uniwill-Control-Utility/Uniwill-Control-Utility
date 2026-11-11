@@ -299,6 +299,79 @@
                          </StackPanel>
                     </ui:CardExpander>
 
+                    <!-- Thermal failsafe -->
+                    <ui:CardExpander x:Name="ThermalFailsafeCard"
+                                     Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Thermal failsafe" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Hold the GPU at minimum power when it stays too hot, and restore it once it has cooled"
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Enable thermal failsafe" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Off by default: it costs performance by design"
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="tsThermalFailsafe"
+                                                 Grid.Column="1"
+                                                 HorizontalAlignment="Right"
+                                                 VerticalAlignment="Center"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="tsThermalFailsafe_Checked"
+                                                 Unchecked="tsThermalFailsafe_Unchecked" />
+                            </Grid>
+
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <StackPanel x:Name="ThermalFailsafeThresholdRow">
+                                <ui:TextBlock FontTypography="Body" Text="Trip temperature" />
+                                <ui:TextBlock Margin="0,2,0,2"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Sustained GPU temperature at which power is held down; release needs 5 °C below it" />
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Slider x:Name="slThermalFailsafeThreshold"
+                                            Grid.Column="0"
+                                            Minimum="70"
+                                            Maximum="95"
+                                            TickFrequency="1"
+                                            IsSnapToTickEnabled="True"
+                                            ValueChanged="slThermalFailsafeThreshold_ValueChanged" />
+                                    <ui:TextBlock x:Name="lblThermalFailsafeThreshold"
+                                                  Grid.Column="1"
+                                                  Margin="12,0,0,0"
+                                                  VerticalAlignment="Center"
+                                                  MinWidth="48"
+                                                  Text="" />
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:CardExpander>
                     <!-- Feature control -->
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">

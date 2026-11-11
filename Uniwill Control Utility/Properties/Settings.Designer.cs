@@ -429,7 +429,22 @@ namespace Uniwill_Control_Utility.Properties {
             set {
                 this["SettingsUpgradeRequired"] = value;
             }
+        }        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ThermalFailsafeEnabled {
+            get { return ((bool)(this["ThermalFailsafeEnabled"])); }
+            set { this["ThermalFailsafeEnabled"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("88")]
+        public int ThermalFailsafeThreshold {
+            get { return ((int)(this["ThermalFailsafeThreshold"])); }
+            set { this["ThermalFailsafeThreshold"] = value; }
+        }
+
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

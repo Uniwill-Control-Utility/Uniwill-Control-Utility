@@ -561,6 +561,8 @@ namespace Uniwill_Control_Utility
                         // hosted loop is gated, throttled, and never queues onto
                         // a saturated engine domain.
                         services.AddSingleton<PowerGuardianService>();
+                        services.AddSingleton<ThermalFailsafeService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<ThermalFailsafeService>());
                         services.AddHostedService(provider => provider.GetRequiredService<PowerGuardianService>());
 
                         // Centralized device applier (singleton)

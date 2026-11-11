@@ -156,6 +156,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
+            tsThermalFailsafe.IsChecked = Settings.Default.ThermalFailsafeEnabled;
+            slThermalFailsafeThreshold.Value = Settings.Default.ThermalFailsafeThreshold;
+            lblThermalFailsafeThreshold.Text = $"{(int)slThermalFailsafeThreshold.Value} °C";
+            ThermalFailsafeThresholdRow.Opacity = Settings.Default.ThermalFailsafeEnabled ? 1.0 : 0.5;
             ReflectToggleState(cbPowerBoostMode, Settings.Default.EnablePowerBoostMode, ref _powerBoost);
             ReflectToggleState(cbHideFlydigi, Settings.Default.EnableFlydigi, ref _flydigiEnabled);
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
@@ -481,6 +485,32 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
+        private void tsThermalFailsafe_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ThermalFailsafeEnabled = true;
+            Settings.Default.Save();
+            ThermalFailsafeThresholdRow.Opacity = 1.0;
+        }
+
+        private void tsThermalFailsafe_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ThermalFailsafeEnabled = false;
+            Settings.Default.Save();
+            ThermalFailsafeThresholdRow.Opacity = 0.5;
+        }
+
+        private void slThermalFailsafeThreshold_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (slThermalFailsafeThreshold == null || lblThermalFailsafeThreshold == null)
+            {
+                return;
+            }
+
+            int threshold = (int)slThermalFailsafeThreshold.Value;
+            lblThermalFailsafeThreshold.Text = $"{threshold} °C";
+            Settings.Default.ThermalFailsafeThreshold = threshold;
+            Settings.Default.Save();
+        }
         private void cbAdaptive_Checked(object sender, RoutedEventArgs e)
         {
             Settings.Default.isStartAdpative = true;
