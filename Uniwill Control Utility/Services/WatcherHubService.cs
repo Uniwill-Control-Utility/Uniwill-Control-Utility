@@ -75,7 +75,7 @@ namespace Uniwill_Control_Utility.Services
             : this(
                 store,
                 observe: () => Observe(hardware, fps),
-                readValue: source => ReadVerbValueAsync(source, fan, power, mux),
+                readValue: new VerbValueReader(fan, power, mux).ReadAsync,
                 execute: rule => ExecuteAsync(rule, arbiter, fan, power),
                 clock: () => DateTime.UtcNow)
         {
@@ -444,48 +444,135 @@ namespace Uniwill_Control_Utility.Services
                 ForegroundExe: "");
         }
 
-        private static async Task<string?> ReadVerbValueAsync(
-            WatcherValueSource source, IFanCapability fan, IPowerCapability power, IGpuMuxCapability mux)
+        /// <summary>
+        /// The verb-backed values the watcher rules compare against.
+        ///
+        /// One EC aggregate per second, not one per rule: a tick can evaluate up to 32
+        /// rules and each fan.get_status is nine register reads on a bus paced at 6 ms per
+        /// byte. Failures are cached for the same second as null, so a busy engine costs
+        /// one refused call per second instead of one per rule; the backoff itself still
+        /// comes from the diff poll floor.
+        /// </summary>
+        private sealed class VerbValueReader
         {
-            try
+            private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(1);
+
+            private readonly IFanCapability _fan;
+            private readonly IPowerCapability _power;
+            private readonly IGpuMuxCapability _mux;
+
+            private FanStatusDto? _fanStatus;
+            private DateTime _fanAt = DateTime.MinValue;
+            private PowerContractTruthDto? _contract;
+            private DateTime _contractAt = DateTime.MinValue;
+            private MuxStateDto? _muxState;
+            private DateTime _muxAt = DateTime.MinValue;
+
+            public VerbValueReader(IFanCapability fan, IPowerCapability power, IGpuMuxCapability mux)
             {
-                switch (source)
+                _fan = fan;
+                _power = power;
+                _mux = mux;
+            }
+
+            public async Task<string?> ReadAsync(WatcherValueSource source)
+            {
+                try
                 {
-                    case WatcherValueSource.FanRpm:
-                        return (await fan.GetStatusAsync().ConfigureAwait(false)).MainFanRpm.ToString();
-                    case WatcherValueSource.FanTurbo:
-                        return (await fan.GetStatusAsync().ConfigureAwait(false)).TurboActive.ToString();
-                    case WatcherValueSource.PerformanceMode:
-                        return (await fan.GetStatusAsync().ConfigureAwait(false)).PerformanceMode.ToString();
-                    case WatcherValueSource.GpuCtgp:
-                        return (await power.GetContractTruthAsync().ConfigureAwait(false)).GpuCtgp.ToString();
-                    case WatcherValueSource.GpuDb:
-                        return (await power.GetContractTruthAsync().ConfigureAwait(false)).GpuDb.ToString();
-                    case WatcherValueSource.CpuPl1:
-                        return (await power.GetContractTruthAsync().ConfigureAwait(false)).Pl1.ToString();
-                    case WatcherValueSource.CpuPl2:
-                        return (await power.GetContractTruthAsync().ConfigureAwait(false)).Pl2.ToString();
-                    case WatcherValueSource.MuxMode:
-                        return (await mux.GetStateAsync().ConfigureAwait(false)).Mode.ToString();
-                    default:
-                        return null;
+                    switch (source)
+                    {
+                        case WatcherValueSource.FanRpm:
+                            return (await FanAsync().ConfigureAwait(false))?.MainFanRpm.ToString();
+                        case WatcherValueSource.FanTurbo:
+                            return (await FanAsync().ConfigureAwait(false))?.TurboActive.ToString();
+                        case WatcherValueSource.PerformanceMode:
+                            return (await FanAsync().ConfigureAwait(false))?.PerformanceMode.ToString();
+                        case WatcherValueSource.GpuCtgp:
+                            return (await ContractAsync().ConfigureAwait(false))?.GpuCtgp.ToString();
+                        case WatcherValueSource.GpuDb:
+                            return (await ContractAsync().ConfigureAwait(false))?.GpuDb.ToString();
+                        case WatcherValueSource.CpuPl1:
+                            return (await ContractAsync().ConfigureAwait(false))?.Pl1.ToString();
+                        case WatcherValueSource.CpuPl2:
+                            return (await ContractAsync().ConfigureAwait(false))?.Pl2.ToString();
+                        case WatcherValueSource.MuxMode:
+                            return (await MuxAsync().ConfigureAwait(false))?.Mode.ToString();
+                        default:
+                            return null;
+                    }
+                }
+                catch (EngineException ex) when (ex.Code == EngineErrorCode.Busy)
+                {
+                    // The story's backoff requirement: skip this cycle, the next
+                    // scheduled diff poll (>= 5 s away) retries. No retry storm.
+                    Log.Debug("[Watcher] diff poll busy on {Source}, next poll in {Floor}s",
+                        source, WatcherPolicy.DiffPollFloor.TotalSeconds);
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug("[Watcher] diff poll failed on {Source}: {Message}", source, ex.Message);
+                    return null;
                 }
             }
-            catch (EngineException ex) when (ex.Code == EngineErrorCode.Busy)
+
+            private async Task<FanStatusDto?> FanAsync()
             {
-                // The story's backoff requirement: skip this cycle, the next
-                // scheduled diff poll (>= 5 s away) retries. No retry storm.
-                Log.Debug("[Watcher] diff poll busy on {Source}, next poll in {Floor}s",
-                    source, WatcherPolicy.DiffPollFloor.TotalSeconds);
-                return null;
+                if (DateTime.UtcNow - _fanAt < Ttl)
+                    return _fanStatus;
+
+                _fanAt = DateTime.UtcNow;
+                try
+                {
+                    _fanStatus = await _fan.GetStatusAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    _fanStatus = null;
+                    throw;
+                }
+
+                return _fanStatus;
             }
-            catch (Exception ex)
+
+            private async Task<PowerContractTruthDto?> ContractAsync()
             {
-                Log.Debug("[Watcher] diff poll failed on {Source}: {Message}", source, ex.Message);
-                return null;
+                if (DateTime.UtcNow - _contractAt < Ttl)
+                    return _contract;
+
+                _contractAt = DateTime.UtcNow;
+                try
+                {
+                    _contract = await _power.GetContractTruthAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    _contract = null;
+                    throw;
+                }
+
+                return _contract;
+            }
+
+            private async Task<MuxStateDto?> MuxAsync()
+            {
+                if (DateTime.UtcNow - _muxAt < Ttl)
+                    return _muxState;
+
+                _muxAt = DateTime.UtcNow;
+                try
+                {
+                    _muxState = await _mux.GetStateAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    _muxState = null;
+                    throw;
+                }
+
+                return _muxState;
             }
         }
-
         /// <summary>The whitelisted action executor (production path; internal
         /// for the app-suite pins). <paramref name="showToast"/> is the
         /// hermetic-test seam for the WPF toast overlay.</summary>
