@@ -152,6 +152,16 @@ namespace UCU.Core.Ec
         /// firmware-side or third-party tool installed, which changes how the
         /// EC applies charge modes, so the UI must say so.
         /// </summary>
+        /// <summary>
+        /// True when the platform-override byte reads anything but 0xFF.
+        ///
+        /// Do not put this in front of the user again: the Linux driver names 0x0770
+        /// EC_ADDR_ROMID_START (the ROM/variant ID block), MechControl's X6FR5 review
+        /// treats it as the byte that selects battery/OEM variants, and a clean X6FR5xxY
+        /// reads 0x0C. "Not 0xFF" is therefore not evidence of an override, and the
+        /// Battery page's notice was removed on 2026-11-11 after it fired on a machine
+        /// running only UCU.
+        /// </summary>
         public static bool IsPlatformOverrideActive(byte overrideRaw) => overrideRaw != PlatformOverrideReset;
     }
 }

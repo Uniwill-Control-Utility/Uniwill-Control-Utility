@@ -265,7 +265,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 bool gateActive = await _battery.GetGateStatusAsync().ConfigureAwait(true);
                 BatteryThresholdsDto thresholds = await _battery.GetThresholdsAsync().ConfigureAwait(true);
-                bool overrideActive = await _battery.GetPlatformOverrideAsync().ConfigureAwait(true);
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -274,7 +273,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                         : LocalizationService.Get("Idle");
                     tbChargeThresholds.Text = LocalizationService.Format(
                         "up to {0} %, restart at {1} %", thresholds.UpPercent, thresholds.DownPercent);
-                    PlatformOverrideNotice.Visibility = overrideActive ? Visibility.Visible : Visibility.Collapsed;
                 });
             }
             catch (EngineException ex) when (ex.Code == EngineErrorCode.UnsupportedVerb)
@@ -285,7 +283,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     ChargeThresholdsRow.Visibility = Visibility.Collapsed;
                     ChargeGateRow.Visibility = Visibility.Collapsed;
-                    PlatformOverrideNotice.Visibility = Visibility.Collapsed;
                 });
                 Debug.WriteLine("[Battery] Engine lacks the battery status verbs; status rows hidden");
             }

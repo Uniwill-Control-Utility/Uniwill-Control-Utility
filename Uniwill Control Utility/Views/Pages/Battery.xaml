@@ -104,25 +104,6 @@
                             </ComboBox>
                         </ui:CardControl>
 
-                        <!-- Platform-override notice: visible only when the EC answers 0x0770 != 0xFF
-                             (U-103). A firmware-side or third-party pin changes how the EC applies
-                             charge modes, so the page must disclose it instead of showing a setting
-                             that silently does not own the behavior. -->
-                        <ui:CardControl x:Name="PlatformOverrideNotice" Visibility="Collapsed" Margin="0,0,0,8">
-                            <ui:CardControl.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
-                            </ui:CardControl.Icon>
-                            <ui:CardControl.Header>
-                                <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="Platform Override Active" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="A firmware-side or third-party tool has pinned the EC platform override. The EC may apply charging modes differently than this page shows."
-                                                   TextWrapping="Wrap" />
-                                </StackPanel>
-                            </ui:CardControl.Header>
-                        </ui:CardControl>
 
                         <!-- Battery Telemetry CardExpander -->
                         <ui:CardExpander Margin="0,0,0,8"
