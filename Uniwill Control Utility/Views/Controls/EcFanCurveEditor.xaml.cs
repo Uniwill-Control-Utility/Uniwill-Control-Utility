@@ -334,6 +334,13 @@ namespace Uniwill_Control_Utility.Views.Controls
         private static double DutyToY(int duty, double height) =>
             ThumbHalf + ((100 - Math.Clamp(duty, 0, 100)) / 100.0 * (height - ThumbSize));
 
+        /// <summary>
+        /// The 0 % line: the 1 px axis border at the bottom of the graph area. Sits one
+        /// pixel above the plot edge so a fill that ends here meets the border instead
+        /// of covering it.
+        /// </summary>
+        private static double AxisY(double height) => height - 1;
+
         private double GetPointX(Slider slider) =>
             slider.TranslatePoint(new Point(slider.ActualWidth * 0.5, 0), _canvas).X;
 
@@ -361,7 +368,9 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             var guidelineBrush = FindBrush("DividerStrokeColorDefaultBrush", GuidelineFallbackBrush);
 
-            foreach (var percent in new[] { 0, 25, 50, 75, 100 })
+            // 0 % is the axis itself (the bottom border below), so it is not drawn
+            // again as a grid line.
+            foreach (var percent in new[] { 25, 50, 75, 100 })
             {
                 var y = DutyToY(percent, height);
                 _canvas.Children.Add(new Line
@@ -381,15 +390,16 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             if (points.Length < 2) return;
 
-            // Area under the curve down to the 0 % line, drawn before the rails and
-            // the polyline so both stay legible on top of it.
+            // Area under the curve down to the temperature axis, drawn before the rails
+            // and the polyline so both stay legible on top of it.
             var areaFill = FindBrush("AccentFillColorDefaultBrush", Brushes.Gray);
+            var baseline = AxisY(height);
             var areaPoints = new List<Point>(points.Length + 2)
             {
-                new(points[0].X, DutyToY(0, height))
+                new(points[0].X, baseline)
             };
             areaPoints.AddRange(points);
-            areaPoints.Add(new Point(points[^1].X, DutyToY(0, height)));
+            areaPoints.Add(new Point(points[^1].X, baseline));
 
             _canvas.Children.Add(new Polygon
             {
@@ -408,7 +418,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                     X1 = x,
                     X2 = x,
                     Y1 = ThumbHalf,
-                    Y2 = height - ThumbHalf,
+                    Y2 = AxisY(height),
                     Stroke = guidelineBrush,
                     StrokeThickness = 1,
                     Opacity = 0.6
