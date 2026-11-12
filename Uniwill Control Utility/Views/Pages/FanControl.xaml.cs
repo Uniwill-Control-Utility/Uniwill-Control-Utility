@@ -33,6 +33,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private DispatcherTimer? _statusTimer;
         private IDisposable? _monitoringLease;
         private System.Timers.Timer? _applyDebounceTimer;
+        private System.Timers.Timer? _saveDebounceTimer;
+        private bool _savePending;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
         private Wpf.Ui.Controls.Snackbar? _stockPresetSnackbar;
 
@@ -77,25 +79,29 @@ namespace Uniwill_Control_Utility.Views.Pages
             // so the page UI stays in sync when the user changes settings from niTray.
             FanControlSettingsService.SettingsChanged += OnFanSettingsChanged;
 
-            // Subscribe to curve changes for banner updates and auto-apply debounce
+            // Subscribe to curve changes for banner updates and auto-apply debounce.
+            // The save is debounced as well: the editors raise CurveChanged per slider
+            // tick, and a drag cascades between linked sliders, so saving inline meant
+            // a full serialize + fsync + rename of the settings file per value change,
+            // on the UI thread.
             FanCurveEditor.CurveChanged += (s, e) =>
             {
                 UpdateBanner();
-                SaveCurrentSettings();
+                RequestSave();
                 ScheduleAutoApply();
                 UpdateSmartFanCurve();
             };
             CpuFanCurveEditor.CurveChanged += (s, e) =>
             {
                 UpdateBanner();
-                SaveCurrentSettings();
+                RequestSave();
                 ScheduleAutoApply();
                 UpdateSmartFanCurve();
             };
            GpuFanCurveEditor.CurveChanged += (s, e) =>
             {
                 UpdateBanner();
-                SaveCurrentSettings();
+                RequestSave();
                 ScheduleAutoApply();
                 UpdateSmartFanCurve();
             };
@@ -117,6 +123,39 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void SetStatusText(string message)
         {
             StatusText.Text = message;
+        }
+
+        /// <summary>
+        /// Saves the page state once the user stops moving a curve. FanControlSettingsService.Save
+        /// rewrites and fsyncs the whole file, so doing it per CurveChanged (which the editors
+        /// raise per slider tick, and which cascades between linked sliders) was tens to hundreds
+        /// of write+rename cycles inside one drag, on the UI thread.
+        /// </summary>
+        private void RequestSave()
+        {
+            if (_loadingSettings) return;
+
+            if (_saveDebounceTimer == null)
+            {
+                _saveDebounceTimer = new System.Timers.Timer(400) { AutoReset = false };
+                _saveDebounceTimer.Elapsed += (s, e) => Dispatcher.Invoke(FlushPendingSave);
+            }
+
+            _savePending = true;
+            _saveDebounceTimer.Stop();
+            _saveDebounceTimer.Start();
+        }
+
+        /// <summary>
+        /// Writes a pending debounced save now (page unload, next immediate save).
+        /// </summary>
+        private void FlushPendingSave()
+        {
+            if (!_savePending) return;
+
+            _savePending = false;
+            _saveDebounceTimer?.Stop();
+            SaveCurrentSettings();
         }
 
         /// <summary>
@@ -936,6 +975,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void SaveCurrentSettings()
         {
+            // This write supersedes any save still sitting in the debounce timer.
+            _savePending = false;
+            _saveDebounceTimer?.Stop();
+
             var settings = FanControlSettingsService.Load(); // merge with existing
 
             // Save unified mode toggle
@@ -1980,10 +2023,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             _isUnloaded = true;
             _statusTimer?.Stop();
 
+            // Land any curve edit still inside the save debounce window.
+            FlushPendingSave();
+
             // Clean up debounce timer
             _applyDebounceTimer?.Stop();
             _applyDebounceTimer?.Dispose();
             _applyDebounceTimer = null;
+
+            _saveDebounceTimer?.Dispose();
+            _saveDebounceTimer = null;
 
             // Hide adaptive snackbar
             HideAdaptiveSnackbar();
