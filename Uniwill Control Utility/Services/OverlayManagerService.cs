@@ -648,13 +648,19 @@ namespace Uniwill_Control_Utility.Services
                         LogOsd(
                             $"focus OFF: foreground pid={foregroundPid}, " +
                             $"fps-service pid={fps.ProcessId} available={fps.IsAvailable}");
+
+                        // First write a space so RTSS renders a blank frame, then
+                        // release the slot. The two-step approach ensures RTSS sees
+                        // the buffer change before the slot goes unowned.
+                        //
+                        // Only on the transition: repeating the pair every tick cost two
+                        // FlushViewOfFile calls and a per-write Information log line, to
+                        // re-blank a slot that is already blank (measured 1/s on a live
+                        // install, 5.9 MB of log in a day).
+                        RtssOsdWriter.Update(" ");
+                        RtssOsdWriter.Release();
                     }
 
-                    // First write a space so RTSS renders a blank frame, then
-                    // release the slot. The two-step approach ensures RTSS sees
-                    // the buffer change before the slot goes unowned.
-                    RtssOsdWriter.Update(" ");
-                    RtssOsdWriter.Release();
                     tWrite = sw.ElapsedMilliseconds;
                     _rtssOsdWasShowing = false;
                     return;
