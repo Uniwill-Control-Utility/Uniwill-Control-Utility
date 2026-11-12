@@ -59,7 +59,10 @@ namespace Uniwill_Control_Utility.Views.Controls
             // product. See SafeImageSource.
             _ = Task.Run(async () =>
             {
-                var image = await Services.SafeImageSource.DecodeAsync(path);
+                // 1600 px covers the header slot (about 1052 DIP wide) at 100-150%
+                // display scaling. Decoding the wallpaper at native size put 33 MB
+                // on the large object heap to fill that slot.
+                var image = await Services.SafeImageSource.DecodeAsync(path, decodeWidth: 1600);
                 if (image is null)
                     return; // keep the current image / background border
                 await Dispatcher.InvokeAsync(() => HeaderImage.Source = image);

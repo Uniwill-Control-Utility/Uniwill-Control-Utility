@@ -140,7 +140,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // color-context open on the dispatcher). See SafeImageSource.
                 _ = Task.Run(async () =>
                 {
-                    var image = await Services.SafeImageSource.DecodeAsync(imagePath);
+                    // The laptop photo is rendered in a 220 DIP-wide slot; 480 px covers
+                    // it at 2x scaling without decoding the 1.2 MB source at native size.
+                    var image = await Services.SafeImageSource.DecodeAsync(imagePath, decodeWidth: 480);
                     await Dispatcher.InvokeAsync(() =>
                     {
                         if (image is not null)

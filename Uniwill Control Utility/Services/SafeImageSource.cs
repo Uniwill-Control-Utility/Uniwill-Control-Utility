@@ -31,9 +31,12 @@ namespace Uniwill_Control_Utility.Services
         /// Decode a pack/file URI off the UI thread. Completes with the
         /// frozen image, or null on any failure (bad URI, unreadable file,
         /// decoder exception, budget exceeded). Never throws, never blocks
-        /// the caller beyond the budget.
+        /// the caller beyond the budget. <paramref name="decodeWidth"/>
+        /// downscales at decode time: an image used in a small slot must not
+        /// be decoded at its native size (a 4K wallpaper is 33 MB decoded,
+        /// against 1052 DIP of header).
         /// </summary>
-        internal static async Task<ImageSource?> DecodeAsync(string uri, TimeSpan? budget = null)
+        internal static async Task<ImageSource?> DecodeAsync(string uri, TimeSpan? budget = null, int decodeWidth = 0)
         {
             TimeSpan limit = budget ?? DefaultBudget;
 
@@ -43,6 +46,8 @@ namespace Uniwill_Control_Utility.Services
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                if (decodeWidth > 0)
+                    bitmap.DecodePixelWidth = decodeWidth;
                 bitmap.UriSource = new Uri(uri, UriKind.RelativeOrAbsolute);
                 bitmap.EndInit();
                 bitmap.Freeze();
