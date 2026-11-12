@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -31,6 +32,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private System.Threading.Timer? _glowPulseTimer;
         private bool _glowPulseDirection;
         private volatile bool _glowActive;
+        private int _glowTickPending;
 
         // Temperature update timer
         private System.Threading.Timer? _tempUpdateTimer;
@@ -1303,34 +1305,37 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (!_glowActive)
                     return;
-                try
+
+                // InvokeAsync with a pending guard, never a synchronous Invoke. Invoke blocks
+                // this pool thread until the UI thread services it, and at 12.5 Hz (80 ms)
+                // that piles up both queued callbacks and pool threads whenever the UI thread
+                // is busy - measured on a live install: 4,388 threads, 2.4 GB working set and
+                // 7.5 GB commit, of which ~1,435 were this timer.
+                if (Interlocked.Exchange(ref _glowTickPending, 1) == 1)
+                    return; // the UI has not caught up with the previous tick
+
+                Dispatcher.InvokeAsync(() =>
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    Volatile.Write(ref _glowTickPending, 0);
+                    if (!_glowActive)
+                        return;
+
+                    var current = rectGlowOverlay.Opacity;
+                    if (_glowPulseDirection)
                     {
-                        if (!_glowActive)
-                            return;
-                        var current = rectGlowOverlay.Opacity;
-                        if (_glowPulseDirection)
-                        {
-                            if (current < 0.5)
-                                rectGlowOverlay.Opacity = current + 0.008;
-                            else
-                                _glowPulseDirection = false;
-                        }
+                        if (current < 0.5)
+                            rectGlowOverlay.Opacity = current + 0.008;
                         else
-                        {
-                            if (current > 0.2)
-                                rectGlowOverlay.Opacity = current - 0.008;
-                            else
-                                _glowPulseDirection = true;
-                        }
-                    });
-                }
-                catch
-                {
-                    // Dispatcher shut down or element detached — stop the timer
-                    _glowActive = false;
-                }
+                            _glowPulseDirection = false;
+                    }
+                    else
+                    {
+                        if (current > 0.2)
+                            rectGlowOverlay.Opacity = current - 0.008;
+                        else
+                            _glowPulseDirection = true;
+                    }
+                });
             }, null, 80, 80);
         }
 
