@@ -831,6 +831,10 @@ namespace Uniwill_Control_Utility.Services
 
         private void StartReadLoop()
         {
+            // A live loop must be stopped, not orphaned: replacing the CTS below would leave
+            // the old loop reading until it accumulates 10 errors.
+            StopReadLoop();
+
             _readCts = new CancellationTokenSource();
             var token = _readCts.Token;
 
@@ -2274,6 +2278,11 @@ namespace Uniwill_Control_Utility.Services
 
         private void StartTimeScheduleMonitor()
         {
+            // Guard against double-start (matches StartDeviceMonitor/StartHealthCheck):
+            // a second call would replace the running CTS and leak a thread.
+            if (_scheduleMonitorCts != null)
+                return;
+
             try
             {
                 _scheduleMonitorCts = new CancellationTokenSource();
