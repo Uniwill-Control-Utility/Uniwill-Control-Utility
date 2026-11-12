@@ -352,8 +352,17 @@ namespace Uniwill_Control_Utility.Services
 
             watcher.Start();
             Log($"{LogPrefix} Starting BLE advertisement scan for {timeoutMs}ms...");
-            await Task.Delay(timeoutMs);
-            watcher.Stop();
+            try
+            {
+                await Task.Delay(timeoutMs);
+            }
+            finally
+            {
+                // Stop in a finally so a failed or cancelled scan cannot leave the native
+                // watcher running. (The type exposes no Dispose/Close in this projection,
+                // so Stop is the release path; the managed wrapper goes with the GC.)
+                watcher.Stop();
+            }
 
             // If no devices found via advertisement scan, fall back to trying the last known device
             if (devices.Count == 0 && !string.IsNullOrEmpty(_settings.LastDeviceAddress))
@@ -1155,6 +1164,12 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private void StartOsLevelMonitor()
         {
+            // Guard against double-start (matches StartDeviceMonitor/StartHealthCheck in the
+            // HID service): a second call overwrote the running watcher without stopping it,
+            // leaving a native DeviceWatcher delivering into its handlers forever.
+            if (_deviceWatcher is { Status: DeviceWatcherStatus.Started or DeviceWatcherStatus.EnumerationCompleted })
+                return;
+
             try
             {
                 // Watch all paired BLE devices and filter for BS1 in the handlers.
