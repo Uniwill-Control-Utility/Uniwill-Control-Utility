@@ -1898,13 +1898,10 @@ namespace Uniwill_Control_Utility.Services
                 {
                     while (!token.IsCancellationRequested)
                     {
-                        // Poll every 5 seconds
-                        for (int i = 0; i < 50; i++)
-                        {
-                            if (token.IsCancellationRequested)
-                                return;
-                            Thread.Sleep(100);
-                        }
+                        // Poll every 5 seconds. A blocking wait instead of 50 × Thread.Sleep(100):
+                        // same cadence, no 10 Hz wakeups, and cancellation returns immediately.
+                        if (token.WaitHandle.WaitOne(5000))
+                            return;
 
                         try
                         {
@@ -2231,13 +2228,9 @@ namespace Uniwill_Control_Utility.Services
 
                     while (!token.IsCancellationRequested)
                     {
-                        // Wait 30 seconds
-                        for (int i = 0; i < 300; i++)
-                        {
-                            if (token.IsCancellationRequested)
-                                return;
-                            Thread.Sleep(100);
-                        }
+                        // Wait 30 seconds, cancellable without a 10 Hz wakeup loop.
+                        if (token.WaitHandle.WaitOne(30000))
+                            return;
 
                         try
                         {
@@ -2296,13 +2289,9 @@ namespace Uniwill_Control_Utility.Services
                 {
                     while (!token.IsCancellationRequested)
                     {
-                        // Poll every 60 seconds
-                        for (int i = 0; i < 600; i++)
-                        {
-                            if (token.IsCancellationRequested)
-                                return;
-                            Thread.Sleep(100);
-                        }
+                        // Poll every 60 seconds, cancellable without a 10 Hz wakeup loop.
+                        if (token.WaitHandle.WaitOne(60000))
+                            return;
 
                         try
                         {
