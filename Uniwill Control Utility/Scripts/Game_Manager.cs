@@ -434,7 +434,16 @@ namespace Uniwill_Control_Utility.Scripts
 
         public static bool BattleNetRunning()
         {
-            return Process.GetProcessesByName("Battle.net.exe").Length > 0;
+            System.Diagnostics.Process[] running = Process.GetProcessesByName("Battle.net.exe");
+            try
+            {
+                return running.Length > 0;
+            }
+            finally
+            {
+                foreach (System.Diagnostics.Process p in running)
+                    p.Dispose();
+            }
         }
 
         public class GameLauncherItemEqualityComparer : IEqualityComparer<GameLauncherItem>

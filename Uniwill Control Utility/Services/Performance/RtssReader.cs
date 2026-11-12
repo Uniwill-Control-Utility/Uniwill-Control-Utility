@@ -337,7 +337,16 @@ namespace Uniwill_Control_Utility.Services.Performance
         {
             try
             {
-                return Process.GetProcessesByName("Rtss").Length > 0;
+                Process[] running = Process.GetProcessesByName("Rtss");
+                try
+                {
+                    return running.Length > 0;
+                }
+                finally
+                {
+                    foreach (Process p in running)
+                        p.Dispose();
+                }
             }
             catch
             {

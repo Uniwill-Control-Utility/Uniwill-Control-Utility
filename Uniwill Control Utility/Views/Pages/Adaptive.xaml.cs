@@ -2260,6 +2260,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     foreach (Process process in Process.GetProcesses())
                     {
+                        // Process objects hold a handle until finalization, and this scan
+                        // runs on the sensor tick; release each one with its iteration.
+                        using var processLease = process;
+
                         try
                         {
                             var mainModule = process.MainModule;

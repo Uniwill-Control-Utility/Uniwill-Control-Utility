@@ -33,7 +33,10 @@ namespace CpuAffinityUtility
                 _mask = newMask;
 
                 foreach (var p in Process.GetProcesses())
-                    TrySetAffinity(p, _mask);
+                {
+                    using (p)
+                        TrySetAffinity(p, _mask);
+                }
 
                 if (_watcher == null)
                 {

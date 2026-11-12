@@ -87,6 +87,8 @@ namespace Uniwill_Control_Utility.Services
             {
                 foreach (System.Diagnostics.Process p in System.Diagnostics.Process.GetProcessesByName(name))
                 {
+                    using var processLease = p;
+
                     try
                     {
                         if (p.SessionId == mine)
