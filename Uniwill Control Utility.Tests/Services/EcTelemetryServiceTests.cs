@@ -40,6 +40,33 @@ public sealed class EcTelemetryServiceTests
         Assert.Equal(40, refreshed.GpuFanPercent);
     }
 
+    [Fact]
+    public async Task Read_ReportsUnavailableOnceTheLastSampleIsOlderThanTheStaleBudget()
+    {
+        int calls = 0;
+        using var service = new EcTelemetryService(
+            fanDutyCapture: () =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                    return Task.FromResult(new EcFanDutySnapshot(100, 80));
+
+                // The EC is gone: every later refresh fails, so the cache keeps the first
+                // sample and its timestamp - that is the stale-while-revalidate contract,
+                // and exactly why the reads need an age gate now that nothing pre-flights.
+                return Task.FromException<EcFanDutySnapshot>(new InvalidOperationException("EC gone"));
+            },
+            mainFanRpmCapture: () => Task.FromResult(3000),
+            maxAge: TimeSpan.FromMilliseconds(20));
+
+        EcFanDutySnapshot fresh = await WaitForSnapshotAsync(service);
+        Assert.Equal(50, fresh.CpuFanPercent);
+
+        // The gate is 5 x maxAge (100 ms); past it the last sample must not be served.
+        await Task.Delay(250);
+
+        Assert.Equal(EcFanDutySnapshot.Empty, service.ReadFanDuty());
+    }
+
     [Theory]
     [InlineData(-10, 0)]
     [InlineData(0, 0)]

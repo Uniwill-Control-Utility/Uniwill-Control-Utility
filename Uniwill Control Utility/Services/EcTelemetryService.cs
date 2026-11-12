@@ -80,6 +80,14 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private static readonly TimeSpan MetricsFreshBudget = TimeSpan.FromSeconds(30);
 
+        /// <summary>
+        /// How long a last-known sample may keep being served. The caches keep the last
+        /// value across refresh failures, so without this a dead EC would leave frozen
+        /// duty/RPM/temperature on screen instead of "--"; five refresh intervals is past
+        /// a single missed cycle and still feels immediate when the EC returns.
+        /// </summary>
+        private readonly TimeSpan _staleAfter;
+
         private readonly StaleWhileRevalidateCache<EcFanDutySnapshot> _fanDutyCache;
         private readonly StaleWhileRevalidateCache<int> _mainFanRpmCache;
         private readonly StaleWhileRevalidateCache<int> _cpuTemperatureCache;
@@ -95,8 +103,8 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public int ConsecutiveFailures => Volatile.Read(ref _consecutiveFailures);
 
-        public EcTelemetryService(IEcTelemetryCapability telemetry, IEngineCapability engine)
-            : this(CreateCaptures(telemetry, engine), DefaultMaxAge)
+        public EcTelemetryService(IEcTelemetryCapability telemetry)
+            : this(CreateCaptures(telemetry), DefaultMaxAge)
         {
         }
 
@@ -136,6 +144,8 @@ namespace Uniwill_Control_Utility.Services
                 timeProvider,
                 onRefreshError: ex => OnRefreshFailed(ex, "Engine metrics"),
                 onRefreshSuccess: () => OnRefreshSucceeded());
+
+            _staleAfter = TimeSpan.FromTicks(maxAge.Ticks * 5);
         }
 
         private static Task<int> ZeroCapture() => Task.FromResult(0);
@@ -172,7 +182,12 @@ namespace Uniwill_Control_Utility.Services
             Interlocked.Exchange(ref _consecutiveFailures, 0);
         }
 
-        public EcFanDutySnapshot ReadFanDuty() => _fanDutyCache.Read();
+        public EcFanDutySnapshot ReadFanDuty()
+        {
+            // Read first: it is also what schedules the refresh of a stale entry.
+            EcFanDutySnapshot value = _fanDutyCache.Read();
+            return _fanDutyCache.Age > _staleAfter ? EcFanDutySnapshot.Empty : value;
+        }
 
         public async Task<int> RefreshMainFanRpmAsync()
         {
@@ -181,10 +196,14 @@ namespace Uniwill_Control_Utility.Services
             // If invalidation joined an older in-flight refresh, that generation is
             // discarded. A second call then captures the requested generation.
             await _mainFanRpmCache.RefreshAsync().ConfigureAwait(false);
-            return _mainFanRpmCache.Read();
+            return ReadMainFanRpm();
         }
 
-        internal int ReadMainFanRpm() => _mainFanRpmCache.Read();
+        internal int ReadMainFanRpm()
+        {
+            int value = _mainFanRpmCache.Read();
+            return _mainFanRpmCache.Age > _staleAfter ? 0 : value;
+        }
 
         /// <summary>
         /// The EC's CPU temperature (degrees Celsius), 0 when the EC cannot answer. Cached
@@ -192,7 +211,11 @@ namespace Uniwill_Control_Utility.Services
         /// when the in-process MSR sensor path is unavailable (see
         /// <see cref="IEcCpuTemperatureSource"/>).
         /// </summary>
-        public int ReadCpuTemperature() => _cpuTemperatureCache.Read();
+        public int ReadCpuTemperature()
+        {
+            int value = _cpuTemperatureCache.Read();
+            return _cpuTemperatureCache.Age > _staleAfter ? 0 : value;
+        }
 
         /// <summary>
         /// The engine's kernel-side sensor readings (CPU Ring0 power/clocks, DIMM SPD).
@@ -243,17 +266,19 @@ namespace Uniwill_Control_Utility.Services
 
         private static (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm,
             Func<Task<int>> cpuTemperature, Func<Task<EngineMetricsSnapshot>> engineMetrics) CreateCaptures(
-            IEcTelemetryCapability telemetry, IEngineCapability engine)
+            IEcTelemetryCapability telemetry)
         {
             ArgumentNullException.ThrowIfNull(telemetry);
-            ArgumentNullException.ThrowIfNull(engine);
 
+            // No readiness pre-flight: each verb already answers HardwareUnavailable from
+            // EcEngineGate.Acquire(), which the dispatcher maps to the same code. The probe
+            // was a whole extra RPC (its own pipe connect and JSON round trip) before every
+            // capture, doubling the idle telemetry traffic. A dead EC now fails the capture
+            // instead of returning an empty value, which the age gate in ReadFanDuty/
+            // ReadMainFanRpm/ReadCpuTemperature turns into the same "--" the pre-flight did.
             return (
                 async () =>
                 {
-                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
-                        return EcFanDutySnapshot.Empty;
-
                     try
                     {
                         UCU.Contracts.FanDutySnapshotDto dto = await telemetry.GetFanDutyAsync().ConfigureAwait(false);
@@ -270,9 +295,6 @@ namespace Uniwill_Control_Utility.Services
                 },
                 async () =>
                 {
-                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
-                        return 0;
-
                     try
                     {
                         return await telemetry.GetMainFanRpmAsync().ConfigureAwait(false);
@@ -286,9 +308,6 @@ namespace Uniwill_Control_Utility.Services
                 },
                 async () =>
                 {
-                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
-                        return 0;
-
                     try
                     {
                         return await telemetry.GetCpuTemperatureAsync().ConfigureAwait(false);
