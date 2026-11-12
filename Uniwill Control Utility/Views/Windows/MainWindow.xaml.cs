@@ -77,6 +77,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             Misc.Tick += Misc_Tick;
             Misc.Start();
 
+            // TEMPORARY DIAGNOSTIC: samples commit charge and logs a jump with the biggest
+            // private regions (see Services/MemoryTripwire.cs). Remove with that file.
+            Services.MemoryTripwire.Start();
+
             SetupNavigationService(pageProvider);
             SetupUI();
 
