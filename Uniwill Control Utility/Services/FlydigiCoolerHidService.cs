@@ -29,21 +29,6 @@ namespace Uniwill_Control_Utility.Services
             int Flags,
             nint EventHandle);
 
-        [DllImport("kernel32.dll")]
-        private static extern nint CreateEvent(
-            nint lpEventAttributes,
-            int bManualReset,
-            int bInitialState,
-            string? lpName);
-
-        [DllImport("kernel32.dll")]
-        private static extern int WaitForSingleObject(
-            nint hHandle,
-            int dwMilliseconds);
-
-        private const int WAIT_OBJECT_0 = 0;
-        private const int INFINITE = -1;
-
         /* ------------------------------------------------------------------ */
         /*  HID interface arrival notification (cfgmgr32.dll)                    */
         /* ------------------------------------------------------------------ */
@@ -103,7 +88,7 @@ namespace Uniwill_Control_Utility.Services
             "vid_37d7&pid_1004", // BS3 PRO
         };
 
-        private nint _powerEventHandle = nint.Zero;
+        private EventWaitHandle? _powerEvent;
         private nint _powerNotificationHandle = nint.Zero;
         private CancellationTokenSource? _powerMonitorCts;
         private Thread? _powerMonitorThread;
@@ -1625,34 +1610,46 @@ namespace Uniwill_Control_Utility.Services
 
         private void StartPowerNotificationMonitor()
         {
+            // Guard against double-start: a second monitor would overwrite the running
+            // thread's registration and leak a thread plus a kernel event.
+            if (_powerMonitorThread is { IsAlive: true })
+                return;
+
             try
             {
-                _powerEventHandle = CreateEvent(nint.Zero, 1, 0, null); // manual-reset event
-                if (_powerEventHandle == nint.Zero)
-                    return;
+                // A managed manual-reset event, not CreateEvent: WaitHandle.WaitAny can
+                // then observe both the notification and the cancellation token, so
+                // Stop() actually wakes the thread instead of closing the handle under it.
+                var powerEvent = new EventWaitHandle(false, EventResetMode.ManualReset);
+                _powerEvent = powerEvent;
 
-                _powerNotificationHandle = PowerRegisterSuspendResumeNotification(0, _powerEventHandle);
+                _powerNotificationHandle = PowerRegisterSuspendResumeNotification(
+                    0, powerEvent.SafeWaitHandle.DangerousGetHandle());
                 if (_powerNotificationHandle == nint.Zero)
                     return; // Registration failed, not a critical error
 
                 _powerMonitorCts = new CancellationTokenSource();
                 var token = _powerMonitorCts.Token;
+                WaitHandle[] waits = { powerEvent, token.WaitHandle };
 
                 _powerMonitorThread = new Thread(() =>
                 {
                     while (!token.IsCancellationRequested)
                     {
-                        int result = WaitForSingleObject(_powerEventHandle, INFINITE);
-                        if (result == WAIT_OBJECT_0)
+                        if (WaitHandle.WaitAny(waits) != 0)
+                            return; // Cancelled
+
+                        // The notification event is manual-reset: without this the wait
+                        // would return immediately forever after the first power event.
+                        powerEvent.Reset();
+
+                        try
                         {
-                            try
-                            {
-                                _ = HandlePowerEvent();
-                            }
-                            catch (Exception)
-                            {
-                                // Non-critical: power event handling failure shouldn't crash the app
-                            }
+                            _ = HandlePowerEvent();
+                        }
+                        catch (Exception)
+                        {
+                            // Non-critical: power event handling failure shouldn't crash the app
                         }
                     }
                 })
@@ -1672,6 +1669,8 @@ namespace Uniwill_Control_Utility.Services
         {
             try
             {
+                // Cancel wakes WaitHandle.WaitAny, so the thread exits instead of staying
+                // blocked on a handle that is about to be disposed.
                 _powerMonitorCts?.Cancel();
             }
             catch (Exception) { /* ignore */ }
@@ -1690,16 +1689,14 @@ namespace Uniwill_Control_Utility.Services
 
             try
             {
-                if (_powerEventHandle != nint.Zero)
-                {
-                    _ = CloseHandle(_powerEventHandle);
-                    _powerEventHandle = nint.Zero;
-                }
+                _powerEvent?.Dispose();
+                _powerEvent = null;
             }
             catch (Exception) { /* ignore */ }
 
             _powerMonitorCts?.Dispose();
             _powerMonitorCts = null;
+            _powerMonitorThread = null;
         }
 
         private async Task HandlePowerEvent()
@@ -1741,9 +1738,6 @@ namespace Uniwill_Control_Utility.Services
         private static extern int PowerUnregisterSuspendResumeNotification(
             int Flags,
             nint Handle);
-
-        [DllImport("kernel32.dll")]
-        private static extern int CloseHandle(nint hHandle);
 
         #endregion
 
