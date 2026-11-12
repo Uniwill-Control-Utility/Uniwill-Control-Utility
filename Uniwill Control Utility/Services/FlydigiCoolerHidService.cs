@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -815,6 +816,34 @@ namespace Uniwill_Control_Utility.Services
 
         #region Background Read Loop
 
+        // hidlibrary's HidDevice.Read(timeout) starts with `if (IsConnected)`, and that
+        // check runs a full HID class enumeration (SetupDiGetClassDevs + a registry read per
+        // device) on every call. At this loop's 200 ms cadence it measured ~60% of the app's
+        // total CPU (profiled 2026-11-12). ReadData is the same read without the probe; it is
+        // protected, so it is invoked directly, with Read() kept as the fallback for a
+        // library upgrade that renames the member.
+        private static readonly MethodInfo? RawReadMethod = typeof(HidDevice).GetMethod(
+            "ReadData",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        private HidDeviceData ReadRaw(int timeout)
+        {
+            if (RawReadMethod is not null && _device is not null)
+            {
+                try
+                {
+                    return (HidDeviceData)RawReadMethod.Invoke(_device, new object[] { timeout })!;
+                }
+                catch (Exception)
+                {
+                    // ReadData handles its own I/O failures (it reports a status rather than
+                    // throwing); if reflection plumbing fails, use the ordinary read.
+                }
+            }
+
+            return _device!.Read(timeout);
+        }
+
         private void StartReadLoop()
         {
             _readCts = new CancellationTokenSource();
@@ -829,7 +858,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     try
                     {
-                        var data = _device.Read(200); // 200ms timeout
+                        var data = ReadRaw(200); // 200ms timeout
 
                         if (data.Status == HidDeviceData.ReadStatus.Success)
                         {
