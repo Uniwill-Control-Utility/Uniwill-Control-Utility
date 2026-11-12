@@ -26,12 +26,21 @@ namespace Uniwill_Control_Utility.Services
         private const long WarnThresholdBytes = 1200L * 1024 * 1024;
         private const long JumpThresholdBytes = 64L * 1024 * 1024;
 
+        /// <summary>
+        /// A burst that allocates and frees inside one sampling window leaves the commit
+        /// line flat - but GC.GetTotalAllocatedBytes never forgets. 256 MB of allocation in
+        /// 30 s is well above this app's idle churn (~10 MB) and catches the shape the
+        /// 5.7 GB case must have had.
+        /// </summary>
+        private const long AllocationBurstBytes = 256L * 1024 * 1024;
+
         private const uint MemCommit = 0x1000;
         private const uint MemPrivate = 0x20000;
         private const long BytesPerMb = 1024L * 1024L;
 
         private static Timer? _timer;
         private static long _lastCommit;
+        private static long _lastAllocated;
 
         public static void Start()
         {
@@ -39,6 +48,7 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             _lastCommit = CurrentCommit();
+            _lastAllocated = GC.GetTotalAllocatedBytes(precise: false);
             _timer = new Timer(_ => Sample(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         }
 
@@ -74,16 +84,24 @@ namespace Uniwill_Control_Utility.Services
             {
                 long commit = CurrentCommit();
                 long delta = commit - Interlocked.Exchange(ref _lastCommit, commit);
+                long allocated = GC.GetTotalAllocatedBytes(precise: false);
+                long allocatedDelta = allocated - Interlocked.Exchange(ref _lastAllocated, allocated);
 
-                // Quiet unless it is big or it just moved: an idle app logs nothing.
-                if (commit < WarnThresholdBytes && Math.Abs(delta) < JumpThresholdBytes)
+                // Quiet unless it is big, it just moved, or the heap churned hard:
+                // an idle app logs nothing.
+                if (commit < WarnThresholdBytes
+                    && Math.Abs(delta) < JumpThresholdBytes
+                    && allocatedDelta < AllocationBurstBytes)
+                {
                     return;
+                }
 
                 Log.Warning(
-                    "[Mem] commit {CommitMb:N0} MB (delta {DeltaMb:+#;-#;0} MB), working set {WsMb:N0} MB, " +
-                    "render tier {Tier}, render mode {Mode}, private regions: {Regions}",
+                    "[Mem] commit {CommitMb:N0} MB (delta {DeltaMb:+#;-#;0} MB), allocated in 30 s {AllocMb:N0} MB, " +
+                    "working set {WsMb:N0} MB, render tier {Tier}, render mode {Mode}, private regions: {Regions}",
                     commit / BytesPerMb,
                     delta / BytesPerMb,
+                    allocatedDelta / BytesPerMb,
                     CurrentWorkingSet() / BytesPerMb,
                     System.Windows.Media.RenderCapability.Tier >> 16,
                     System.Windows.Media.RenderOptions.ProcessRenderMode,
