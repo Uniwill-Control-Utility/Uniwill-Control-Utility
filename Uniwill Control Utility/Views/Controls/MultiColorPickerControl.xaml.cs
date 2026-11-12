@@ -30,6 +30,7 @@ public partial class MultiColorPickerControl : UserControl
     private readonly Random _randomColor = new();
     private Border? _removeButton;
     private bool _isDeleteMode;
+    private Window? _deleteModeRoot;
 
     /// <summary>All selected colors in order.</summary>
     public List<Color> GetColors()
@@ -44,6 +45,16 @@ public partial class MultiColorPickerControl : UserControl
     public MultiColorPickerControl()
     {
         InitializeComponent();
+
+        // A control torn down while in delete mode would otherwise stay reachable through
+        // the window's PreviewMouseDown list and keep its page alive.
+        Unloaded += (_, _) =>
+        {
+            if (_isDeleteMode)
+                ExitDeleteMode();
+            else
+                DetachDeleteModeHandler();
+        };
 
         // Start with one default color (white)
         AddColor(System.Windows.Media.Colors.White);
@@ -121,9 +132,9 @@ public partial class MultiColorPickerControl : UserControl
         UpdateAddRemoveButtons();
 
         // Attach handler to root window so clicks anywhere outside the chip row exit deletion mode
-        var root = Window.GetWindow(this);
-        if (root != null)
-            root.PreviewMouseDown += OnRootPreviewMouseDown;
+        _deleteModeRoot = Window.GetWindow(this);
+        if (_deleteModeRoot != null)
+            _deleteModeRoot.PreviewMouseDown += OnRootPreviewMouseDown;
     }
 
     private void ExitDeleteMode()
@@ -134,10 +145,21 @@ public partial class MultiColorPickerControl : UserControl
         // Restore buttons
         UpdateAddRemoveButtons();
 
-        // Detach root handler
-        var root = Window.GetWindow(this);
-        if (root != null)
-            root.PreviewMouseDown -= OnRootPreviewMouseDown;
+        DetachDeleteModeHandler();
+    }
+
+    /// <summary>
+    /// Removes the window handler from the remembered window. The window has to be stored:
+    /// once the control is unloaded, Window.GetWindow(this) is null and the handler would
+    /// be unreachable, leaving the window holding this control (and its page).
+    /// </summary>
+    private void DetachDeleteModeHandler()
+    {
+        if (_deleteModeRoot is null)
+            return;
+
+        _deleteModeRoot.PreviewMouseDown -= OnRootPreviewMouseDown;
+        _deleteModeRoot = null;
     }
 
     /* ------------------------------------------------------------------ */
