@@ -58,6 +58,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private System.Threading.Timer? _glowPulseTimer;
         private bool _glowPulseDirection = true;
         private volatile bool _glowActive;
+        private volatile bool _isDeviceConnected;
 
         private const string Bs1ImageUri = "pack://application:,,,/Assets/Flydigi/bs1.png";
         private const string FlydigiAssetPrefix = "pack://application:,,,/Assets/Flydigi/";
@@ -1702,6 +1703,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnConnectionStateChanged(object? sender, bool connected)
         {
+            // Tracked here so the temperature timer can skip a disconnected device without
+            // hopping to the UI thread (see UpdateTemperatureDisplay).
+            _isDeviceConnected = connected;
+
             try
             {
                 Application.Current.Dispatcher.Invoke(() =>
@@ -2382,20 +2387,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_coolerService == null)
                 return;
 
-            // Don't update temperature if disconnected
-            var checkDispatcher = Application.Current?.Dispatcher;
-            if (checkDispatcher != null)
-            {
-                bool isConnected = false;
-                try
-                {
-                    checkDispatcher.Invoke(() => isConnected = (spConnectedState.Visibility == Visibility.Visible));
-                }
-                catch { /* Dispatcher shutting down during app exit */ return; }
-
-                if (!isConnected)
-                    return;
-            }
+            // Don't update temperature if disconnected. Read from the field set by
+            // OnConnectionStateChanged, not from the visual tree: a synchronous
+            // Dispatcher.Invoke here parks this timer's pool thread until the UI thread is
+            // free, and a 2 s tick that cannot be serviced piles threads up (measured:
+            // 1,383 threads on this method in one session).
+            if (!_isDeviceConnected)
+                return;
 
             _tempProvider ??= new FlydigiTemperatureProvider();
 
@@ -2416,7 +2414,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 try
                 {
-                    dispatcher.Invoke(() =>
+                    _ = dispatcher.InvokeAsync(() =>
                     {
                         tbTemperature.Text = temp.HasValue ? $"{temp.Value:F1}°C" : LocalizationService.Get("N/A");
                     });
@@ -2429,7 +2427,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var dispatcher = Application.Current?.Dispatcher;
                 if (dispatcher != null)
                 {
-                    try { dispatcher.Invoke(() => tbTemperature.Text = "N/A"); }
+                    try { _ = dispatcher.InvokeAsync(() => tbTemperature.Text = "N/A"); }
                     catch { /* Dispatcher shutting down during app exit */ }
                 }
             }
