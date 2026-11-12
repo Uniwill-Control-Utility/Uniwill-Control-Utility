@@ -566,8 +566,8 @@ namespace UCU.Hardware.Takeover
                 {
                     installed++;
 
-                    TakeoverNative.QUERY_SERVICE_CONFIG? config = TakeoverNative.QueryServiceConfig(service);
-                    string? image = config is null ? null : ExePathFromCommand(Marshal.PtrToStringUni(config.Value.lpBinaryPathName) ?? string.Empty);
+                    TakeoverNative.ServiceConfig? config = TakeoverNative.QueryServiceConfig(service);
+                    string? image = config is null ? null : ExePathFromCommand(config.Value.BinaryPathName);
 
                     var (verdict, reason) = GateFileIdentity(probe, image);
                     if (verdict == TakeoverPolicy.Eligibility.UcuSelf)
@@ -585,7 +585,7 @@ namespace UCU.Hardware.Takeover
                     if (TakeoverNative.QueryServiceStatus(service, ref status) && status.dwCurrentState == TakeoverNative.SERVICE_RUNNING)
                         running++;
 
-                    bool parked = config!.Value.dwStartType == TakeoverNative.SERVICE_DEMAND_START
+                    bool parked = config!.Value.StartType == TakeoverNative.SERVICE_DEMAND_START
                                   && demandEvidence.Contains(name.ToUpperInvariant());
                     if (parked)
                     {
@@ -654,14 +654,14 @@ namespace UCU.Hardware.Takeover
 
                 try
                 {
-                    TakeoverNative.QUERY_SERVICE_CONFIG? config = TakeoverNative.QueryServiceConfig(service);
-                    string? image = config is null ? null : ExePathFromCommand(Marshal.PtrToStringUni(config.Value.lpBinaryPathName) ?? string.Empty);
+                    TakeoverNative.ServiceConfig? config = TakeoverNative.QueryServiceConfig(service);
+                    string? image = config is null ? null : ExePathFromCommand(config.Value.BinaryPathName);
 
                     var (verdict, _) = GateFileIdentity(probe, image);
                     if (verdict != TakeoverPolicy.Eligibility.Eligible)
                         continue; // status audit-lists refusals; a pause acts only on gated targets
 
-                    uint start = config!.Value.dwStartType;
+                    uint start = config!.Value.StartType;
 
                     // The pre-kill snapshot is the authority on "was running":
                     // by now the kill pass may already have stopped this

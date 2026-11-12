@@ -95,10 +95,21 @@ namespace UCU.Hardware.Takeover
         [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool QueryServiceConfigNative(IntPtr hService, IntPtr lpServiceConfig, uint cbBufSize, out uint pcbBytesNeeded);
 
+        /// <summary>
+        /// Managed copy of the fields callers use. The native struct's string pointers
+        /// are read inside the query, so nothing owned by the caller can leak.
+        /// </summary>
+        public readonly record struct ServiceConfig(
+            uint ServiceType,
+            uint StartType,
+            uint ErrorControl,
+            string BinaryPathName,
+            string DisplayName);
+
         /// <summary>Reads the service config (Start type + ImagePath). The
         /// two-call buffer dance is the documented query (the first call
         /// reports the needed size via ERROR_INSUFFICIENT_BUFFER).</summary>
-        public static QUERY_SERVICE_CONFIG? QueryServiceConfig(IntPtr hService)
+        public static ServiceConfig? QueryServiceConfig(IntPtr hService)
         {
             QueryServiceConfigNative(hService, IntPtr.Zero, 0, out uint needed);
             if (needed == 0)
@@ -112,14 +123,15 @@ namespace UCU.Hardware.Takeover
 
                 QUERY_SERVICE_CONFIG config = Marshal.PtrToStructure<QUERY_SERVICE_CONFIG>(buffer);
 
-                // Copy the strings out before the buffer is released; keep the
-                // struct's pointers pointed at them so callers read one shape.
-                config.lpBinaryPathName = Marshal.StringToHGlobalUni(Marshal.PtrToStringUni(config.lpBinaryPathName) ?? string.Empty);
-                config.lpLoadOrderGroup = Marshal.StringToHGlobalUni(Marshal.PtrToStringUni(config.lpLoadOrderGroup) ?? string.Empty);
-                config.lpDependencies = Marshal.StringToHGlobalUni(Marshal.PtrToStringUni(config.lpDependencies) ?? string.Empty);
-                config.lpServiceStartName = Marshal.StringToHGlobalUni(Marshal.PtrToStringUni(config.lpServiceStartName) ?? string.Empty);
-                config.lpDisplayName = Marshal.StringToHGlobalUni(Marshal.PtrToStringUni(config.lpDisplayName) ?? string.Empty);
-                return config;
+                // Copy the strings while the buffer is alive. The previous shape
+                // handed callers HGlobal copies of all five strings and nobody
+                // freed them: five native allocations per config query, forever.
+                return new ServiceConfig(
+                    config.dwServiceType,
+                    config.dwStartType,
+                    config.dwErrorControl,
+                    Marshal.PtrToStringUni(config.lpBinaryPathName) ?? string.Empty,
+                    Marshal.PtrToStringUni(config.lpDisplayName) ?? string.Empty);
             }
             finally
             {
