@@ -31,6 +31,62 @@ namespace UCU.Engine
 
         private static readonly IntPtr InvalidHandleValue = new(-1);
 
+        // The descriptor is immutable once built and CreateNamedPipeW copies it into the
+        // pipe, so one instance per distinct SDDL serves the process. The accept loop used
+        // to re-parse the SDDL (ConvertStringSecurityDescriptorToSecurityDescriptor plus an
+        // HGlobal round trip and two frees) for every accepted connection.
+        private static readonly object DescriptorSync = new();
+        private static string? _cachedSddl;
+        private static IntPtr _cachedDescriptor;
+        private static IntPtr _cachedAttributes;
+
+        /// <summary>
+        /// Cached SECURITY_ATTRIBUTES for <paramref name="sddl"/> (process lifetime; the OS
+        /// reclaims it at exit). Rebuilt only if a host asks for a different SDDL.
+        /// </summary>
+        private static IntPtr GetSecurityAttributes(string sddl)
+        {
+            lock (DescriptorSync)
+            {
+                if (_cachedDescriptor != IntPtr.Zero && string.Equals(_cachedSddl, sddl, StringComparison.Ordinal))
+                    return _cachedAttributes;
+
+                if (_cachedDescriptor != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_cachedAttributes);
+                    LocalFree(_cachedDescriptor);
+                    _cachedDescriptor = IntPtr.Zero;
+                    _cachedAttributes = IntPtr.Zero;
+                }
+
+                if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                        sddl, 1 /* SECURITY_DESCRIPTOR_REVISION */, out IntPtr descriptor, out _))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(),
+                        $"pipe SDDL rejected: {sddl}");
+                }
+
+                // SECURITY_ATTRIBUTES must reach the call as a pointer: a
+                // Nullable<SECURITY_ATTRIBUTES> parameter is not marshallable
+                // (MarshalDirectiveException), and passing the struct by value
+                // would hand the callee a copy that claims the wrong size.
+                var attributes = new SECURITY_ATTRIBUTES
+                {
+                    nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(),
+                    lpSecurityDescriptor = descriptor,
+                };
+
+                IntPtr attributesPtr = Marshal.AllocHGlobal(Marshal.SizeOf<SECURITY_ATTRIBUTES>());
+                Marshal.StructureToPtr(attributes, attributesPtr, fDeleteOld: false);
+
+                _cachedSddl = sddl;
+                _cachedDescriptor = descriptor;
+                _cachedAttributes = attributesPtr;
+
+                return attributesPtr;
+            }
+        }
+
         /// <summary>
         /// A byte-mode, overlapped server pipe with up to 255 instances.
         /// <paramref name="sddl"/> is the pipe's DACL; null applies the default
@@ -38,69 +94,34 @@ namespace UCU.Engine
         /// </summary>
         public static NamedPipeServerStream Create(string pipeName, string? sddl)
         {
-            IntPtr securityDescriptor = IntPtr.Zero;
-            IntPtr securityAttributesPtr = IntPtr.Zero;
+            IntPtr saPtr = sddl is null ? IntPtr.Zero : GetSecurityAttributes(sddl);
+
+            IntPtr handle = CreateNamedPipeW(
+                $@"\\.\pipe\{pipeName}",
+                PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+                PipeModeByteByteWait,
+                PipeMaxInstances,
+                0, 0, 0, saPtr);
+
+            if (handle == InvalidHandleValue)
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    $"CreateNamedPipeW('{pipeName}') failed");
+
+            var safeHandle = new SafePipeHandle(handle, ownsHandle: true);
             try
             {
-                IntPtr saPtr = IntPtr.Zero;
-                if (sddl is not null)
-                {
-                    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
-                            sddl, 1 /* SECURITY_DESCRIPTOR_REVISION */, out securityDescriptor, out _))
-                    {
-                        throw new Win32Exception(Marshal.GetLastWin32Error(),
-                            $"pipe SDDL rejected: {sddl}");
-                    }
-
-                    // SECURITY_ATTRIBUTES must reach the call as a pointer: a
-                    // Nullable<SECURITY_ATTRIBUTES> parameter is not marshallable
-                    // (MarshalDirectiveException), and passing the struct by value
-                    // would hand the callee a copy that claims the wrong size.
-                    var attributes = new SECURITY_ATTRIBUTES
-                    {
-                        nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(),
-                        lpSecurityDescriptor = securityDescriptor,
-                    };
-
-                    securityAttributesPtr = Marshal.AllocHGlobal(Marshal.SizeOf<SECURITY_ATTRIBUTES>());
-                    Marshal.StructureToPtr(attributes, securityAttributesPtr, fDeleteOld: false);
-                    saPtr = securityAttributesPtr;
-                }
-
-                IntPtr handle = CreateNamedPipeW(
-                    $@"\\.\pipe\{pipeName}",
-                    PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-                    PipeModeByteByteWait,
-                    PipeMaxInstances,
-                    0, 0, 0, saPtr);
-
-                if (handle == InvalidHandleValue)
-                    throw new Win32Exception(Marshal.GetLastWin32Error(),
-                        $"CreateNamedPipeW('{pipeName}') failed");
-
-                var safeHandle = new SafePipeHandle(handle, ownsHandle: true);
-                try
-                {
-                    // The handle-taking constructor: the handle is created overlapped
-                    // (isAsync) and is a fresh listening instance (isConnected false).
-                    return new NamedPipeServerStream(
-                        PipeDirection.InOut,
-                        isAsync: true,
-                        isConnected: false,
-                        safeHandle);
-                }
-                catch
-                {
-                    safeHandle.Dispose();
-                    throw;
-                }
+                // The handle-taking constructor: the handle is created overlapped
+                // (isAsync) and is a fresh listening instance (isConnected false).
+                return new NamedPipeServerStream(
+                    PipeDirection.InOut,
+                    isAsync: true,
+                    isConnected: false,
+                    safeHandle);
             }
-            finally
+            catch
             {
-                if (securityAttributesPtr != IntPtr.Zero)
-                    Marshal.FreeHGlobal(securityAttributesPtr);
-                if (securityDescriptor != IntPtr.Zero)
-                    LocalFree(securityDescriptor);
+                safeHandle.Dispose();
+                throw;
             }
         }
 
