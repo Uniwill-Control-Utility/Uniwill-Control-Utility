@@ -138,7 +138,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                 FlushViewOfFile((IntPtr)basePtr, IntPtr.Zero);
             }
 
-            try { Log.Information("[RTSS] Update: wrote slot {Slot}, text {TextLength} chars", slot, osdText.Length); } catch { }
+            try { Log.Debug("[RTSS] Update: wrote slot {Slot}, text {TextLength} chars", slot, osdText.Length); } catch { }
             return slot;
         }
 
