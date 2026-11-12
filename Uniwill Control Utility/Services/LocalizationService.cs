@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
@@ -78,6 +79,15 @@ namespace Uniwill_Control_Utility.Services
         private static readonly List<WeakReference<object>> TrackedElements = new();
         private static readonly object TrackingSync = new();
         private static readonly string[] StringProperties = { "Text", "Content", "Header", "Title", "Message", "ToolTip", "PlaceholderText" };
+
+        /// <summary>
+        /// Reflection results per (control type, property name). ApplyElement walks these
+        /// seven names over every element on every Loaded, and the lookups were uncached:
+        /// a ~500-element page cost ~3.5k GetProperty + DependencyPropertyDescriptor.FromName
+        /// calls per load, and the same again on every navigation and language switch.
+        /// Type metadata cannot change at runtime, so a null result is cacheable too.
+        /// </summary>
+        private static readonly ConcurrentDictionary<(Type Type, string Property), (PropertyInfo? Property, DependencyPropertyDescriptor? Descriptor)> PropertyLookup = new();
         private static bool _isInitialised;
 
         public static LanguageOption[] SupportedLanguages => Languages;
@@ -285,25 +295,41 @@ namespace Uniwill_Control_Utility.Services
                 return;
             }
 
-            PropertyInfo? property;
-            try
-            {
-                property = element.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
-            }
-            catch (AmbiguousMatchException)
-            {
-                // Types like SnackbarPresenter shadow ContentPresenter.Content — skip them
-                return;
-            }
-            if (property == null || (property.PropertyType != typeof(string) && property.PropertyType != typeof(object)) || !property.CanRead || !property.CanWrite || property.GetIndexParameters().Length != 0)
+            (PropertyInfo? Property, DependencyPropertyDescriptor? Descriptor) lookup =
+                PropertyLookup.GetOrAdd((element.GetType(), propertyName), static key =>
+                {
+                    PropertyInfo? reflected;
+                    try
+                    {
+                        reflected = key.Type.GetProperty(key.Property, BindingFlags.Instance | BindingFlags.Public);
+                    }
+                    catch (AmbiguousMatchException)
+                    {
+                        // Types like SnackbarPresenter shadow ContentPresenter.Content — skip them
+                        return (null, null);
+                    }
+
+                    if (reflected is null
+                        || (reflected.PropertyType != typeof(string) && reflected.PropertyType != typeof(object))
+                        || !reflected.CanRead
+                        || !reflected.CanWrite
+                        || reflected.GetIndexParameters().Length != 0)
+                    {
+                        return (null, null);
+                    }
+
+                    return (reflected, DependencyPropertyDescriptor.FromName(key.Property, key.Type, key.Type));
+                });
+
+            PropertyInfo? property = lookup.Property;
+            if (property is null)
             {
                 return;
             }
 
-            if (element is DependencyObject dependencyObject)
+            if (element is DependencyObject dependencyObject && lookup.Descriptor is { } descriptor)
             {
-                var descriptor = DependencyPropertyDescriptor.FromName(propertyName, element.GetType(), element.GetType());
-                if (descriptor != null && BindingOperations.IsDataBound(dependencyObject, descriptor.DependencyProperty))
+                if (BindingOperations.IsDataBound(dependencyObject, descriptor.DependencyProperty))
                 {
                     return;
                 }
