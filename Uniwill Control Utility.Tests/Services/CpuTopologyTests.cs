@@ -1,6 +1,6 @@
-using UCU.Hardware.Cpu;
+﻿using Uniwill_Control_Utility.Services;
 
-namespace UCU.Hardware.Tests;
+namespace Uniwill_Control_Utility.Tests.Services;
 
 /// <summary>
 /// The CCD/core layout the per-core Curve Optimizer groups its rows by. The cases are the

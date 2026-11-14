@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 
-namespace UCU.Hardware.Cpu
+namespace Uniwill_Control_Utility.Services
 {
     /// <summary>A physical core and where it sits.</summary>
     /// <param name="Index">0-based physical core index, ordered by lowest logical processor.</param>
