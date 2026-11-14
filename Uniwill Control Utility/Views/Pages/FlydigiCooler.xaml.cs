@@ -1703,10 +1703,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnConnectionStateChanged(object? sender, bool connected)
         {
-            // Tracked here so the temperature timer can skip a disconnected device without
-            // hopping to the UI thread (see UpdateTemperatureDisplay).
-            _isDeviceConnected = connected;
-
             try
             {
                 Application.Current.Dispatcher.Invoke(() =>
@@ -2093,6 +2089,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateConnectionUI(bool connected, bool isBs1Sender = false)
         {
+            // Single source of truth for the temperature timer's "is there a device" test.
+            // It is set here, not only in OnConnectionStateChanged, because the page also
+            // applies its connection state directly on load/navigation (UpdateConnectionUI(
+            // true, ...) at the page's initial sync) without any event.
+            _isDeviceConnected = connected;
+
             if (connected)
             {
                 // Determine device type from the event sender (which service fired this event)
