@@ -1130,7 +1130,14 @@ namespace Uniwill_Control_Utility.Services
                         IsGpuEnabled = _configured.HasFlag(HardwareMonitoringCategory.Gpu),
                         IsBatteryEnabled = _configured.HasFlag(HardwareMonitoringCategory.Battery),
                         IsMotherboardEnabled = _configured.HasFlag(SystemDevicesMask),
-                        IsStorageEnabled = _configured.HasFlag(SystemDevicesMask),
+
+                        // Storage stays off even for the system-devices group. Measured
+                        // 2026-11-14: LHM's SMART pass on the Crucial P310 takes 21 s per
+                        // probe (repeating every ~82 s, "[slow] device update Storage
+                        // CT2000P310SSD8 21036ms") and pushed Computer.Open to 78-85 s.
+                        // Nothing reads the storage sensors: the app's snapshot carries no
+                        // disk fields and SensorsControl renders that snapshot, not LHM's tree.
+                        IsStorageEnabled = false,
                         IsControllerEnabled = _configured.HasFlag(SystemDevicesMask)
                     };
 
