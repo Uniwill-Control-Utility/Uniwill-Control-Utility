@@ -1076,22 +1076,6 @@
                                 </StackPanel>
                             </Grid>
 
-                            <!-- Row: Smart-Temp message (visible for Smart-Temp) -->
-                            <Grid x:Name="spBs2ProRgbSmartTemp" Visibility="Collapsed">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Smart-Temp mode" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Smart-Temp automatically adjusts colors based on device temperature and has no additional controls"
-                                                   TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-
                             <!-- Row: Color picker (visible for Static/Breathing) -->
                             <Grid x:Name="spBs2ProRgbColorPicker" Visibility="Collapsed">
                                 <Grid.ColumnDefinitions>

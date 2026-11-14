@@ -224,8 +224,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (spBs2ProRgbOff is not null)
                 spBs2ProRgbOff.Visibility = Visibility.Collapsed;
-            if (spBs2ProRgbSmartTemp is not null)
-                spBs2ProRgbSmartTemp.Visibility = Visibility.Collapsed;
             if (spBs2ProRgbColorPicker is not null)
                 spBs2ProRgbColorPicker.Visibility = Visibility.Collapsed;
             if (spBs2ProRgbBrightness is not null)
@@ -250,7 +248,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             Bs2ProCurveEditorDivider.Visibility = Bs2ProCurveEditor.Visibility;
             Bs2ProRgbDivider.Visibility = spBs2ProRgbMode.Visibility;
             Bs2ProRgbSubDivider.Visibility = AnyVisible(
-                spBs2ProRgbOff, spBs2ProRgbSmartTemp, spBs2ProRgbColorPicker,
+                spBs2ProRgbOff, spBs2ProRgbColorPicker,
                 spBs2ProRgbBrightness, spBs2ProRgbSpeed);
             Bs2ProRgbStaticBrightnessDivider.Visibility = spBs2ProRgbBrightness.Visibility;
             Bs2ProRgbFlowingSpeedDivider.Visibility = spBs2ProRgbSpeed.Visibility;
@@ -2892,8 +2890,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 case 0: // Off
                     spBs2ProRgbOff.Visibility = Visibility.Visible;
                     break;
-                case 1: // Smart-Temp
-                    spBs2ProRgbSmartTemp.Visibility = Visibility.Visible;
+                case 1: // Smart-Temp — the device animates on its own, nothing to configure
                     break;
                 case 2: // Static
                     spBs2ProRgbColorPicker.Visibility = Visibility.Visible;
