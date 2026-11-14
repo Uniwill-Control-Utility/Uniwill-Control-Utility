@@ -655,14 +655,23 @@ namespace Uniwill_Control_Utility.Services
                 ? preset.BuildPerCoreMap(topology)
                 : null;
 
+            var values = new List<uint>(topology.CoreCount);
             foreach (CpuCore core in topology.Cores)
             {
                 int offset = perCore is not null
                     ? perCore[core.Index]
                     : (core.CcdIndex == 0 ? ccd0 : ccd1);
 
-                parts.Add($"--set-coper={BuildCoperArg(core.CcdIndex, core.IndexInCcd, offset)}");
+                values.Add(BuildCoperArg(core.CcdIndex, core.IndexInCcd, offset));
             }
+
+            // One token for the whole map: the translator hands it to the engine's batch verb,
+            // so the apply is a single queue item (and a single 50 ms pacing cost) instead of
+            // one pipe round trip per core.
+            if (values.Count == 1)
+                parts.Add($"--set-coper={values[0]}");
+            else if (values.Count > 1)
+                parts.Add($"--set-coper-batch={string.Join(",", values)}");
         }
 
         /// <summary>

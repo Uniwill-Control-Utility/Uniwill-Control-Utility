@@ -107,23 +107,26 @@ public sealed class CurveOptimizerModelTests
     }
 
     [Fact]
-    public void PerCcd_EmitsOneWritePerExistingCore_NotAFixedSixteen()
+    public void PerCcd_EmitsOneBatchTokenForEveryExistingCore_NotAFixedSixteen()
     {
-        // A part with CCD1 disabled: eight cores, so eight writes - the old loop sent 16 and
-        // addressed four cores that do not exist.
+        // A part with CCD1 disabled: eight cores, so eight values in one batch - the old loop
+        // sent 16 separate commands and addressed four cores that do not exist.
         var parts = new List<string>();
         var preset = new CustomPreset { CpuCoMode = CpuCoMode.PerCcd, CpuCoCcd0 = -15, CpuCoCcd1 = -25 };
 
         PresetProfileApplier.AppendCoCommands(parts, preset, OneByEight());
 
-        Assert.Equal(8, parts.Count);
-        Assert.All(parts, part => Assert.StartsWith("--set-coper=", part));
+        string batch = Assert.Single(parts);
+        Assert.StartsWith("--set-coper-batch=", batch);
+
+        string[] values = batch["--set-coper-batch=".Length..].Split(',');
+        Assert.Equal(8, values.Length);
         // CCD0 offset -15 on core 0: 0x100000 - 15, printed as decimal.
-        Assert.Equal("--set-coper=1048561", parts[0]);
+        Assert.Equal("1048561", values[0]);
     }
 
     [Fact]
-    public void PerCore_EmitsOneWritePerCore_WithPerCoreValues()
+    public void PerCore_EmitsOneBatchToken_WithPerCoreValues()
     {
         var parts = new List<string>();
         var preset = new CustomPreset
@@ -136,12 +139,39 @@ public sealed class CurveOptimizerModelTests
 
         PresetProfileApplier.AppendCoCommands(parts, preset, TwoByEight());
 
-        Assert.Equal(16, parts.Count);
-        // Core 0 of CCD0 at -5: prefix 0, offset 0x100000-5.
-        Assert.Equal("--set-coper=1048571", parts[0]);
+        string batch = Assert.Single(parts);
+        string[] values = batch["--set-coper-batch=".Length..].Split(',');
+
+        Assert.Equal(16, values.Length);
+        Assert.Equal("1048571", values[0]);   // core 0, -5
         // Core 8 of CCD1 at -30 (the fallback): prefix 0x100 << 20 = 268435456, plus
         // 0x100000 - 30.
-        Assert.Equal("--set-coper=269484002", parts[8]);
+        Assert.Equal("269484002", values[8]);
+    }
+
+    [Fact]
+    public void ASingleCore_StillUsesThePlainCommand()
+    {
+        var parts = new List<string>();
+        var preset = new CustomPreset { CpuCoMode = CpuCoMode.PerCcd, CpuCoCcd0 = -20 };
+        CpuTopology oneCore = CpuTopologyReader.Build(
+            new List<(ulong, bool)> { (0b11UL, true) },
+            new List<(ulong, long)> { (0b11UL, 96 * Mb) });
+
+        PresetProfileApplier.AppendCoCommands(parts, preset, oneCore);
+
+        Assert.Equal("--set-coper=1048556", Assert.Single(parts));
+    }
+
+    [Theory]
+    [InlineData("1048571,1048570", 2)]
+    [InlineData("1048571", 1)]
+    [InlineData("1048571,,1048570", 2)]
+    [InlineData("1048571,garbage,1048570", 2)]
+    [InlineData("", 0)]
+    public void CoperBatchPayload_ParsesTheValuesAndDropsJunk(string payload, int expected)
+    {
+        Assert.Equal(expected, Scripts.RyzenAdj_To_UCU.ParseCoperBatch(payload).Length);
     }
 
     [Fact]

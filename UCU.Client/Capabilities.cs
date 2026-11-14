@@ -249,6 +249,10 @@ namespace UCU.Client
         public Task<uint[]> ReadCommandAsync(string name, uint value, CancellationToken cancellationToken = default) =>
             ReadAsync(name, value, cancellationToken);
 
+        public Task<int> ExecuteCoperBatchAsync(IReadOnlyList<uint> values, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<int>(EngineVerbs.Cpu.SetCoperMany,
+                EngineSerializer.ToParams(new SmuCoperBatchDto { Values = values.ToArray() }), cancellationToken);
+
         private async Task<uint[]> ReadAsync(string name, uint value, CancellationToken cancellationToken)
         {
             SmuReadResultDto result = await _client.InvokeAsync<SmuReadResultDto>(

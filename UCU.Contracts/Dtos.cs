@@ -279,6 +279,17 @@ namespace UCU.Contracts
         public uint[] Args { get; init; } = Array.Empty<uint>();
     }
 
+    /// <summary>
+    /// A whole per-core Curve Optimizer write in one request: one already-packed --set-coper
+    /// argument per core, in core order. Batching matters for more than speed - the engine
+    /// runs the list as one queue item, so a timeout can no longer leave half the cores on the
+    /// new offset and half on the old one.
+    /// </summary>
+    public sealed record SmuCoperBatchDto
+    {
+        public uint[] Values { get; init; } = Array.Empty<uint>();
+    }
+
     /// <summary>The TDP MSR pair: PL1 (low dword) and PL2 (high dword), watts.</summary>
     public sealed record IntelTdpDto
     {

@@ -65,6 +65,52 @@ public sealed class CpuVerbsTests
     }
 
     [Fact]
+    public async Task SetCoperMany_AppliesEveryValueInOrderAndAnswersOk()
+    {
+        var smu = new FakeAmdSmuService().Answers("set-coper");
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        int status = await host.Smu.ExecuteCoperBatchAsync(new uint[] { 0x11, 0x22, 0x33 });
+
+        Assert.Equal(0x01, status);
+        Assert.Equal(
+            new[] { ("set-coper", 0x11u), ("set-coper", 0x22u), ("set-coper", 0x33u) },
+            smu.Calls);
+    }
+
+    [Fact]
+    public async Task SetCoperMany_RefusesAnEmptyBatch()
+    {
+        var smu = new FakeAmdSmuService().Answers("set-coper");
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        await Assert.ThrowsAsync<EngineException>(
+            () => host.Smu.ExecuteCoperBatchAsync(Array.Empty<uint>()));
+
+        Assert.Empty(smu.Calls);
+    }
+
+    [Fact]
+    public async Task SetCoperMany_StopsAtTheFirstNonOkStatus()
+    {
+        // The firmware refuses the first mailbox, so the rest must not be written - that is
+        // the half-applied map the batch exists to prevent.
+        var smu = new FakeAmdSmuService().Answers("set-coper", 0x02);
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        int status = await host.Smu.ExecuteCoperBatchAsync(new uint[] { 0x11, 0x22, 0x33 });
+
+        Assert.Equal(0x02, status);
+        Assert.Single(smu.Calls);
+    }
+
+    [Fact]
     public async Task ExecuteAmdSmuCommand_RefusesAReadCommand()
     {
         // ...and the other direction: the write verb's allowlist must not admit a
@@ -119,7 +165,8 @@ public sealed class CpuVerbsTests
     }
 
     [Fact]
-    public async Task ExecuteAmdSmuCommand_UnknownCommand_IsInvalidValue()    {
+    public async Task ExecuteAmdSmuCommand_UnknownCommand_IsInvalidValue()
+    {
         // The preset author typed a command the socket table does not have:
         // a request fault, not a hardware fault, and the app's fallback-first
         // routing must NOT treat it as "engine not answering".

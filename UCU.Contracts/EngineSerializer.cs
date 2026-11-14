@@ -54,6 +54,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(NvramValueDto))]
     [JsonSerializable(typeof(SmuCommandDto))]
     [JsonSerializable(typeof(SmuReadResultDto))]
+    [JsonSerializable(typeof(SmuCoperBatchDto))]
     [JsonSerializable(typeof(IntelTdpDto))]
     [JsonSerializable(typeof(PlaneValueDto))]
     [JsonSerializable(typeof(string))]

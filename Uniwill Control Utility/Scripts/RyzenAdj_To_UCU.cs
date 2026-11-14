@@ -229,6 +229,48 @@ namespace Uniwill_Control_Utility.Scripts
 
                                 DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}={ecValue}");
                             }
+                            else if (ryzenAdjCommandString == "set-coper-batch")
+                            {
+                                // The whole per-core map in one engine call: the engine paces the
+                                // mailboxes (50 ms, as the old per-command sleep did) and answers
+                                // all-or-nothing, so a timeout can no longer leave half the cores
+                                // on the new offset. The app-side SMU stack stays as the fallback
+                                // for a machine whose engine is not answering.
+                                uint[] coperValues = ParseCoperBatch(ryzenAdjCommandValueString);
+                                if (coperValues.Length == 0)
+                                {
+                                    DiagnosticLogger.LogDebug("CO batch ignored: no values in the command");
+                                    continue;
+                                }
+
+                                DiagnosticLogger.LogInfo($"CO batch: {coperValues.Length} cores, first 0x{coperValues[0]:X}");
+
+                                UCU.Contracts.Capabilities.IAmdSmuCapability? cpu = SmuAccess.Cpu;
+                                if (cpu is null)
+                                {
+                                    DiagnosticLogger.LogDebug("CO batch skipped: no SMU capability in this process");
+                                    continue;
+                                }
+
+                                try
+                                {
+                                    cpu.ExecuteCoperBatchAsync(coperValues).GetAwaiter().GetResult();
+                                }
+                                catch (UCU.Contracts.EngineException ex) when (
+                                    ex.Code == UCU.Contracts.EngineErrorCode.HardwareUnavailable
+                                    || ex.Code == UCU.Contracts.EngineErrorCode.Timeout
+                                    || ex.Code == UCU.Contracts.EngineErrorCode.Busy)
+                                {
+                                    // Degraded engine: replay per core, which is what every apply
+                                    // did before the batch verb existed.
+                                    foreach (uint coperValue in coperValues)
+                                    {
+                                        try { SmuAccess.Execute("set-coper", coperValue); }
+                                        catch (Exception fallbackEx) { LogCommandFailureOnce(fallbackEx, "set-coper"); }
+                                        Thread.Sleep(50);
+                                    }
+                                }
+                            }
                             else
                             {
                                 // Parse as int first so negative CO values (e.g. -15) don't throw
@@ -297,6 +339,24 @@ namespace Uniwill_Control_Utility.Scripts
         /// </summary>
         private static readonly System.Collections.Generic.HashSet<string> _loggedCommandFailures =
             new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Parses the --set-coper-batch payload ("v1,v2,..."). The values are the packed
+        /// arguments the applier already encoded, so this only splits and parses; an
+        /// unparseable entry is dropped rather than sent as a garbage mailbox value.
+        /// </summary>
+        internal static uint[] ParseCoperBatch(string payload)
+        {
+            if (string.IsNullOrWhiteSpace(payload))
+                return Array.Empty<uint>();
+
+            return payload
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(part => uint.TryParse(part, out uint parsed) ? (uint?)parsed : null)
+                .Where(parsed => parsed.HasValue)
+                .Select(parsed => parsed!.Value)
+                .ToArray();
+        }
 
         private static void LogCommandFailureOnce(Exception ex, string command)
         {

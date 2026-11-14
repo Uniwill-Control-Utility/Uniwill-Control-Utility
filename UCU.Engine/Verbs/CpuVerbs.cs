@@ -55,6 +55,14 @@ namespace UCU.Engine
             "get-coper-options",
         };
 
+        /// <summary>Upper bound for a Curve Optimizer batch: 64 cores is beyond every part this
+        /// app targets, and it keeps a caller from asking the engine to run a mailbox storm.</summary>
+        private const int MaxCoperBatch = 64;
+
+        /// <summary>The firmware needs time between mailboxes (the app used to sleep this long
+        /// between --set-coper commands); the batch keeps the pacing engine-side.</summary>
+        private const int SmuCommandSpacingMilliseconds = 50;
+
         /// <summary>
         /// The MSR 0x150 offset field is 11 bits at 1/1.024 mV per step (~±1024 mV).
         /// The app's sliders stay inside ±150; this is the field's own limit, so a
@@ -93,6 +101,33 @@ namespace UCU.Engine
                 }
 
                 return Task.FromResult<object?>(new SmuReadResultDto { Args = smu.ExecuteRead(dto.Name, dto.Value, ct) });
+            });
+
+            // One per-core Curve Optimizer map, one queue item. The 50 ms spacing the app used
+            // to sleep between --set-coper commands lives here now: the firmware still needs it
+            // between mailboxes, but it no longer costs one pipe round trip per core.
+            add(EngineVerbs.Cpu.SetCoperMany, (p, ct) =>
+            {
+                SmuCoperBatchDto dto = EngineSerializer.BindParams<SmuCoperBatchDto>(p);
+
+                if (dto.Values.Length is 0 or > MaxCoperBatch)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(dto.Values), dto.Values.Length,
+                        $"a Curve Optimizer batch must carry 1..{MaxCoperBatch} values");
+                }
+
+                int status = 0x01;
+                for (int i = 0; i < dto.Values.Length; i++)
+                {
+                    status = smu.Execute("set-coper", dto.Values[i], ct);
+                    if (status != 0x01)
+                        break;
+
+                    if (i < dto.Values.Length - 1)
+                        Thread.Sleep(SmuCommandSpacingMilliseconds);
+                }
+
+                return Task.FromResult<object?>(status);
             });
 
             add(EngineVerbs.Cpu.IntelSetTdp, (p, ct) =>

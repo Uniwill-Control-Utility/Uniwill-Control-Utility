@@ -304,6 +304,14 @@ namespace UCU.Contracts.Capabilities
         /// <see cref="ExecuteCommandAsync"/>, so neither path can reach the
         /// other's mailboxes.</summary>
         Task<uint[]> ReadCommandAsync(string name, uint value, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Write a whole per-core Curve Optimizer map in one request (values are the packed
+        /// --set-coper arguments, in core order). The engine applies them as one queue item
+        /// with the firmware's 50 ms spacing between mailboxes, and answers 0x01 when every
+        /// value was accepted - so a failure is all-or-nothing rather than half the cores.
+        /// </summary>
+        Task<int> ExecuteCoperBatchAsync(IReadOnlyList<uint> values, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
