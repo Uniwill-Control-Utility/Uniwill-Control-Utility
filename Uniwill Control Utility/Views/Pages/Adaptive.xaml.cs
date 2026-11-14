@@ -320,8 +320,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const int MaxRpmBs2 = 4000;
 
         // RyzenAdj curve optimizer 20-bit bias base
-        private const int CoBiasBase = 0x100000;
-
+    
         private AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + AdaptivePresetsFile);
         private DeviceApplier? _deviceApplier;
         private FlydigiSmartControl? _bs2ProSmartControl;
@@ -386,6 +385,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             CpuBoost = 85,
                             CpuTjMax = 95,
                             CpuCoUnified = true,
+                            CpuCoMode = Models.CpuCoMode.Unified,
                             CpuCoUnifiedValue = 0,
                             CpuCoCcd0 = 0,
                             CpuCoCcd1 = 0,
@@ -933,8 +933,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpSdSustained.Value = Math.Clamp(preset.CpuSustained, 5, 255);
                 AdpSdBoost.Value = Math.Clamp(preset.CpuBoost, 5, 255);
                 AdpSdTjMax.Value = Math.Clamp(preset.CpuTjMax, 70, 105);
-                AdpRbCoUnified.IsChecked = preset.CpuCoUnified;
-                AdpRbCoPerCcd.IsChecked = !preset.CpuCoUnified;
+                AdpRbCoUnified.IsChecked = preset.CpuCoMode == Models.CpuCoMode.Unified;
+                AdpRbCoPerCcd.IsChecked = preset.CpuCoMode == Models.CpuCoMode.PerCcd;
+                AdpRbCoPerCore.IsChecked = preset.CpuCoMode == Models.CpuCoMode.PerCore;
+                _adpCoPerCore = preset.CpuCoPerCore ?? System.Array.Empty<int>();
                 AdpSdCoUnified.Value = Math.Clamp(preset.CpuCoUnifiedValue, -30, 0);
                 AdpSdCoCcd0.Value = Math.Clamp(preset.CpuCoCcd0, -30, 0);
                 AdpSdCoCcd1.Value = Math.Clamp(preset.CpuCoCcd1, -30, 0);
@@ -1208,6 +1210,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     CpuBoost = (int)AdpSdBoost.Value,
                     CpuTjMax = (int)AdpSdTjMax.Value,
                     CpuCoUnified = AdpRbCoUnified.IsChecked == true,
+                    CpuCoMode = AdpRbCoUnified.IsChecked == true
+                        ? Models.CpuCoMode.Unified
+                        : AdpRbCoPerCore.IsChecked == true
+                            ? Models.CpuCoMode.PerCore
+                            : Models.CpuCoMode.PerCcd,
+                    CpuCoPerCore = (int[])_adpCoPerCore.Clone(),
                     CpuCoUnifiedValue = (int)AdpSdCoUnified.Value,
                     CpuCoCcd0 = (int)AdpSdCoCcd0.Value,
                     CpuCoCcd1 = (int)AdpSdCoCcd1.Value,
@@ -1465,9 +1473,19 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int lastCpuBoost = 0;
         private int lastCpuTjMax = 0;
         private bool lastCpuCoUnified = true;
+        private Models.CpuCoMode lastCpuCoMode = Models.CpuCoMode.Unified;
+        private string lastCpuCoPerCoreKey = string.Empty;
         private int lastCpuCoUnifiedValue = 0;
         private int lastCpuCoCcd0 = 0;
         private int lastCpuCoCcd1 = 0;
+
+        // Per-core CO state: the configured map, the mode a cancelled per-core dialog goes
+        // back to, and the topology read once for this page.
+        private int[] _adpCoPerCore = System.Array.Empty<int>();
+        private Models.CpuCoMode _adpCoModeBeforePerCore = Models.CpuCoMode.Unified;
+        private CpuTopology? _adpTopology;
+
+        private CpuTopology AdpTopology => _adpTopology ??= CpuTopologyReader.Read();
         private int lastCpuPl1 = 0;
         private int lastCpuPl2 = 0;
         // GPU diff-tracking
@@ -1883,10 +1901,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             int coCcd0 = (int)AdpSdCoCcd0.Value;
             int coCcd1 = (int)AdpSdCoCcd1.Value;
             bool coUnified = AdpRbCoUnified.IsChecked == true;
+            Models.CpuCoMode coMode = AdpRbCoUnified.IsChecked == true
+                ? Models.CpuCoMode.Unified
+                : AdpRbCoPerCore.IsChecked == true ? Models.CpuCoMode.PerCore : Models.CpuCoMode.PerCcd;
+            string coPerCoreKey = string.Join(",", _adpCoPerCore);
 
             if (sustained != lastCpuSustained || boost != lastCpuBoost ||
                 tjMax != lastCpuTjMax ||
                 coUnified != lastCpuCoUnified ||
+                coMode != lastCpuCoMode ||
+                !string.Equals(coPerCoreKey, lastCpuCoPerCoreKey, StringComparison.Ordinal) ||
                 coUnifiedValue != lastCpuCoUnifiedValue ||
                 coCcd0 != lastCpuCoCcd0 ||
                 coCcd1 != lastCpuCoCcd1)
@@ -1894,7 +1918,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     string cmd = BuildAmdCpuCommand(sustained, boost, tjMax,
-                        AdpCpuVoltageEnabled, coUnified, coUnifiedValue, coCcd0, coCcd1);
+                        AdpCpuVoltageEnabled, coMode, coUnifiedValue, coCcd0, coCcd1, _adpCoPerCore);
                     _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
 
                     // Also write EC CPU power limits
@@ -1911,6 +1935,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastCpuBoost = boost;
                 lastCpuTjMax = tjMax;
                 lastCpuCoUnified = coUnified;
+            lastCpuCoMode = coMode;
+            lastCpuCoPerCoreKey = coPerCoreKey;
                 lastCpuCoUnifiedValue = coUnifiedValue;
                 lastCpuCoCcd0 = coCcd0;
                 lastCpuCoCcd1 = coCcd1;
@@ -1918,7 +1944,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private static string BuildAmdCpuCommand(int sustained, int boost, int tjMax,
-            bool coEnabled, bool coUnified, int coUnifiedValue, int coCcd0, int coCcd1)
+            bool coEnabled, Models.CpuCoMode coMode, int coUnifiedValue, int coCcd0, int coCcd1, int[] coPerCore)
         {
             var parts = new System.Collections.Generic.List<string>();
             parts.Add($"--slow-limit={sustained * 1000}");
@@ -1928,24 +1954,20 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (coEnabled)
             {
-                if (coUnified)
+                // Same encoder as the Presets page and the preset apply path: one place decides
+                // how unified, per-CCD and per-core become SMU commands. The old code here built
+                // a hex string the translator could not parse (it reads decimal), so any offset
+                // whose encoding contained a letter never reached the SMU.
+                var coPreset = new Models.CustomPreset
                 {
-                    int biased = CoBiasBase - Math.Abs(coUnifiedValue);
-                    parts.Add($"--set-coall={biased:X}");
-                }
-                else
-                {
-                    int[,] ccdMap = { { 0, 1, 2, 3, 4, 5, 6, 7 }, { 8, 9, 10, 11, 12, 13, 14, 15 } };
-                    for (int ccd = 0; ccd < 2; ccd++)
-                    {
-                        int offset = ccd == 0 ? coCcd0 : coCcd1;
-                        int biased = CoBiasBase - Math.Abs(offset);
-                        for (int core = 0; core < 8; core++)
-                        {
-                            parts.Add($"--set-coper={BuildCoperArg(ccd, ccdMap[ccd, core], biased):X}");
-                        }
-                    }
-                }
+                    CpuCoMode = coMode,
+                    CpuCoUnifiedValue = coUnifiedValue,
+                    CpuCoCcd0 = coCcd0,
+                    CpuCoCcd1 = coCcd1,
+                    CpuCoPerCore = coPerCore ?? Array.Empty<int>()
+                };
+
+                PresetProfileApplier.AppendCoCommands(parts, coPreset, CpuTopologyReader.Read());
             }
 
             return string.Join(" ", parts);
@@ -3885,27 +3907,90 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void AdpRbCoMode_Click(object sender, RoutedEventArgs e) => updateAdpCoVisibility();
+        private void AdpRbCoMode_Click(object sender, RoutedEventArgs e)
+        {
+            // Remembered so a cancelled per-core dialog can put the selection back.
+            if (AdpRbCoUnified.IsChecked == true)
+                _adpCoModeBeforePerCore = Models.CpuCoMode.Unified;
+            else if (AdpRbCoPerCcd.IsChecked == true)
+                _adpCoModeBeforePerCore = Models.CpuCoMode.PerCcd;
+
+            updateAdpCoVisibility();
+        }
 
         private void updateAdpCoVisibility()
         {
             bool unified = AdpRbCoUnified.IsChecked == true;
-            if (unified)
+            bool perCore = AdpRbCoPerCore.IsChecked == true;
+            bool perCcd = !unified && !perCore;
+
+            AdpGridCoUnified.Visibility = unified ? Visibility.Visible : Visibility.Collapsed;
+            AdpGridCoCcd0.Visibility = perCcd ? Visibility.Visible : Visibility.Collapsed;
+            AdpGridCoCcd1.Visibility = perCcd ? Visibility.Visible : Visibility.Collapsed;
+            AdpDividerCoPerCcd.Visibility = perCcd ? Visibility.Visible : Visibility.Collapsed;
+            AdpDividerCoAfterCcd1.Visibility = perCcd ? Visibility.Visible : Visibility.Collapsed;
+            AdpGridCoPerCore.Visibility = perCore ? Visibility.Visible : Visibility.Collapsed;
+
+            // No topology, no per-core map to edit.
+            AdpRbCoPerCore.IsEnabled = AdpTopology.CoreCount > 0;
+
+            if (perCore)
+                updateAdpCoPerCoreSummary();
+        }
+
+        private void AdpBtnCoPerCore_Click(object sender, RoutedEventArgs e)
+        {
+            var topology = AdpTopology;
+            if (topology.CoreCount == 0)
+                return;
+
+            var dialog = new Views.Windows.PerCoreCurveOptimizerWindow(topology, CurrentAdpCoMap())
             {
-                AdpDividerCoPerCcd.Visibility = Visibility.Collapsed;
-                AdpGridCoUnified.Visibility = Visibility.Visible;
-                AdpGridCoCcd0.Visibility = Visibility.Collapsed;
-                AdpGridCoCcd1.Visibility = Visibility.Collapsed;
-                AdpDividerCoAfterCcd1.Visibility = Visibility.Collapsed;
-            }
-            else
+                Owner = Application.Current.MainWindow
+            };
+
+            if (dialog.ShowDialog() == true && dialog.Result is not null)
             {
-                AdpDividerCoPerCcd.Visibility = Visibility.Visible;
-                AdpGridCoUnified.Visibility = Visibility.Collapsed;
-                AdpGridCoCcd0.Visibility = Visibility.Visible;
-                AdpGridCoCcd1.Visibility = Visibility.Visible;
-                AdpDividerCoAfterCcd1.Visibility = Visibility.Visible;
+                _adpCoPerCore = dialog.Result.ToArray();
+                AdpRbCoPerCore.IsChecked = true;
+                updateAdpCoVisibility();
+                return;
             }
+
+            // Cancelled: nothing was tuned, so a mode picked only for the dialog goes back.
+            if (_adpCoPerCore.Length == 0)
+            {
+                AdpRbCoUnified.IsChecked = _adpCoModeBeforePerCore == Models.CpuCoMode.Unified;
+                AdpRbCoPerCcd.IsChecked = _adpCoModeBeforePerCore == Models.CpuCoMode.PerCcd;
+                updateAdpCoVisibility();
+            }
+        }
+
+        /// <summary>
+        /// The per-core map as the user sees it: stored cores win, the rest fall back to
+        /// their CCD offset so the dialog never opens on stale zeros.
+        /// </summary>
+        private int[] CurrentAdpCoMap()
+        {
+            var topology = AdpTopology;
+            if (topology.CoreCount == 0)
+                return _adpCoPerCore;
+
+            return new Models.CustomPreset
+            {
+                CpuCoCcd0 = AdpSdCoCcd0.Value,
+                CpuCoCcd1 = AdpSdCoCcd1.Value,
+                CpuCoPerCore = _adpCoPerCore
+            }.BuildPerCoreMap(topology);
+        }
+
+        private void updateAdpCoPerCoreSummary()
+        {
+            var map = CurrentAdpCoMap();
+            AdpLblCoPerCore.Text = LocalizationService.Format(
+                "{0} cores · {1} set",
+                map.Length,
+                map.Count(value => value != 0));
         }
 
         private void cbxGpuEnabled_Toggled(object sender, RoutedEventArgs e)
@@ -4276,11 +4361,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
      #endregion
-
-        private static uint BuildCoperArg(int ccd, int core, int offset20)
-        {
-            return ((uint)((ccd << 8) | core) << 20) | (uint)offset20;
-        }
 
         /// <summary>
         /// Resets all diff-tracking variables so the next update() tick will

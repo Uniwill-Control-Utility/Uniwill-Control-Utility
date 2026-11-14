@@ -80,6 +80,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _profileTjMax = 95;
         private int _profileCoCcd0 = 0;
         private int _profileCoCcd1 = 0;
+
+        // Per-core CO state: the map the user configured, the mode to go back to if the
+        // per-core dialog is cancelled, and the topology read once for this page.
+        private int[] _coPerCore = Array.Empty<int>();
+        private Models.CpuCoMode _coModeBeforePerCore = Models.CpuCoMode.Unified;
+        private CpuTopology? _coTopology;
+
+        private CpuTopology CoTopology => _coTopology ??= CpuTopologyReader.Read();
         private double _profileGpuTgp = 150;
         private bool _profileGpuDb = false;
         private double _profileGpuDbOffset = 0;
@@ -387,25 +395,90 @@ namespace Uniwill_Control_Utility.Views.Pages
             updateAllLabels();
         }
 
-        private void rbCoMode_Click(object sender, RoutedEventArgs e) => updateCoVisibility();
+        private void rbCoMode_Click(object sender, RoutedEventArgs e)
+        {
+            // Remembered so a cancelled per-core dialog can put the selection back.
+            if (rbCoUnified.IsChecked == true)
+                _coModeBeforePerCore = Models.CpuCoMode.Unified;
+            else if (rbCoPerCcd.IsChecked == true)
+                _coModeBeforePerCore = Models.CpuCoMode.PerCcd;
+
+            updateCoVisibility();
+        }
 
         private void updateCoVisibility()
         {
             bool unified = rbCoUnified.IsChecked == true;
-            if (unified)
+            bool perCore = rbCoPerCore.IsChecked == true;
+            bool perCcd = !unified && !perCore;
+
+            gridCustomCoUnifiedSlider.Visibility = unified ? Visibility.Visible : Visibility.Collapsed;
+            gridCustomCoCcd0.Visibility = perCcd ? Visibility.Visible : Visibility.Collapsed;
+            gridCustomCoCcd1.Visibility = perCcd ? Visibility.Visible : Visibility.Collapsed;
+            dividerCoPerCcd.Visibility = perCcd ? Visibility.Visible : Visibility.Collapsed;
+            gridCustomCoPerCore.Visibility = perCore ? Visibility.Visible : Visibility.Collapsed;
+
+            // No topology, no per-core map to edit.
+            rbCoPerCore.IsEnabled = CoTopology.CoreCount > 0;
+
+            if (perCore)
+                updateCoPerCoreSummary();
+        }
+
+        private void btnCoPerCore_Click(object sender, RoutedEventArgs e)
+        {
+            var topology = CoTopology;
+            if (topology.CoreCount == 0)
+                return;
+
+            var dialog = new Views.Windows.PerCoreCurveOptimizerWindow(topology, CurrentCoMap())
             {
-                dividerCoPerCcd.Visibility = Visibility.Collapsed;
-                gridCustomCoUnifiedSlider.Visibility = Visibility.Visible;
-                gridCustomCoCcd0.Visibility = Visibility.Collapsed;
-                gridCustomCoCcd1.Visibility = Visibility.Collapsed;
-            }
-            else
+                Owner = Application.Current.MainWindow
+            };
+
+            if (dialog.ShowDialog() == true && dialog.Result is not null)
             {
-                dividerCoPerCcd.Visibility = Visibility.Visible;
-                gridCustomCoUnifiedSlider.Visibility = Visibility.Collapsed;
-                gridCustomCoCcd0.Visibility = Visibility.Visible;
-                gridCustomCoCcd1.Visibility = Visibility.Visible;
+                _coPerCore = dialog.Result.ToArray();
+                rbCoPerCore.IsChecked = true;
+                updateCoVisibility();
+                updateStatus();
+                return;
             }
+
+            // Cancelled: nothing was tuned, so a mode picked only for the dialog goes back.
+            if (_coPerCore.Length == 0)
+            {
+                rbCoUnified.IsChecked = _coModeBeforePerCore == Models.CpuCoMode.Unified;
+                rbCoPerCcd.IsChecked = _coModeBeforePerCore == Models.CpuCoMode.PerCcd;
+                updateCoVisibility();
+            }
+        }
+
+        /// <summary>
+        /// The per-core map as the user sees it: stored cores win, the rest fall back to
+        /// their CCD offset so the dialog never opens on stale zeros.
+        /// </summary>
+        private int[] CurrentCoMap()
+        {
+            var topology = CoTopology;
+            if (topology.CoreCount == 0)
+                return _coPerCore;
+
+            return new Models.CustomPreset
+            {
+                CpuCoCcd0 = sdCoCcd0.Value,
+                CpuCoCcd1 = sdCoCcd1.Value,
+                CpuCoPerCore = _coPerCore
+            }.BuildPerCoreMap(topology);
+        }
+
+        private void updateCoPerCoreSummary()
+        {
+            var map = CurrentCoMap();
+            lblCoPerCore.Text = LocalizationService.Format(
+                "{0} cores · {1} set",
+                map.Length,
+                map.Count(value => value != 0));
         }
 
         private void togDynamicBoost_Checked(object sender, RoutedEventArgs e)
@@ -1159,10 +1232,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbTjMax.Text = $"{_profileTjMax} \u00B0C";
                 if (CpuVoltageEnabled)
                 {
-                    bool coUnified = rbCoUnified.IsChecked == true;
-                    if (coUnified)
+                    if (rbCoUnified.IsChecked == true)
                     {
                         tbCoOffset.Text = $"{(int)sdCoUnified.Value:+0;-0;0}";
+                    }
+                    else if (rbCoPerCore.IsChecked == true)
+                    {
+                        var map = CurrentCoMap();
+                        tbCoOffset.Text = map.Length > 0
+                            ? $"{map.Min():+0;-0;0}..{map.Max():+0;-0;0}"
+                            : $"{_profileCoCcd0:+0;-0;0} | {_profileCoCcd1:+0;-0;0}";
                     }
                     else
                     {
@@ -1491,7 +1570,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // The mode is the authority; the bool above is the legacy mirror older builds read.
             presets[slotIndex].CpuCoMode = rbCoUnified.IsChecked == true
                 ? Models.CpuCoMode.Unified
-                : Models.CpuCoMode.PerCcd;
+                : rbCoPerCore.IsChecked == true
+                    ? Models.CpuCoMode.PerCore
+                    : Models.CpuCoMode.PerCcd;
+            presets[slotIndex].CpuCoPerCore = (int[])_coPerCore.Clone();
             presets[slotIndex].CpuCoUnifiedValue = sdCoUnified.Value;
 
             // Also save V-F curve offsets from editor if active
@@ -1562,7 +1644,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdCoCcd0.Value = preset.CpuCoCcd0;
                 sdCoCcd1.Value = preset.CpuCoCcd1;
                 rbCoUnified.IsChecked = preset.CpuCoMode == Models.CpuCoMode.Unified;
-                rbCoPerCcd.IsChecked = preset.CpuCoMode != Models.CpuCoMode.Unified;
+                rbCoPerCcd.IsChecked = preset.CpuCoMode == Models.CpuCoMode.PerCcd;
+                rbCoPerCore.IsChecked = preset.CpuCoMode == Models.CpuCoMode.PerCore;
+                _coPerCore = preset.CpuCoPerCore ?? Array.Empty<int>();
                 sdCoUnified.Value = preset.CpuCoUnifiedValue;
 
                 // Sync CO visibility after programmatic IsChecked change (events don't fire)
@@ -1687,6 +1771,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdCoUnified.Value = 0;
             rbCoUnified.IsChecked = true;
             rbCoPerCcd.IsChecked = false;
+            rbCoPerCore.IsChecked = false;
+            _coPerCore = Array.Empty<int>();
             updateCoVisibility();
 
             // Reset V-F curve state
@@ -1742,37 +1828,25 @@ namespace Uniwill_Control_Utility.Views.Pages
                 parts.Add($"--tctl-temp={tjMax}");
                 parts.Add($"--cHTC-temp={tjMax}");
 
-                // Curve Optimizer — unified mode uses set-coall, per-CCD uses set-coper.
+                // Curve Optimizer — one encoder for all three modes (Services/PresetProfileApplier),
+                // so the page cannot drift from the preset path: per-core, per-CCD and unified all
+                // resolve against the real topology, and the command is decimal (the translator
+                // parses decimal; the old hex format here silently dropped half the values).
                 // Skip entirely if the user disabled CPU voltage control (BIOS-managed).
                 if (CpuVoltageEnabled)
                 {
-                    bool coUnified = rbCoUnified.IsChecked == true;
-                    if (coUnified)
+                    var coPreset = new Models.CustomPreset
                     {
-                        int coValue = (int)sdCoUnified.Value;
-                        uint coEncoded = coValue < 0
-                            ? (uint)(0x100000 - Math.Abs(coValue))
-                            : (uint)coValue;
-                        parts.Add($"--set-coall={coEncoded}");
-                    }
-                    else
-                    {
-                        // Per-CCD mode: use set-coper for each core.
-                        // Encoding (Renoir+/AM5): ((ccd << 8) | core_in_ccd) << 20 | offset20
-                        // offset20: 20-bit biased — negative = 0x100000 - |offset|
-                        // CCD0 = cores 0-7, CCD1 = cores 8-15
-                        int coCcd0 = (int)sdCoCcd0.Value;
-                        int coCcd1 = (int)sdCoCcd1.Value;
-                        for (int ccd = 0; ccd < 2; ccd++)
-                        {
-                            int offset = ccd == 0 ? coCcd0 : coCcd1;
-                            for (int core = 0; core < 8; core++)
-                            {
-                                uint encoded = BuildCoperArg(ccd, core, offset);
-                                parts.Add($"--set-coper={encoded}");
-                            }
-                        }
-                    }
+                        CpuCoMode = rbCoUnified.IsChecked == true ? Models.CpuCoMode.Unified
+                            : rbCoPerCore.IsChecked == true ? Models.CpuCoMode.PerCore
+                            : Models.CpuCoMode.PerCcd,
+                        CpuCoUnifiedValue = sdCoUnified.Value,
+                        CpuCoCcd0 = sdCoCcd0.Value,
+                        CpuCoCcd1 = sdCoCcd1.Value,
+                        CpuCoPerCore = _coPerCore.Length > 0 ? (int[])_coPerCore.Clone() : Array.Empty<int>()
+                    };
+
+                    PresetProfileApplier.AppendCoCommands(parts, coPreset, CpuTopologyReader.Read());
                 }
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
@@ -1819,20 +1893,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             return string.Join(" ", parts) + " ";
         }
 
-        /// <summary>
-        /// Encodes a per-core Curve Optimizer argument (Renoir+/AM5 format).
-        /// Layout: ((ccd << 8) | core) << 20 | offset20
-        /// offset20: 20-bit biased — negative = 0x100000 - |offset|
-        /// </summary>
-        private static uint BuildCoperArg(int ccd, int core, int offset)
-        {
-            int magnitude = Math.Min(Math.Abs(offset), 0xFFFFF);
-            uint encoded20 = offset < 0
-                ? (uint)((0x100000 - magnitude) & 0xFFFFF)
-                : (uint)(magnitude & 0xFFFFF);
-            uint prefix = (uint)(((ccd << 8) | (core & 7)) << 20);
-            return prefix | encoded20;
-        }
 
         #endregion
 

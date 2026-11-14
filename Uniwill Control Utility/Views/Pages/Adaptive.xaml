@@ -212,7 +212,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Unified or per-CCD offset" />
+                                                   Text="Unified, per-CCD or per-core offset" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -234,6 +234,15 @@
                                                  Content="Per-CCD"
                                                  HorizontalContentAlignment="Center"
                                                  FontSize="13"
+                                                 Click="AdpRbCoMode_Click"
+                                                 Width="90"
+                                                 MinWidth="20"/>
+                                    <RadioButton x:Name="AdpRbCoPerCore"
+                                                 GroupName="AdpCoMode"
+                                                 Content="Per-Core"
+                                                 HorizontalContentAlignment="Center"
+                                                 FontSize="13"
+                                                 Margin="12,0,0,0"
                                                  Click="AdpRbCoMode_Click"
                                                  Width="90"
                                                  MinWidth="20"/>
@@ -319,6 +328,34 @@
                                                Margin="0,0,8,0"
                                                Text="0" />
                                     <Slider x:Name="AdpSdCoCcd1" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Per-core offsets (AMD only) -->
+                            <Grid x:Name="AdpGridCoPerCore" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Per-Core Offsets" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="One offset per physical core" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblCoPerCore"
+                                               VerticalAlignment="Center"
+                                               FontSize="12"
+                                               Margin="0,0,8,0"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <Button x:Name="AdpBtnCoPerCore"
+                                            Content="Configure per core…"
+                                            Click="AdpBtnCoPerCore_Click"
+                                            Padding="12,4" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider (visible only in Per-CCD mode, after CCD1) -->

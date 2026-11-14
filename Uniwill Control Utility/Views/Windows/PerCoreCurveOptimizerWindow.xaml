@@ -1,0 +1,96 @@
+<ui:FluentWindow x:Class="Uniwill_Control_Utility.Views.Windows.PerCoreCurveOptimizerWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Per-Core Curve Optimizer"
+                 Width="640" Height="600"
+                 MinWidth="520" MinHeight="420"
+                 ResizeMode="CanResizeWithGrip"
+                 WindowStartupLocation="CenterOwner"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round"
+                 SnapsToDevicePixels="True"
+                 UseLayoutRounding="True">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Title bar -->
+        <ui:TitleBar Grid.Row="0"
+                     x:Name="TitleBar"
+                     Title="Per-Core Curve Optimizer"
+                     CanMaximize="False"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="True" />
+
+        <!-- Core groups (built from the CPU topology in code-behind) -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      PanningMode="VerticalOnly">
+            <StackPanel Margin="24,8,24,0">
+                <ui:TextBlock FontTypography="Body"
+                              TextWrapping="Wrap"
+                              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                              Text="Each core takes its own offset, from 0 down to -50. Raise a core back toward 0 if it turns unstable under load." />
+
+                <Grid x:Name="CoreGrid" Margin="0,16,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="ColLabel0" Width="*" />
+                        <ColumnDefinition x:Name="ColBox0" Width="Auto" />
+                        <ColumnDefinition x:Name="ColGap" Width="32" />
+                        <ColumnDefinition x:Name="ColLabel1" Width="*" />
+                        <ColumnDefinition x:Name="ColBox1" Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Inline validation -->
+        <ui:TextBlock x:Name="ValidationText"
+                      Grid.Row="2"
+                      Margin="24,8,24,0"
+                      FontTypography="Caption"
+                      TextWrapping="Wrap"
+                      Visibility="Collapsed"
+                      Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                      Text="Offsets must be from -50 to 0." />
+
+        <!-- Footer -->
+        <Grid Grid.Row="3" Margin="24,16,24,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <ui:Button x:Name="DefaultButton"
+                       Grid.Column="0"
+                       Content="Default"
+                       MinWidth="90"
+                       Click="Default_Click" />
+
+            <ui:Button x:Name="CancelButton"
+                       Grid.Column="2"
+                       Content="Cancel"
+                       MinWidth="90"
+                       Margin="0,0,8,0"
+                       Click="Cancel_Click" />
+
+            <ui:Button x:Name="SaveButton"
+                       Grid.Column="3"
+                       Content="Save"
+                       MinWidth="90"
+                       Appearance="Primary"
+                       IsDefault="True"
+                       Click="Save_Click" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>
