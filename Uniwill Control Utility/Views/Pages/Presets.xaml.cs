@@ -1488,6 +1488,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             presets[slotIndex].CpuCoCcd0 = sdCoCcd0.Value;
             presets[slotIndex].CpuCoCcd1 = sdCoCcd1.Value;
             presets[slotIndex].CpuCoUnified = rbCoUnified.IsChecked == true;
+            // The mode is the authority; the bool above is the legacy mirror older builds read.
+            presets[slotIndex].CpuCoMode = rbCoUnified.IsChecked == true
+                ? Models.CpuCoMode.Unified
+                : Models.CpuCoMode.PerCcd;
             presets[slotIndex].CpuCoUnifiedValue = sdCoUnified.Value;
 
             // Also save V-F curve offsets from editor if active
@@ -1557,8 +1561,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdNvMem.Value = preset.GpuMemOffset;
                 sdCoCcd0.Value = preset.CpuCoCcd0;
                 sdCoCcd1.Value = preset.CpuCoCcd1;
-                rbCoUnified.IsChecked = preset.CpuCoUnified;
-                rbCoPerCcd.IsChecked = !preset.CpuCoUnified;
+                rbCoUnified.IsChecked = preset.CpuCoMode == Models.CpuCoMode.Unified;
+                rbCoPerCcd.IsChecked = preset.CpuCoMode != Models.CpuCoMode.Unified;
                 sdCoUnified.Value = preset.CpuCoUnifiedValue;
 
                 // Sync CO visibility after programmatic IsChecked change (events don't fire)

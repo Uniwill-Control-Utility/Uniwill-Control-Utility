@@ -17,6 +17,18 @@ namespace Uniwill_Control_Utility.Models
     }
 
     /// <summary>
+    /// How the CPU's Curve Optimizer offsets are addressed. Unified writes one value for the
+    /// whole package; PerCcd writes one per CCD; PerCore writes one per physical core.
+    /// Per-core is the only mode that needs a topology to know how many cores exist.
+    /// </summary>
+    public enum CpuCoMode
+    {
+        Unified,
+        PerCcd,
+        PerCore
+    }
+
+    /// <summary>
     /// A single Custom preset slot that stores ALL tuning controls (CPU + GPU + V-F curve).
     /// </summary>
     public class CustomPreset
@@ -32,16 +44,35 @@ namespace Uniwill_Control_Utility.Models
         /// <summary> CPU TjMax in degrees Celsius </summary>
         public double CpuTjMax { get; set; } = 95;
 
-        /// <summary> CPU Curve Optimizer offset for CCD0 (signed, -30 to +30) </summary>
+        /// <summary> CPU Curve Optimizer offset for CCD0 (signed, -50 to 0) </summary>
         public double CpuCoCcd0 { get; set; } = 0;
 
-        /// <summary> CPU Curve Optimizer offset for CCD1 (signed, -30 to +30) </summary>
+        /// <summary> CPU Curve Optimizer offset for CCD1 (signed, -50 to 0) </summary>
         public double CpuCoCcd1 { get; set; } = 0;
 
-        /// <summary> Unified CO mode (true = single offset, false = per-CCD) </summary>
+        /// <summary>
+        /// The mode selector. <see cref="CpuCoUnified"/> is the pre-per-core field and stays
+        /// authoritative for the unified case: a preset saved before per-core existed has the
+        /// bool and no mode, and the deserializer's default (PerCcd) is exactly what
+        /// <c>false</c> meant. See <see cref="Normalize"/>.
+        /// </summary>
+        public CpuCoMode CpuCoMode { get; set; } = CpuCoMode.PerCcd;
+
+        /// <summary>
+        /// Per-core offsets, indexed by <c>CpuCore.Index</c> from the topology, clamped to
+        /// -50..0. Shorter than the core count (or empty) means "not configured": the missing
+        /// cores fall back to their CCD's value when the map is built.
+        /// </summary>
+        public int[] CpuCoPerCore { get; set; } = Array.Empty<int>();
+
+        /// <summary>
+        /// Legacy mode selector (true = unified, false = per-CCD), kept so presets saved before
+        /// per-core existed still load and so older builds can still read ours.
+        /// <see cref="CpuCoMode"/> is the authority; keep this in step when writing.
+        /// </summary>
         public bool CpuCoUnified { get; set; } = false;
 
-        /// <summary> Unified CO offset value (signed, -30 to 0) </summary>
+        /// <summary> Unified CO offset value (signed, -50 to 0) </summary>
         public double CpuCoUnifiedValue { get; set; } = 0;
 
         /// <summary> Intel PL1 in watts </summary>
@@ -122,9 +153,74 @@ namespace Uniwill_Control_Utility.Models
             FanSmartFanMode ||
             !string.IsNullOrEmpty(FanSmartFanTempSource);
 
+        /// <summary>
+        /// Lowest Curve Optimizer offset the models and the UI accept. AMD's CO is a
+        /// reduction only: a positive offset asks for more voltage, which no AGESA version
+        /// this app targets documents, and an out-of-range value is the classic way to wedge
+        /// a core. The app accepted -30 before the per-core work; -50 is the floor the field
+        /// firmware accepts.
+        /// </summary>
+        public const int CoMinimum = -50;
+
+        /// <summary>Clamps a Curve Optimizer offset to -50..0.</summary>
+        public static int ClampCo(int value) => Math.Clamp(value, CoMinimum, 0);
+
+        /// <summary>Clamps a Curve Optimizer offset to -50..0.</summary>
+        public static double ClampCo(double value) => Math.Clamp(value, CoMinimum, 0);
+
+        /// <summary>
+        /// Brings a deserialized preset into the current shape: the legacy unified bool maps
+        /// onto the mode, every offset is clamped to -50..0, and a null per-core array becomes
+        /// empty. Pure and idempotent - it runs on load and never writes.
+        /// </summary>
+        public void Normalize()
+        {
+#pragma warning disable CS0618 // the legacy field is exactly what this maps
+            if (CpuCoUnified)
+                CpuCoMode = CpuCoMode.Unified;
+#pragma warning restore CS0618
+
+            CpuCoUnifiedValue = ClampCo(CpuCoUnifiedValue);
+            CpuCoCcd0 = ClampCo(CpuCoCcd0);
+            CpuCoCcd1 = ClampCo(CpuCoCcd1);
+
+            if (CpuCoPerCore is null || CpuCoPerCore.Length == 0)
+            {
+                CpuCoPerCore = Array.Empty<int>();
+                return;
+            }
+
+            for (int i = 0; i < CpuCoPerCore.Length; i++)
+                CpuCoPerCore[i] = ClampCo(CpuCoPerCore[i]);
+        }
+
+        /// <summary>
+        /// The per-core offsets to write: one entry per topology core, in core order. A value
+        /// the preset stores wins; a missing one falls back to its CCD's offset, so a preset
+        /// authored under per-CCD keeps its meaning when the user switches to per-core and no
+        /// core is left at a stale value. Parts with more than two CCDs (not a target) take
+        /// CCD0's value above index 1.
+        /// </summary>
+        public int[] BuildPerCoreMap(CpuTopology topology)
+        {
+            ArgumentNullException.ThrowIfNull(topology);
+
+            var map = new int[topology.CoreCount];
+            foreach (CpuCore core in topology.Cores)
+            {
+                int fallback = ClampCo((int)(core.CcdIndex == 0 ? CpuCoCcd0 : CpuCoCcd1));
+                map[core.Index] = core.Index < CpuCoPerCore.Length
+                    ? ClampCo(CpuCoPerCore[core.Index])
+                    : fallback;
+            }
+
+            return map;
+        }
+
         /// <summary>True when any CPU/GPU/V-F tuning control differs from its default.</summary>
         public bool HasTuningChanges => Differs(CpuSustained, 75) || Differs(CpuBoost, 85) || Differs(CpuTjMax, 95) ||
             Differs(CpuCoCcd0, 0) || Differs(CpuCoCcd1, 0) ||
+            (CpuCoPerCore is not null && CpuCoPerCore.Any(value => value != 0)) ||
             Differs(IntelPl1, 45) || Differs(IntelPl2, 60) || Differs(IntelVolt, 0) ||
             Differs(GpuTgp, 150) || GpuDynamicBoost || Differs(GpuDbOffset, 0) ||
             Differs(GpuCoreOffset, 0) || Differs(GpuMemOffset, 0) ||
@@ -186,6 +282,11 @@ namespace Uniwill_Control_Utility.Models
                     for (int i = 0; i < CustomPreset.MaxSlots && i < loaded.Count; i++)
                     {
                         presets[i] = loaded[i] ?? new CustomPreset();
+
+                        // Shape the legacy file into the current model in memory only: the
+                        // unified bool becomes the mode, offsets clamp to -50..0. Saving is
+                        // the user's edit, never a side effect of reading.
+                        presets[i].Normalize();
                     }
                 }
             }

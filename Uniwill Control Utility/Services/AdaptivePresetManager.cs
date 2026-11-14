@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -69,11 +69,42 @@ namespace Uniwill_Control_Utility.Services
         // AMD SMU
         public int CpuSustained { get; set; } = 75;    // 5-255W (SPL)
         public int CpuBoost { get; set; } = 85;        // 5-255W (FPL)
-        public int CpuTjMax { get; set; } = 95;        // 70-105�C (AMD only)
+        public int CpuTjMax { get; set; } = 95;        // 70-105ï¿½C (AMD only)
         public bool CpuCoUnified { get; set; } = true; // true = unified, false = per-CCD
-        public int CpuCoUnifiedValue { get; set; } = 0; // unified offset (-30 to 0)
-        public int CpuCoCcd0 { get; set; } = 0;        // CCD 0 offset (-30 to 0)
-        public int CpuCoCcd1 { get; set; } = 0;        // CCD 1 offset (-30 to 0)
+        /// <summary>
+        /// The mode selector. <see cref="CpuCoUnified"/> is the pre-per-core field: it stays
+        /// authoritative for unified (a preset saved before per-core has the bool and no
+        /// mode), which <see cref="Normalize"/> applies on load.
+        /// </summary>
+        public Models.CpuCoMode CpuCoMode { get; set; } = Models.CpuCoMode.PerCcd;
+        /// <summary>Per-core offsets, indexed by topology core index, clamped to -50..0.</summary>
+        public int[] CpuCoPerCore { get; set; } = System.Array.Empty<int>();
+        public int CpuCoUnifiedValue { get; set; } = 0; // unified offset (-50 to 0)
+        public int CpuCoCcd0 { get; set; } = 0;        // CCD 0 offset (-50 to 0)
+        public int CpuCoCcd1 { get; set; } = 0;        // CCD 1 offset (-50 to 0)
+
+        /// <summary>
+        /// Maps the legacy bool onto the mode and clamps every offset to -50..0. Pure and
+        /// idempotent; runs on load and never writes.
+        /// </summary>
+        public void Normalize()
+        {
+            if (CpuCoUnified)
+                CpuCoMode = Models.CpuCoMode.Unified;
+
+            CpuCoUnifiedValue = Models.CustomPreset.ClampCo(CpuCoUnifiedValue);
+            CpuCoCcd0 = Models.CustomPreset.ClampCo(CpuCoCcd0);
+            CpuCoCcd1 = Models.CustomPreset.ClampCo(CpuCoCcd1);
+
+            if (CpuCoPerCore is null || CpuCoPerCore.Length == 0)
+            {
+                CpuCoPerCore = System.Array.Empty<int>();
+                return;
+            }
+
+            for (int i = 0; i < CpuCoPerCore.Length; i++)
+                CpuCoPerCore[i] = Models.CustomPreset.ClampCo(CpuCoPerCore[i]);
+        }
         // Intel MSR
         public int CpuPl1 { get; set; } = 45;          // 5-400W (Intel only)
         public int CpuPl2 { get; set; } = 60;          // 5-400W (Intel only)
@@ -255,6 +286,11 @@ namespace Uniwill_Control_Utility.Services
                     string migrated = MigrateBetterRgbFieldsToJson(MigrateGpuFieldsToJson(json));
                     _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(migrated)
                         ?? new Dictionary<string, AdaptivePreset>();
+
+                    // Shape legacy entries in memory only (bool -> mode, offsets clamped to
+                    // -50..0); a read never rewrites the file for that.
+                    foreach (AdaptivePreset preset in _presets.Values)
+                        preset.Normalize();
 
                     // If migration rewrites happened, persist the new format back to disk
                     if (migrated != json)

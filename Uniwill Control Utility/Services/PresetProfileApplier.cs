@@ -487,28 +487,7 @@ namespace Uniwill_Control_Utility.Services
                 parts.Add($"--tctl-temp={tjMax}");
                 parts.Add($"--cHTC-temp={tjMax}");
 
-                if (preset.CpuCoUnified)
-                {
-                    int coValue = (int)preset.CpuCoUnifiedValue;
-                    uint coEncoded = coValue < 0
-                        ? (uint)(0x1000000 - Math.Abs(coValue))
-                        : (uint)coValue;
-                    parts.Add($"--set-coall={coEncoded}");
-                }
-                else
-                {
-                    int coCcd0 = (int)preset.CpuCoCcd0;
-                    int coCcd1 = (int)preset.CpuCoCcd1;
-                    for (int ccd = 0; ccd < 2; ccd++)
-                    {
-                        int offset = ccd == 0 ? coCcd0 : coCcd1;
-                        for (int core = 0; core < 8; core++)
-                        {
-                            uint encoded = BuildCoperArg(ccd, core, offset);
-                            parts.Add($"--set-coper={encoded}");
-                        }
-                    }
-                }
+                AppendCoCommands(parts, preset, CpuTopologyReader.Read());
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
@@ -636,6 +615,57 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Appends the Curve Optimizer command(s) for the preset's mode. Split out from
+        /// BuildCustomCommandFromPreset so the topology is a parameter: the tests drive the
+        /// 2x8 / 1x8 / 12-core cases with synthetic layouts instead of the machine's.
+        ///
+        /// Per-core and per-CCD write one command per core the topology reports, so a
+        /// BIOS-disabled CCD contributes no writes and no core keeps a value from an earlier
+        /// preset. Unified stays one package-wide command.
+        /// </summary>
+        internal static void AppendCoCommands(List<string> parts, CustomPreset preset, CpuTopology topology)
+        {
+            ArgumentNullException.ThrowIfNull(parts);
+            ArgumentNullException.ThrowIfNull(preset);
+            ArgumentNullException.ThrowIfNull(topology);
+
+            if (preset.CpuCoMode == CpuCoMode.Unified)
+            {
+                parts.Add($"--set-coall={EncodeCoAll(CustomPreset.ClampCo((int)preset.CpuCoUnifiedValue))}");
+                return;
+            }
+
+            int ccd0 = CustomPreset.ClampCo((int)preset.CpuCoCcd0);
+            int ccd1 = CustomPreset.ClampCo((int)preset.CpuCoCcd1);
+
+            if (topology.CoreCount == 0)
+            {
+                // Cannot describe this CPU: keep the proven 2 x 8 shape rather than skip CO.
+                for (int ccd = 0; ccd < 2; ccd++)
+                {
+                    int offset = ccd == 0 ? ccd0 : ccd1;
+                    for (int core = 0; core < 8; core++)
+                        parts.Add($"--set-coper={BuildCoperArg(ccd, core, offset)}");
+                }
+
+                return;
+            }
+
+            int[]? perCore = preset.CpuCoMode == CpuCoMode.PerCore
+                ? preset.BuildPerCoreMap(topology)
+                : null;
+
+            foreach (CpuCore core in topology.Cores)
+            {
+                int offset = perCore is not null
+                    ? perCore[core.Index]
+                    : (core.CcdIndex == 0 ? ccd0 : ccd1);
+
+                parts.Add($"--set-coper={BuildCoperArg(core.CcdIndex, core.IndexInCcd, offset)}");
+            }
+        }
+
+        /// <summary>
         /// Encodes a per-core Curve Optimizer argument (Renoir+/AM5 format).
         /// Layout: ((ccd << 8) | core) << 20 | offset20
         /// offset20: 20-bit biased — negative = 0x100000 - |offset|
@@ -649,6 +679,13 @@ namespace Uniwill_Control_Utility.Services
             uint prefix = (uint)(((ccd << 8) | (core & 7)) << 20);
             return prefix | encoded20;
         }
+
+        /// <summary>
+        /// Encodes the package-wide Curve Optimizer argument (--set-coall).
+        /// 24-bit biased: negative = 0x1000000 - |offset|.
+        /// </summary>
+        private static uint EncodeCoAll(int offset) =>
+            offset < 0 ? (uint)(0x1000000 - Math.Abs(offset)) : (uint)offset;
 
         /// <summary>
         /// Returns the human-readable display name for a profile.
