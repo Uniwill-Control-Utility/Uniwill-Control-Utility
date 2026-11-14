@@ -954,9 +954,15 @@ namespace Uniwill_Control_Utility.Services
                     return HardwareMonitoringCategory.None;
 
                 HardwareMonitoringCategory mask = SystemDevicesMask;
-                if (requested.HasFlag(HardwareMonitoringCategory.Memory))
-                    mask |= HardwareMonitoringCategory.Memory;
 
+                // LHM's Memory group is NOT enabled, even when a lease asks for the
+                // Memory category. Measured on this machine (2026-11-14): opening the
+                // tree with mem=True took 78-85 s and allocated ~10 GB of managed memory,
+                // retaining ~7.2 GB in nine ~800 MB regions until the next reopen - and
+                // the app reads none of it: RAM speed/type come from WMI
+                // (Win32_PhysicalMemory ConfiguredClockSpeed) and usage from
+                // GlobalMemoryStatusEx. The category still exists for leases that want the
+                // slow group, it just no longer drags the DIMM subtree in.
                 return mask;
             }
 
