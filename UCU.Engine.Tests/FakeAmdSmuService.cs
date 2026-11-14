@@ -46,4 +46,29 @@ public sealed class FakeAmdSmuService : IAmdSmuService
 
         return status;
     }
+
+    /// <summary>Response arguments each read command should answer with (index 0 is the status).</summary>
+    private readonly Dictionary<string, uint[]> _readAnswers = new(StringComparer.Ordinal);
+
+    public FakeAmdSmuService AnswersRead(string commandName, params uint[] responseArgs)
+    {
+        _readAnswers[commandName] = responseArgs;
+        return this;
+    }
+
+    public uint[] ExecuteRead(string commandName, uint value, CancellationToken cancellationToken = default)
+    {
+        Calls.Add((commandName, value));
+
+        if (_faults.TryGetValue(commandName, out Exception? fault))
+            throw fault;
+
+        if (_readAnswers.TryGetValue(commandName, out uint[]? answer))
+            return (uint[])answer.Clone();
+
+        if (_statuses.ContainsKey(commandName))
+            return new uint[6];
+
+        throw new ArgumentOutOfRangeException($"Command '{commandName}' not found");
+    }
 }

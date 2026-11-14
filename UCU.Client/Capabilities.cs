@@ -245,6 +245,19 @@ namespace UCU.Client
         public Task<int> ExecuteCommandAsync(string name, uint value, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<int>(EngineVerbs.Cpu.ExecuteAmdSmuCommand,
                 EngineSerializer.ToParams(new SmuCommandDto { Name = name, Value = value }), cancellationToken);
+
+        public Task<uint[]> ReadCommandAsync(string name, uint value, CancellationToken cancellationToken = default) =>
+            ReadAsync(name, value, cancellationToken);
+
+        private async Task<uint[]> ReadAsync(string name, uint value, CancellationToken cancellationToken)
+        {
+            SmuReadResultDto result = await _client.InvokeAsync<SmuReadResultDto>(
+                EngineVerbs.Cpu.ReadAmdSmuCommand,
+                EngineSerializer.ToParams(new SmuCommandDto { Name = name, Value = value }),
+                cancellationToken).ConfigureAwait(false);
+
+            return result.Args;
+        }
     }
 
     /// <summary>Intel MSR verb proxies.</summary>

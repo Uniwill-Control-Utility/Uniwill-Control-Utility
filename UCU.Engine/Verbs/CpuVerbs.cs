@@ -45,6 +45,17 @@ namespace UCU.Engine
         };
 
         /// <summary>
+        /// Read-only mailboxes the app may query. Kept separate from
+        /// <see cref="AllowedSmuCommands"/> so the two directions cannot cross: a query is
+        /// refused on the write verb and a write is refused on the read verb even though
+        /// both travel the same mailbox protocol.
+        /// </summary>
+        private static readonly HashSet<string> AllowedSmuReadCommands = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "get-coper-options",
+        };
+
+        /// <summary>
         /// The MSR 0x150 offset field is 11 bits at 1/1.024 mV per step (~±1024 mV).
         /// The app's sliders stay inside ±150; this is the field's own limit, so a
         /// caller on the pipe cannot shift a garbage value into the register.
@@ -64,6 +75,24 @@ namespace UCU.Engine
                 }
 
                 return Task.FromResult<object?>(smu.Execute(dto.Name, dto.Value, ct));
+            });
+
+            // Read-only mailboxes get their own verb and their own allowlist: a "get-"
+            // command must never be reachable through the write verb, and a "set-" command
+            // must never be reachable through this one. One entry today - the CO core map -
+            // and it exists so the per-core Curve Optimizer can read what the firmware
+            // thinks before it writes.
+            add(EngineVerbs.Cpu.ReadAmdSmuCommand, (p, ct) =>
+            {
+                SmuCommandDto dto = EngineSerializer.BindParams<SmuCommandDto>(p);
+
+                if (dto.Name is null || !AllowedSmuReadCommands.Contains(dto.Name))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(dto.Name), dto.Name,
+                        "not a read-only command this app asks for; the write mailboxes are not reachable through the read verb");
+                }
+
+                return Task.FromResult<object?>(new SmuReadResultDto { Args = smu.ExecuteRead(dto.Name, dto.Value, ct) });
             });
 
             add(EngineVerbs.Cpu.IntelSetTdp, (p, ct) =>

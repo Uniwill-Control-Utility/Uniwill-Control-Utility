@@ -20,6 +20,13 @@ namespace UCU.Hardware.Cpu
         /// the SMU answers a non-OK status.
         /// </summary>
         int Execute(string commandName, uint value, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Execute a read-only SMU command and hand back the mailbox's response
+        /// arguments. The status lives in index 0 (0x01 = OK); the rest is the
+        /// command's answer. Throws exactly like <see cref="Execute"/>.
+        /// </summary>
+        uint[] ExecuteRead(string commandName, uint value, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -51,6 +58,23 @@ namespace UCU.Hardware.Cpu
             args[0] = value;
 
             return SMUCommands.ExecuteWithStatus(commandName, args);
+        }
+
+        /// <summary>
+        /// Read-only counterpart: ExecuteWithStatus fills the argument array with the
+        /// mailbox's response (it passes the array by ref through SendMp1/SendRsmu), so
+        /// the same call answers a query's payload. The caller must have allowlisted the
+        /// command as a read - this method does not know which mailboxes write.
+        /// </summary>
+        public uint[] ExecuteRead(string commandName, uint value, CancellationToken cancellationToken = default)
+        {
+            EnsureTablesConfigured();
+
+            uint[] args = new uint[6];
+            args[0] = value;
+
+            SMUCommands.ExecuteWithStatus(commandName, args);
+            return args;
         }
 
         /// <summary>

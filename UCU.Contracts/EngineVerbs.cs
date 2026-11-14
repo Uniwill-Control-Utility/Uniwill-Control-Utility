@@ -253,6 +253,11 @@ namespace UCU.Contracts
         {
             public const string ExecuteAmdSmuCommand = "cpu.execute_amd_smu_command";
 
+        /// <summary>Read-only SMU mailbox query. Separate verb from the write path
+        /// so each carries its own allowlist: a read can never execute a register
+        /// write, and a write can never be issued to a "get-" mailbox.</summary>
+        public const string ReadAmdSmuCommand = "cpu.read_amd_smu_command";
+
             /// <summary>
             /// Intel MSRs ride the same PawnIO device as the SMU mailboxes
             /// (ACL: System and Administrators), so the app-side TDP / voltage

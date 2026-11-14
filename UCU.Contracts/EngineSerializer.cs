@@ -53,6 +53,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(DeviceToggleDto))]
     [JsonSerializable(typeof(NvramValueDto))]
     [JsonSerializable(typeof(SmuCommandDto))]
+    [JsonSerializable(typeof(SmuReadResultDto))]
     [JsonSerializable(typeof(IntelTdpDto))]
     [JsonSerializable(typeof(PlaneValueDto))]
     [JsonSerializable(typeof(string))]
@@ -135,6 +136,7 @@ namespace UCU.Contracts
             VfCurveOffsetsDto v => ToParams(v),
             DrsPreferenceDto v => ToParams(v),
             SetClocksDto v => ToParams(v),
+            SmuReadResultDto v => ToParams(v),
             _ => throw new ProtocolViolationException($"result type {value.GetType().Name} is not registered in {nameof(EngineJsonContext)}"),
         };
 

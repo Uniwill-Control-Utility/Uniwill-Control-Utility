@@ -34,6 +34,53 @@ public sealed class CpuVerbsTests
     }
 
     [Fact]
+    public async Task ReadAmdSmuCommand_AnswersTheMailboxResponseArguments()
+    {
+        var smu = new FakeAmdSmuService()
+            .AnswersRead("get-coper-options", 0x01, 0x11, 0x22, 0x33, 0x44, 0x55);
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        uint[] answer = await host.Smu.ReadCommandAsync("get-coper-options", 0);
+
+        Assert.Equal(new[] { 0x01u, 0x11u, 0x22u, 0x33u, 0x44u, 0x55u }, answer);
+        Assert.Equal(new[] { ("get-coper-options", 0u) }, smu.Calls);
+    }
+
+    [Fact]
+    public async Task ReadAmdSmuCommand_RefusesAWriteCommand()
+    {
+        // The read verb carries read mailboxes only: a "set-" command must not be
+        // reachable through it, and the refusal happens before the hardware seam.
+        var smu = new FakeAmdSmuService().Answers("set-coper").AnswersRead("get-coper-options", 0x01);
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        await Assert.ThrowsAsync<EngineException>(
+            () => host.Smu.ReadCommandAsync("set-coper", 1));
+
+        Assert.Empty(smu.Calls);
+    }
+
+    [Fact]
+    public async Task ExecuteAmdSmuCommand_RefusesAReadCommand()
+    {
+        // ...and the other direction: the write verb's allowlist must not admit a
+        // query, so a query can never be smuggled through the register-write path.
+        var smu = new FakeAmdSmuService().Answers("set-coper").AnswersRead("get-coper-options", 0x01);
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        await Assert.ThrowsAsync<EngineException>(
+            () => host.Smu.ExecuteCommandAsync("get-coper-options", 0));
+
+        Assert.Empty(smu.Calls);
+    }
+
+    [Fact]
     public async Task ExecuteAmdSmuCommand_PackedCurveOptimizerValue_SurvivesTheWire()
     {
         // The CO encoding signs in the high bits (0xE0000004): the DTO's uint

@@ -296,6 +296,14 @@ namespace UCU.Contracts.Capabilities
         /// PawnIO init failure / SMU refusal (HardwareFault), no engine
         /// (HardwareUnavailable).</summary>
         Task<int> ExecuteCommandAsync(string name, uint value, CancellationToken cancellationToken = default);
+
+        /// <summary>Read-only SMU query ("get-coper-options" today). Returns the
+        /// mailbox response arguments: index 0 is the same status the write path
+        /// returns, the rest carry the command's answer. The write vocabulary is
+        /// refused here and the read vocabulary is refused on
+        /// <see cref="ExecuteCommandAsync"/>, so neither path can reach the
+        /// other's mailboxes.</summary>
+        Task<uint[]> ReadCommandAsync(string name, uint value, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

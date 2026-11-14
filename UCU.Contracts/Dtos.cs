@@ -268,6 +268,17 @@ namespace UCU.Contracts
         public uint Value { get; init; }
     }
 
+    /// <summary>
+    /// The mailbox response of a read-only SMU query. Index 0 is the same status code the
+    /// write path returns (0x01 = OK); the remaining entries carry the command's answer.
+    /// A DTO rather than a bare uint[] because this wire uses a source-generated serializer
+    /// with no reflection fallback - an unregistered type is a hard failure, not a slow path.
+    /// </summary>
+    public sealed record SmuReadResultDto
+    {
+        public uint[] Args { get; init; } = Array.Empty<uint>();
+    }
+
     /// <summary>The TDP MSR pair: PL1 (low dword) and PL2 (high dword), watts.</summary>
     public sealed record IntelTdpDto
     {
