@@ -20,10 +20,17 @@ namespace Uniwill_Control_Utility.Views.Windows
     /// </summary>
     public partial class PerCoreCurveOptimizerWindow : Wpf.Ui.Controls.FluentWindow
     {
-        private const double BoxWidth = 96;
+        // 116: measured floor for this template in Inline mode is 115 px - "-50" first paints
+        // its full 20 px of ink there, while 114 clips a column - plus 1 px for hinting and
+        // rounding at other display scales.
+        private const double BoxWidth = 116;
+        private const double HelperBoxWidth = 116;
 
         /// <summary>Core boxes in tab order, each paired with the topology core index it writes.</summary>
-        private readonly List<(NumberBox Box, int CoreIndex)> _rows = new();
+        private readonly List<(NumberBox Box, int CoreIndex, double Seed)> _rows = new();
+
+        /// <summary>The per-CCD "Set all" inputs, kept with their seed for the same re-seat.</summary>
+        private readonly List<(NumberBox Box, double Seed)> _helpers = new();
 
         private readonly int _coreCount;
 
@@ -43,6 +50,13 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             Loaded += (_, _) =>
             {
+                // The template is applied by now. Seat every box from its seed once more, so a
+                // control that dropped its text on the way in cannot open as an empty field.
+                foreach ((NumberBox box, _, double seed) in _rows)
+                    Seat(box, seed);
+                foreach ((NumberBox box, double seed) in _helpers)
+                    Seat(box, seed);
+
                 if (_rows.Count > 0)
                     _rows[0].Box.Focus();
             };
@@ -55,7 +69,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// </summary>
         private void BuildGroups(CpuTopology topology, IReadOnlyList<int>? currentValues)
         {
-            var cells = new List<(FrameworkElement Element, int Row, int Column)>();
+            var cells = new List<(FrameworkElement Element, int Row, int Column, int ColumnSpan)>();
             var dividers = new List<(Border Element, int Row, int RowSpan)>();
 
             if (topology.Ccds.Count == 1)
@@ -83,19 +97,41 @@ namespace Uniwill_Control_Utility.Views.Windows
                     Ccd ccd = band[slot];
                     int labelColumn = slot * 3;
 
-                    var header = new TextBlock
+                    // Header cell spans the whole group: [name][chip] on the left, the per-CCD
+                    // helper on the right, filler between. ClipToBounds keeps a long name from
+                    // painting over anything.
+                    var header = new Grid { ClipToBounds = true, Margin = new Thickness(0, 0, 0, 4) };
+                    header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                                  // name
+                    header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                                  // chip
+                    header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });            // filler
+                    header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                                  // helper
+
+                    var ccdName = new TextBlock
                     {
                         Text = string.Format(
                             CultureInfo.CurrentCulture,
-                            LocalizationService.Get(ccd.IsX3D ? "CCD {0} · 3D V-Cache" : "CCD {0}"),
+                            LocalizationService.Get("CCD {0}"),
                             ccd.Index),
                         FontSize = 13,
                         FontWeight = FontWeights.SemiBold,
-                        Margin = new Thickness(0, 0, 0, 8),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
                     };
-                    cells.Add((header, headerRow, labelColumn));
+                    Grid.SetColumn(ccdName, 0);
+                    header.Children.Add(ccdName);
 
-                    NumberBox setAllBox = NewNumberBox(SeedForCcd(ccd, currentValues));
+                    Border? chip = null;
+                    if (ccd.IsX3D)
+                    {
+                        chip = X3DChip();
+                        Grid.SetColumn(chip, 1);
+                        header.Children.Add(chip);
+                    }
+
+                    double seed = SeedForCcd(ccd, currentValues);
+                    NumberBox setAllBox = NewNumberBox(seed, HelperBoxWidth);
+                    _helpers.Add((setAllBox, seed));
+
                     var setAllButton = new Button
                     {
                         Content = LocalizationService.Get("Set all"),
@@ -107,11 +143,38 @@ namespace Uniwill_Control_Utility.Views.Windows
                     {
                         Orientation = Orientation.Horizontal,
                         HorizontalAlignment = HorizontalAlignment.Right,
-                        Margin = new Thickness(0, 0, 0, 8),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(8, 0, 0, 0),
                     };
                     setAllPanel.Children.Add(setAllBox);
                     setAllPanel.Children.Add(setAllButton);
-                    cells.Add((setAllPanel, headerRow, labelColumn + 1));
+                    Grid.SetColumn(setAllPanel, 3);
+                    header.Children.Add(setAllPanel);
+
+                    // The chip and the helper keep their width; the name is what gives up room.
+                    // The budget comes from the grid, not from the header's own width: a header
+                    // that sized itself to its content would never shrink, and the group would
+                    // spill past the window edge at the minimum width.
+                    void CapNameWidth()
+                    {
+                        double budget = band.Count == 1
+                            ? CoreGrid.ActualWidth
+                            : (CoreGrid.ActualWidth - ColGap.ActualWidth) / band.Count;
+
+                        double taken = setAllPanel.ActualWidth + setAllPanel.Margin.Left + setAllPanel.Margin.Right;
+                        if (chip is not null)
+                            taken += chip.ActualWidth + chip.Margin.Left + chip.Margin.Right;
+
+                        ccdName.MaxWidth = Math.Max(0, budget - taken);
+                    }
+
+                    CoreGrid.SizeChanged += (_, _) => CapNameWidth();
+                    setAllPanel.SizeChanged += (_, _) => CapNameWidth();
+                    if (chip is not null)
+                        chip.SizeChanged += (_, _) => CapNameWidth();
+                    header.Loaded += (_, _) => CapNameWidth();
+
+                    cells.Add((header, headerRow, labelColumn, 2));
 
                     var coreBoxes = new List<NumberBox>(ccd.Cores.Count);
                     int row = headerRow + 1;
@@ -127,21 +190,22 @@ namespace Uniwill_Control_Utility.Views.Windows
                             VerticalAlignment = VerticalAlignment.Center,
                             Margin = new Thickness(0, 4, 0, 4),
                         };
-                        cells.Add((label, row, labelColumn));
+                        cells.Add((label, row, labelColumn, 1));
 
-                        NumberBox box = NewNumberBox(SeedForCore(core, currentValues));
+                        double coreSeed = SeedForCore(core, currentValues);
+                        NumberBox box = NewNumberBox(coreSeed, BoxWidth);
                         box.HorizontalAlignment = HorizontalAlignment.Right;
-                        cells.Add((box, row, labelColumn + 1));
+                        cells.Add((box, row, labelColumn + 1, 1));
 
                         coreBoxes.Add(box);
-                        _rows.Add((box, core.Index));
+                        _rows.Add((box, core.Index, coreSeed));
                         row++;
                     }
 
                     setAllButton.Click += (_, _) =>
                     {
                         foreach (NumberBox box in coreBoxes)
-                            box.Value = setAllBox.Value ?? 0;
+                            Seat(box, setAllBox.Value ?? 0);
                         Validate();
                     };
                 }
@@ -159,10 +223,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                 }
             }
 
-            foreach ((FrameworkElement element, int row, int column) in cells.OrderBy(c => c.Row).ThenBy(c => c.Column))
+            foreach ((FrameworkElement element, int row, int column, int columnSpan) in cells.OrderBy(c => c.Row).ThenBy(c => c.Column))
             {
                 Grid.SetRow(element, row);
                 Grid.SetColumn(element, column);
+                Grid.SetColumnSpan(element, columnSpan);
                 CoreGrid.Children.Add(element);
             }
 
@@ -175,7 +240,25 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
-        private NumberBox NewNumberBox(double value)
+        /// <summary>The 3D V-Cache qualifier, on the CCD name's line: a bordered chip in the theme accent.</summary>
+        private Border X3DChip() => new()
+        {
+            BorderBrush = (Brush)FindResource("AccentFillColorDefaultBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(6, 1, 6, 2),
+            Margin = new Thickness(8, 0, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock
+            {
+                Text = LocalizationService.Get("3D V-Cache"),
+                FontSize = 11,
+                Foreground = (Brush)FindResource("AccentTextFillColorPrimaryBrush"),
+            },
+        };
+
+        private NumberBox NewNumberBox(double value, double width)
         {
             // Item order matters: the range has to be in place before the value, or the
             // control formats the text twice.
@@ -188,16 +271,35 @@ namespace Uniwill_Control_Utility.Views.Windows
                 LargeChange = 5,
                 AcceptsExpression = false,
                 ClearButtonEnabled = false,
+                // Inline: the two separate chevrons every other NumberBox in the app shows
+                // (Compact fuses them into one flyout button until the box has focus).
                 SpinButtonPlacementMode = Wpf.Ui.Controls.NumberBoxSpinButtonPlacementMode.Inline,
-                Width = BoxWidth,
+                Width = width,
                 MinHeight = 32,
+                Padding = new Thickness(10, 4, 4, 4),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 4, 0, 4),
             };
 
-            box.Value = value;
+            Seat(box, value);
             box.TextChanged += (_, _) => Validate();
             return box;
+        }
+
+        /// <summary>
+        /// Puts the value in the box and in its text. A number box renders nothing while its
+        /// value is null, and it nulls the value itself when its text is empty at template
+        /// time, so an unseated or blank field would stay blank for good. Clamped, never null.
+        /// </summary>
+        private static void Seat(NumberBox box, double value)
+        {
+            value = Math.Clamp(value, CustomPreset.CoMinimum, 0);
+
+            if (box.Value != value)
+                box.Value = value;
+
+            if (string.IsNullOrEmpty(box.Text))
+                box.Text = value.ToString("0", CultureInfo.CurrentCulture);
         }
 
         private static double SeedForCore(CpuCore core, IReadOnlyList<int>? currentValues) =>
@@ -269,8 +371,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (answer != MessageBoxResult.Yes)
                 return;
 
-            foreach ((NumberBox box, _) in _rows)
-                box.Value = 0;
+            foreach ((NumberBox box, _, _) in _rows)
+                Seat(box, 0);
 
             Validate();
         }
@@ -284,7 +386,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             var values = new int[_coreCount];
-            foreach ((NumberBox box, int coreIndex) in _rows)
+            foreach ((NumberBox box, int coreIndex, _) in _rows)
             {
                 if (!TryParseOffset(box.Text, out int value))
                 {
