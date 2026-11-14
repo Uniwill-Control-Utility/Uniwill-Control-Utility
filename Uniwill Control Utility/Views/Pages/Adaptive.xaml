@@ -840,6 +840,7 @@
                                     Visibility="Collapsed"
                                     IsEnabled="True"
                                     IsExpanded="False"
+                                    Expanded="sdBs2Pro_Expanded"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
                             <controls:FlydigiIconElement Margin="6,0,4,0" />
@@ -903,9 +904,11 @@
                                 </ComboBox>
                             </Grid>
 
-                            <!-- Divider before fan sub-controls (visible for any mode) -->
+                            <!-- Divider before fan sub-controls: shown by SyncBs2ProDividers only
+                                 while one of the fan rows below it is visible -->
                             <Border x:Name="Bs2ProFanSubDivider" Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
 
                             <!-- Row: Gear Preset (visible for Gear mode) -->
                             <Grid x:Name="spBs2ProGear" Visibility="Collapsed">
@@ -1051,9 +1054,11 @@
                                 </ComboBox>
                             </Grid>
 
-                            <!-- Divider before RGB sub-controls (visible for any mode except Off/Smart-Temp which show messages) -->
+                            <!-- Divider before RGB sub-controls: shown by SyncBs2ProDividers only
+                                 while one of the RGB sub-rows below it is visible -->
                             <Border x:Name="Bs2ProRgbSubDivider" Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
 
                             <!-- Row: Off message (visible for Off) -->
                             <Grid x:Name="spBs2ProRgbOff" Visibility="Collapsed">

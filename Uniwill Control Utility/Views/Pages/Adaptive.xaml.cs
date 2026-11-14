@@ -190,14 +190,17 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool isBs1 = deviceType == ConnectedDeviceType.BS1;
             tbBs2ProTitle.Text = "Flydigi Cooler";
 
-            // BS1 has no RGB — hide the RGB divider and all RGB controls
-            if (Bs2ProRgbDivider != null)
-                Bs2ProRgbDivider.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
-            if (spBs2ProRgbMode != null)
+            // BS1 has no RGB — hide the RGB Mode row (the divider above it follows that row)
+            if (spBs2ProRgbMode is not null)
                 spBs2ProRgbMode.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
 
             // Hide all RGB sub-controls (they are shown/hidden by UpdateBs2ProRgbUI)
             HideAllBs2ProRgbControls();
+
+            // Derive the fan rows and every divider from the current mode ComboBoxes, so the
+            // card cannot be revealed with a selected mode whose row is still hidden.
+            UpdateBs2ProModeUI();
+            SyncBs2ProDividers();
 
             if (isBs1)
             {
@@ -214,26 +217,59 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        /// <summary>Hides all RGB sub-controls (color picker, brightness, speed, dividers, info rows).</summary>
+        /// <summary>Hides all RGB sub-controls (color picker, brightness, speed, info rows).
+        /// Dividers are not touched here: <see cref="SyncBs2ProDividers"/> derives them from
+        /// whichever rows end up visible.</summary>
         private void HideAllBs2ProRgbControls()
         {
-            // Guard: CardExpander content may not be realized yet (IsExpanded=false).
             if (spBs2ProRgbOff is not null)
                 spBs2ProRgbOff.Visibility = Visibility.Collapsed;
             if (spBs2ProRgbSmartTemp is not null)
                 spBs2ProRgbSmartTemp.Visibility = Visibility.Collapsed;
             if (spBs2ProRgbColorPicker is not null)
                 spBs2ProRgbColorPicker.Visibility = Visibility.Collapsed;
-            if (Bs2ProRgbSubDivider is not null)
-                Bs2ProRgbSubDivider.Visibility = Visibility.Collapsed;
-            if (Bs2ProRgbStaticBrightnessDivider is not null)
-                Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Collapsed;
             if (spBs2ProRgbBrightness is not null)
                 spBs2ProRgbBrightness.Visibility = Visibility.Collapsed;
-            if (Bs2ProRgbFlowingSpeedDivider is not null)
-                Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Collapsed;
             if (spBs2ProRgbSpeed is not null)
                 spBs2ProRgbSpeed.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Keeps every divider in this card with the row it introduces: a divider is visible
+        /// exactly when something below it is. Called from the mode updaters and when the
+        /// card is expanded, so no state can leave an orphan rule behind.
+        /// </summary>
+        private void SyncBs2ProDividers()
+        {
+            // The fan-mode ComboBox raises SelectionChanged while the page is still being
+            // built, before the controls declared after it exist.
+            if (Bs2ProFanSubDivider is null || Bs2ProRgbSubDivider is null)
+                return;
+
+            Bs2ProFanSubDivider.Visibility = AnyVisible(spBs2ProGear, spBs2ProRpm, spBs2ProCurve);
+            Bs2ProCurveEditorDivider.Visibility = Bs2ProCurveEditor.Visibility;
+            Bs2ProRgbDivider.Visibility = spBs2ProRgbMode.Visibility;
+            Bs2ProRgbSubDivider.Visibility = AnyVisible(
+                spBs2ProRgbOff, spBs2ProRgbSmartTemp, spBs2ProRgbColorPicker,
+                spBs2ProRgbBrightness, spBs2ProRgbSpeed);
+            Bs2ProRgbStaticBrightnessDivider.Visibility = spBs2ProRgbBrightness.Visibility;
+            Bs2ProRgbFlowingSpeedDivider.Visibility = spBs2ProRgbSpeed.Visibility;
+        }
+
+        private static Visibility AnyVisible(params UIElement[] rows) =>
+            rows.Any(row => row.Visibility == Visibility.Visible)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        /// <summary>
+        /// The card's content is built with the page (the named controls always exist), but
+        /// its rows keep their XAML defaults until an updater runs. Expanding is the moment
+        /// to derive them again: a preset may have loaded while the card was collapsed.
+        /// </summary>
+        private void sdBs2Pro_Expanded(object? sender, RoutedEventArgs e)
+        {
+            UpdateBs2ProModeUI();
+            UpdateBs2ProRgbUI();
         }
 
         /// <summary>
@@ -2739,12 +2775,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateBs2ProModeUI()
         {
-            // Guard: controls may be null if sdBs2Pro is still collapsed (hardware not detected yet)
+            // Guard for the SelectionChanged the fan-mode ComboBox raises while the page is
+            // still being built, before the controls declared below it exist.
             if (spBs2ProGear == null)
                 return;
 
             var mode = cbxBs2ProFanMode.SelectedIndex;
-            Bs2ProFanSubDivider.Visibility = Visibility.Visible;
             spBs2ProGear.Visibility = mode == 0 ? Visibility.Visible : Visibility.Collapsed;
             spBs2ProRpm.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
             spBs2ProCurve.Visibility = mode == 2 ? Visibility.Visible : Visibility.Collapsed;
@@ -2753,13 +2789,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             // inside the Curve mode sub-pane. Re-show if already in Curve + Custom.
             if (mode != 2)
             {
-                Bs2ProCurveEditorDivider.Visibility = Visibility.Collapsed;
                 Bs2ProCurveEditor.Visibility = Visibility.Collapsed;
             }
             else if (Bs2ProCurveEditor is not null && cbxBs2ProCurve?.SelectedIndex == 5)
             {
                 // Re-entering Curve mode with Custom selected — re-show editor
-                Bs2ProCurveEditorDivider.Visibility = Visibility.Visible;
                 Bs2ProCurveEditor.Visibility = Visibility.Visible;
                 try
                 {
@@ -2771,17 +2805,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProCurveEditor.SetCurve(FlydigiFanCurveProfile.CreateBalanced());
                 }
             }
+
+            SyncBs2ProDividers();
         }
 
         private void cbxBs2ProCurve_SelectionChanged(object sender, EventArgs e)
         {
-            // Guard: controls may be null if CardExpander content not realized
+            // Guard for the SelectionChanged raised while the page is still being built.
             if (cbxBs2ProCurve is null || Bs2ProCurveEditor is null)
                 return;
 
             bool isCustom = cbxBs2ProCurve.SelectedIndex == 5;
-            Bs2ProCurveEditorDivider.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
             Bs2ProCurveEditor.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+            SyncBs2ProDividers();
 
             if (isCustom)
             {
@@ -2833,10 +2869,18 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateBs2ProRgbUI()
         {
-            // Guard: CardExpander content may not be realized yet (IsExpanded=false).
-            // All content controls are null until the user expands the card.
+            // Guard for the SelectionChanged raised while the page is still being built,
+            // before the RGB sub-rows exist.
             if (spBs2ProRgbOff is null)
                 return;
+
+            // BS1 has no RGB: its mode row is collapsed, and no sub-row may appear under it.
+            if (spBs2ProRgbMode.Visibility != Visibility.Visible)
+            {
+                HideAllBs2ProRgbControls();
+                SyncBs2ProDividers();
+                return;
+            }
 
             // Hide all first, then show what's needed for the selected mode
             HideAllBs2ProRgbControls();
@@ -2846,32 +2890,26 @@ namespace Uniwill_Control_Utility.Views.Pages
             switch (mode)
             {
                 case 0: // Off
-                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbOff.Visibility = Visibility.Visible;
                     break;
                 case 1: // Smart-Temp
-                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbSmartTemp.Visibility = Visibility.Visible;
                     break;
                 case 2: // Static
-                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbColorPicker.Visibility = Visibility.Visible;
-                    Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     break;
                 case 3: // Breathing
-                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbColorPicker.Visibility = Visibility.Visible;
-                    Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     break;
-                case 4: // Flowing — no color picker, so skip the sub divider to avoid a bare divider above Brightness
-                    Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
+                case 4: // Flowing — no color picker, brightness and speed only
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
-                    Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbSpeed.Visibility = Visibility.Visible;
                     break;
             }
+
+            SyncBs2ProDividers();
         }
 
           /* ------------------------------------------------------------------ */
