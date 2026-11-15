@@ -53,6 +53,18 @@ the code string and the catalogs disagree is a regression.
 6. Then, and only then, run the normal gates (clean Release build at the
    warning baseline, all five suites green) and commit.
 
+## Never commit the `.opencode` folder
+
+`.opencode/` holds the author's agent configuration and skills — local tooling, not product
+source — and it must never be published (user rule, 2026-11-12). `/.opencode/` is in
+`.gitignore`; do not remove that entry, do not `git add -f` anything under it, and do not
+re-introduce it by restoring an old commit's tree. The history was rewritten on 2026-11-15 to
+strip the eight skill files that had been committed in `29f22821`; the only remaining copies
+are the `wip/0.9.9` backup branch and a local `refs/original` ref.
+
+If a task seems to need a skill inside the repo, that is a signal to install it into the user
+profile (`~/.config/opencode/skills/`) instead.
+
 ## Project conventions live in the wiki
 
 Release/field procedure, staging mechanics, the field-verified hardware
