@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "Semak pengambilalihan OEM Control Center",
   "Extra GPU power": "Kuasa GPU tambahan",
   "Raises the GPU's power ceiling at driver level": "Menaikkan had kuasa GPU pada peringkat pemacu",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "Diukur pada mesin ini: kira-kira 267 W daripada GPU dan 130 W daripada CPU, hampir 397 W daripada penyesuai 420 W. Titik panas GPU kekal pada 62 °C semasa ujian.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "Ini mengatasi dasar kuasa pemacu. Ia tidak mengubah firmware GPU, dan “Pulihkan asal” membatalkannya.",
   "I understand this changes driver-level settings and restarts the GPU": "Saya faham ini mengubah tetapan peringkat pemacu dan memulakan semula GPU",
   "Unlock extra GPU power": "Buka kuasa GPU tambahan",
   "Restore stock": "Pulihkan asal",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "Memulakan semula GPU. Skrin mungkin menjadi kosong sehingga 60 saat.",
-  "not read": "tidak dibaca",
-  "Ceiling {0} W · enforced limit {1} W": "Had {0} W · had dikuatkuasakan {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "Rel: {0} A GPU, {1} A memori, {2} A input papan",
   "The engine service is not available, so the current state could not be read.": "Perkhidmatan enjin tidak tersedia, jadi keadaan semasa tidak dapat dibaca.",
   "The override cannot be used on this machine.": "Pengatasan ini tidak boleh digunakan pada mesin ini.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "Ini ditolak apabila VBIOS GPU bukan yang diukur untuk binaan ini, atau apabila alat lain sudah memegang pengatasan. Kad ini tidak pernah menimpa pengatasan yang tidak ditulisnya: buang dalam alat itu, kemudian mulakan semula GPU.",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "Pulihkan had kuasa GPU asal?",
   "Apply the extra GPU power override?": "Gunakan pengatasan kuasa GPU tambahan?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Ini membuang pengatasan peringkat pemacu dan memulakan semula GPU. Skrin akan menjadi kosong, dan sebarang permainan atau beban kerja GPU yang berjalan akan ditutup.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Ini mengubah tetapan kuasa peringkat pemacu dan memulakan semula GPU. Skrin akan menjadi kosong, dan sebarang permainan atau beban kerja GPU yang berjalan akan ditutup. “Pulihkan asal” membatalkannya."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Ini mengubah tetapan kuasa peringkat pemacu dan memulakan semula GPU. Skrin akan menjadi kosong, dan sebarang permainan atau beban kerja GPU yang berjalan akan ditutup. “Pulihkan asal” membatalkannya.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "Diukur: GPU menarik kira-kira 210 W pada had 220 W, berbanding 175 W asal, dan titik panas kekal pada 62 °C.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Had input papan 13.5 A membenarkan kira-kira 267 W, yang bersama 130 W CPU kekal dalam penyesuai 420 W.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Dilaksanakan: had {0} W · {1} A GPU, {2} A memori, {3} A input papan",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Akan ditetapkan: had {0} W · {1} A GPU, {2} A memori, {3} A input papan",
+  "Live enforced limit: {0} W": "Had yang dikuatkuasakan kini: {0} W",
+  "Live enforced limit: not read": "Had yang dikuatkuasakan kini: tidak dibaca"
 }

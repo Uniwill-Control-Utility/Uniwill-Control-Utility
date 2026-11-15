@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "Vérifier la reprise du OEM Control Center",
   "Extra GPU power": "Puissance GPU supplémentaire",
   "Raises the GPU's power ceiling at driver level": "Élève le plafond de puissance du GPU au niveau du pilote",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "Mesuré sur cette machine : environ 267 W pour le GPU et 130 W pour le CPU, soit près de 397 W d'un adaptateur de 420 W. Le point chaud du GPU est resté à 62 °C lors des tests.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "Cela remplace la politique d'alimentation du pilote. Le firmware du GPU n'est pas modifié et « Restaurer l'origine » l'annule.",
   "I understand this changes driver-level settings and restarts the GPU": "Je comprends que cela modifie des paramètres au niveau du pilote et redémarre le GPU",
   "Unlock extra GPU power": "Débloquer la puissance GPU supplémentaire",
   "Restore stock": "Restaurer l'origine",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "Redémarrage du GPU. L'écran peut rester noir jusqu'à 60 secondes.",
-  "not read": "non lue",
-  "Ceiling {0} W · enforced limit {1} W": "Plafond {0} W · limite appliquée {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "Rails : {0} A GPU, {1} A mémoire, {2} A entrée carte",
   "The engine service is not available, so the current state could not be read.": "Le service du moteur n'est pas disponible, l'état actuel n'a donc pas pu être lu.",
   "The override cannot be used on this machine.": "La substitution ne peut pas être utilisée sur cette machine.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "Ceci est refusé lorsque le VBIOS du GPU n'est pas celui sur lequel cette version a été mesurée, ou lorsqu'un autre outil détient déjà la substitution. Cette carte n'écrase jamais une substitution qu'elle n'a pas écrite : retirez-la dans cet outil, puis redémarrez le GPU.",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "Restaurer la limite de puissance d'origine du GPU ?",
   "Apply the extra GPU power override?": "Appliquer la substitution de puissance GPU supplémentaire ?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Cela retire la substitution au niveau du pilote et redémarre le GPU. L'écran devient noir et tout jeu ou traitement GPU en cours se ferme.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Cela modifie un réglage d'alimentation au niveau du pilote et redémarre le GPU. L'écran devient noir et tout jeu ou traitement GPU en cours se ferme. « Restaurer l'origine » annule l'opération."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Cela modifie un réglage d'alimentation au niveau du pilote et redémarre le GPU. L'écran devient noir et tout jeu ou traitement GPU en cours se ferme. « Restaurer l'origine » annule l'opération.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "Mesuré : le GPU a consommé environ 210 W au plafond de 220 W, contre 175 W d'origine, et le point chaud est resté à 62 °C.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Sa limite d'entrée carte de 13,5 A autorise environ 267 W, ce qui, avec les 130 W du CPU, reste dans l'adaptateur de 420 W.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Appliqué : plafond {0} W · {1} A GPU, {2} A mémoire, {3} A entrée carte",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Appliquerait : plafond {0} W · {1} A GPU, {2} A mémoire, {3} A entrée carte",
+  "Live enforced limit: {0} W": "Limite appliquée en direct : {0} W",
+  "Live enforced limit: not read": "Limite appliquée en direct : non lue"
 }

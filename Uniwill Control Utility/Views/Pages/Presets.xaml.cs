@@ -2134,27 +2134,31 @@ namespace Uniwill_Control_Utility.Views.Pages
             // status bar while the engine is being asked.
             RomOverrideStatus.Visibility = Visibility.Visible;
 
-            // The read-back is what the engine read from the driver, never what was asked for.
+            // The read-back is what the engine read from the driver, never what was asked
+            // for. The tier values are labelled by ownership (applied vs. only proposed)
+            // and the live NVML limit is always its own line.
             if (state == null)
             {
                 spRomReadback.Visibility = Visibility.Collapsed;
             }
             else
             {
-                object enforced = state.EnforcedLimitMilliwatts is int limit
-                    ? limit / 1000.0
-                    : LocalizationService.Get("not read");
+                double ceilingW = state.PowerMilliwatts / 1000.0;
+                double nvVddA = state.NvVddMilliAmps / 1000.0;
+                double msVddA = state.MsVddMilliAmps / 1000.0;
+                double boardA = state.BoardInputMilliAmps / 1000.0;
 
                 spRomReadback.Visibility = Visibility.Visible;
-                tbRomCeiling.Text = LocalizationService.Format(
-                    "Ceiling {0} W · enforced limit {1} W",
-                    state.PowerMilliwatts / 1000.0,
-                    enforced);
-                tbRomRails.Text = LocalizationService.Format(
-                    "Rails: {0} A GPU, {1} A memory, {2} A board input",
-                    state.NvVddMilliAmps / 1000.0,
-                    state.MsVddMilliAmps / 1000.0,
-                    state.BoardInputMilliAmps / 1000.0);
+                tbRomTier.Text = unlocked
+                    ? LocalizationService.Format(
+                        "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
+                        ceilingW, nvVddA, msVddA, boardA)
+                    : LocalizationService.Format(
+                        "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
+                        ceilingW, nvVddA, msVddA, boardA);
+                tbRomLive.Text = state.EnforcedLimitMilliwatts is int limit
+                    ? LocalizationService.Format("Live enforced limit: {0} W", limit / 1000.0)
+                    : LocalizationService.Get("Live enforced limit: not read");
             }
 
             if (state == null)
@@ -2197,17 +2201,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 RomOverrideStatus.Message = RomReasonLine(_romOverrideError);
             }
 
-            btnRomOverride.Visibility = state == null || blocked ? Visibility.Collapsed : Visibility.Visible;
-            btnRomOverride.Content = unlocked
-                ? LocalizationService.Get("Restore stock")
-                : LocalizationService.Get("Unlock extra GPU power");
-
+            // Both actions stay visible; each is gated separately and dimmed when off.
             bool consent = chkRomConsent.IsChecked == true;
             bool powerBoost = Settings.Default.EnablePowerBoostMode;
-            bool enabled = !busy && (unlocked || (canUnlock && powerBoost && consent));
+            bool unlockEnabled = !busy && canUnlock && powerBoost && consent;
+            bool restoreEnabled = !busy && (unlocked || uncertain);
 
-            btnRomOverride.IsEnabled = enabled;
-            btnRomOverride.Opacity = enabled ? 1.0 : 0.5;
+            btnRomUnlock.IsEnabled = unlockEnabled;
+            btnRomUnlock.Opacity = unlockEnabled ? 1.0 : 0.5;
+            btnRomRestore.IsEnabled = restoreEnabled;
+            btnRomRestore.Opacity = restoreEnabled ? 1.0 : 0.5;
 
             chkRomConsent.Visibility = canUnlock ? Visibility.Visible : Visibility.Collapsed;
             chkRomConsent.IsEnabled = !busy;
@@ -2215,16 +2218,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             spRomBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
 
             // Never a control that looks live but ignores the click: the reason sits
-            // right under the button.
+            // right under the buttons. State-driven disables (already unlocked, nothing
+            // staged, refused) are explained by the status line above.
             tbRomOverrideNote.Text = busy
                 ? LocalizationService.Get("Restarting the GPU. The screen may go blank for up to 60 seconds.")
-                : state == null || blocked || unlocked
-                    ? string.Empty
-                    : !powerBoost
-                        ? LocalizationService.Get("Turn on Power boost mode in Settings first.")
-                        : !consent
-                            ? LocalizationService.Get("Tick the statement above first.")
-                            : string.Empty;
+                : canUnlock && !powerBoost
+                    ? LocalizationService.Get("Turn on Power boost mode in Settings first.")
+                    : canUnlock && !consent
+                        ? LocalizationService.Get("Tick the statement above first.")
+                        : string.Empty;
         }
 
         private static string RomReasonLine(string? reason) =>
@@ -2232,17 +2234,28 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
 
-        private async void btnRomOverride_Click(object sender, RoutedEventArgs e)
+        private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>
+            await RunRomOverrideAsync(restore: false);
+
+        private async void btnRomRestore_Click(object sender, RoutedEventArgs e) =>
+            await RunRomOverrideAsync(restore: true);
+
+        private async Task RunRomOverrideAsync(bool restore)
         {
             if (_romOverrideBusy || _gpuTuning == null || _romOverride == null)
                 return;
 
-            bool restore = _romOverride.State == UCU.Contracts.GpuRomOverrideStates.Unlocked;
+            bool unlocked = _romOverride.State == UCU.Contracts.GpuRomOverrideStates.Unlocked;
+            bool uncertain = _romOverride.State == UCU.Contracts.GpuRomOverrideStates.Uncertain;
 
-            // Consent gates the unlock (a CheckBox), then a dialog names the two effects
-            // the act has on the machine.
-            if (!restore && !(Settings.Default.EnablePowerBoostMode && chkRomConsent.IsChecked == true))
+            // The buttons are already gated visually; re-check so a stale frame cannot
+            // fire an act the card was showing as unavailable.
+            if (restore
+                ? !(unlocked || uncertain)
+                : !(Settings.Default.EnablePowerBoostMode && chkRomConsent.IsChecked == true))
+            {
                 return;
+            }
 
             string question = restore
                 ? LocalizationService.Get("Restore the stock GPU power limit?")

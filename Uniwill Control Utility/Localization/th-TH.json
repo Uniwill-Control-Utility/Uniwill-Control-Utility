@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "ตรวจสอบการเข้าควบคุม OEM Control Center",
   "Extra GPU power": "กำลังไฟ GPU เพิ่มเติม",
   "Raises the GPU's power ceiling at driver level": "เพิ่มเพดานกำลังไฟของ GPU ที่ระดับไดรเวอร์",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "วัดบนเครื่องนี้: ประมาณ 267 W จาก GPU และ 130 W จาก CPU รวมเกือบ 397 W ของอะแดปเตอร์ 420 W จุดร้อนของ GPU อยู่ที่ 62 °C ในการทดสอบ",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "การตั้งค่านี้เขียนทับนโยบายพลังงานของไดรเวอร์ ไม่ได้เปลี่ยนเฟิร์มแวร์ของ GPU และ “คืนค่าเดิม” จะย้อนกลับได้",
   "I understand this changes driver-level settings and restarts the GPU": "ฉันเข้าใจว่าการตั้งค่านี้เปลี่ยนการตั้งค่าระดับไดรเวอร์และรีสตาร์ท GPU",
   "Unlock extra GPU power": "ปลดล็อกกำลังไฟ GPU เพิ่มเติม",
   "Restore stock": "คืนค่าเดิม",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "กำลังรีสตาร์ท GPU หน้าจออาจดับนานถึง 60 วินาที",
-  "not read": "อ่านไม่ได้",
-  "Ceiling {0} W · enforced limit {1} W": "เพดาน {0} W · ขีดจำกัดที่บังคับใช้ {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "รางจ่ายไฟ: {0} A GPU, {1} A หน่วยความจำ, {2} A อินพุตบอร์ด",
   "The engine service is not available, so the current state could not be read.": "บริการเอนจินไม่พร้อมใช้งาน จึงอ่านสถานะปัจจุบันไม่ได้",
   "The override cannot be used on this machine.": "ไม่สามารถใช้การเขียนทับนี้บนเครื่องนี้ได้",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "ระบบจะปฏิเสธเมื่อ VBIOS ของ GPU ไม่ใช่รุ่นที่ใช้วัดในเวอร์ชันนี้ หรือเมื่อเครื่องมืออื่นถือการเขียนทับอยู่แล้ว การ์ดนี้จะไม่เขียนทับการตั้งค่าที่ตัวเองไม่ได้สร้าง: ให้ลบในเครื่องมือนั้นแล้วรีสตาร์ท GPU",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "คืนค่าขีดจำกัดกำลังไฟ GPU เดิมหรือไม่",
   "Apply the extra GPU power override?": "ใช้การเขียนทับกำลังไฟ GPU เพิ่มเติมหรือไม่",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "การดำเนินการนี้จะลบการเขียนทับระดับไดรเวอร์และรีสตาร์ท GPU หน้าจอจะดับ และเกมหรืองาน GPU ที่ทำงานอยู่จะปิดลง",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "การดำเนินการนี้เปลี่ยนการตั้งค่าพลังงานระดับไดรเวอร์และรีสตาร์ท GPU หน้าจอจะดับ และเกมหรืองาน GPU ที่ทำงานอยู่จะปิดลง “คืนค่าเดิม” จะย้อนกลับได้"
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "การดำเนินการนี้เปลี่ยนการตั้งค่าพลังงานระดับไดรเวอร์และรีสตาร์ท GPU หน้าจอจะดับ และเกมหรืองาน GPU ที่ทำงานอยู่จะปิดลง “คืนค่าเดิม” จะย้อนกลับได้",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "วัดได้: GPU ดึงไฟประมาณ 210 W ที่เพดาน 220 W เทียบกับ 175 W เดิม และจุดร้อนอยู่ที่ 62 °C",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "ขีดจำกัดอินพุตบอร์ด 13.5 A อนุญาตประมาณ 267 W ซึ่งเมื่อรวมกับ 130 W ของ CPU แล้วยังอยู่ในอะแดปเตอร์ 420 W",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "นำไปใช้แล้ว: เพดาน {0} W · {1} A GPU, {2} A หน่วยความจำ, {3} A อินพุตบอร์ด",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "จะตั้งเป็น: เพดาน {0} W · {1} A GPU, {2} A หน่วยความจำ, {3} A อินพุตบอร์ด",
+  "Live enforced limit: {0} W": "ขีดจำกัดที่บังคับใช้อยู่: {0} W",
+  "Live enforced limit: not read": "ขีดจำกัดที่บังคับใช้อยู่: อ่านไม่ได้"
 }

@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "OEM Control Center-overname controleren",
   "Extra GPU power": "Extra GPU-vermogen",
   "Raises the GPU's power ceiling at driver level": "Verhoogt het vermogensplafond van de GPU op driverniveau",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "Gemeten op dit systeem: ongeveer 267 W van de GPU en 130 W van de CPU, bijna 397 W van een adapter van 420 W. De GPU-hotspot bleef tijdens de test op 62 °C.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "Dit overschrijft het energiebeleid van de driver. De firmware van de GPU blijft ongewijzigd en ‘Origineel herstellen’ draait het terug.",
   "I understand this changes driver-level settings and restarts the GPU": "Ik begrijp dat dit instellingen op driverniveau wijzigt en de GPU herstart",
   "Unlock extra GPU power": "Extra GPU-vermogen vrijgeven",
   "Restore stock": "Origineel herstellen",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "De GPU wordt herstart. Het scherm kan tot 60 seconden zwart blijven.",
-  "not read": "niet gelezen",
-  "Ceiling {0} W · enforced limit {1} W": "Plafond {0} W · opgelegde limiet {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "Rails: {0} A GPU, {1} A geheugen, {2} A boardingang",
   "The engine service is not available, so the current state could not be read.": "De engineservice is niet beschikbaar, dus de huidige status kon niet worden gelezen.",
   "The override cannot be used on this machine.": "De overschrijving kan op dit systeem niet worden gebruikt.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "Dit wordt geweigerd als het VBIOS van de GPU niet het exemplaar is waarop deze build is gemeten, of als een ander hulpprogramma de overschrijving al bezit. Deze kaart overschrijft nooit een overschrijving die zij niet zelf schreef: verwijder die in dat hulpprogramma en herstart de GPU.",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "Oorspronkelijke vermogenslimiet van de GPU herstellen?",
   "Apply the extra GPU power override?": "De overschrijving voor extra GPU-vermogen toepassen?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Dit verwijdert de overschrijving op driverniveau en herstart de GPU. Het scherm wordt zwart en lopende games of GPU-taken worden gesloten.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Dit wijzigt een vermogensinstelling op driverniveau en herstart de GPU. Het scherm wordt zwart en lopende games of GPU-taken worden gesloten. ‘Origineel herstellen’ draait het terug."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Dit wijzigt een vermogensinstelling op driverniveau en herstart de GPU. Het scherm wordt zwart en lopende games of GPU-taken worden gesloten. ‘Origineel herstellen’ draait het terug.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "Gemeten: de GPU trok ongeveer 210 W bij het plafond van 220 W, tegen 175 W origineel, en de hotspot bleef op 62 °C.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "De boardingang van 13,5 A staat ongeveer 267 W toe, wat samen met de 130 W van de CPU binnen de 420 W-adapter blijft.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Toegepast: plafond {0} W · {1} A GPU, {2} A geheugen, {3} A boardingang",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Zou instellen: plafond {0} W · {1} A GPU, {2} A geheugen, {3} A boardingang",
+  "Live enforced limit: {0} W": "Nu opgelegde limiet: {0} W",
+  "Live enforced limit: not read": "Nu opgelegde limiet: niet gelezen"
 }

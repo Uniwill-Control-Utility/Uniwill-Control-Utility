@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "OEM Control Center 인수 확인",
   "Extra GPU power": "추가 GPU 전력",
   "Raises the GPU's power ceiling at driver level": "드라이버 수준에서 GPU 전력 상한을 높입니다",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "이 시스템에서 측정: GPU 약 267 W, CPU 130 W로 420 W 어댑터의 약 397 W에 해당합니다. 테스트 중 GPU 핫스팟은 62 °C였습니다.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "드라이버의 전력 정책을 덮어씁니다. GPU 펌웨어는 변경하지 않으며 “원래대로 복원”으로 되돌릴 수 있습니다.",
   "I understand this changes driver-level settings and restarts the GPU": "드라이버 수준 설정이 변경되고 GPU가 다시 시작됨을 이해합니다",
   "Unlock extra GPU power": "추가 GPU 전력 사용",
   "Restore stock": "원래대로 복원",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "GPU를 다시 시작하는 중입니다. 최대 60초 동안 화면이 꺼질 수 있습니다.",
-  "not read": "읽지 못함",
-  "Ceiling {0} W · enforced limit {1} W": "상한 {0} W · 적용된 제한 {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "레일: {0} A GPU, {1} A 메모리, {2} A 보드 입력",
   "The engine service is not available, so the current state could not be read.": "엔진 서비스를 사용할 수 없어 현재 상태를 읽지 못했습니다.",
   "The override cannot be used on this machine.": "이 시스템에서는 이 재정의를 사용할 수 없습니다.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "GPU의 VBIOS가 이 빌드에서 측정한 것과 다르거나 다른 도구가 이미 재정의를 보유한 경우 거부됩니다. 이 카드는 자신이 쓰지 않은 재정의를 덮어쓰지 않습니다. 해당 도구에서 제거한 뒤 GPU를 다시 시작하세요.",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "GPU의 원래 전력 상한으로 복원할까요?",
   "Apply the extra GPU power override?": "추가 GPU 전력 재정의를 적용할까요?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "드라이버 수준 재정의를 제거하고 GPU를 다시 시작합니다. 화면이 꺼지고 실행 중인 게임이나 GPU 작업이 종료됩니다.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "드라이버 수준의 전력 설정을 변경하고 GPU를 다시 시작합니다. 화면이 꺼지고 실행 중인 게임이나 GPU 작업이 종료됩니다. “원래대로 복원”으로 되돌릴 수 있습니다."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "드라이버 수준의 전력 설정을 변경하고 GPU를 다시 시작합니다. 화면이 꺼지고 실행 중인 게임이나 GPU 작업이 종료됩니다. “원래대로 복원”으로 되돌릴 수 있습니다.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "측정: 220 W 상한에서 GPU는 약 210 W를 소비했고 원래는 175 W였으며, 핫스팟은 62 °C를 유지했습니다.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "보드 입력 한도 13.5 A는 약 267 W를 허용하며, CPU의 130 W와 합쳐도 420 W 어댑터 범위 안에 있습니다.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "적용됨: 상한 {0} W · {1} A GPU, {2} A 메모리, {3} A 보드 입력",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "적용 예정: 상한 {0} W · {1} A GPU, {2} A 메모리, {3} A 보드 입력",
+  "Live enforced limit: {0} W": "현재 적용된 제한: {0} W",
+  "Live enforced limit: not read": "현재 적용된 제한: 읽지 못함"
 }

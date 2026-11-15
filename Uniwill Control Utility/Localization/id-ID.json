@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "Tinjau pengambilalihan OEM Control Center",
   "Extra GPU power": "Daya GPU tambahan",
   "Raises the GPU's power ceiling at driver level": "Menaikkan batas daya GPU di tingkat driver",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "Diukur pada mesin ini: sekitar 267 W dari GPU dan 130 W dari CPU, hampir 397 W dari adaptor 420 W. Titik panas GPU tetap di 62 °C saat pengujian.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "Ini menimpa kebijakan daya driver. Firmware GPU tidak diubah, dan “Pulihkan asli” membatalkannya.",
   "I understand this changes driver-level settings and restarts the GPU": "Saya paham ini mengubah pengaturan tingkat driver dan memulai ulang GPU",
   "Unlock extra GPU power": "Buka daya GPU tambahan",
   "Restore stock": "Pulihkan asli",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "Memulai ulang GPU. Layar dapat menjadi hitam hingga 60 detik.",
-  "not read": "tidak terbaca",
-  "Ceiling {0} W · enforced limit {1} W": "Batas {0} W · batas yang berlaku {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "Rel: {0} A GPU, {1} A memori, {2} A masukan papan",
   "The engine service is not available, so the current state could not be read.": "Layanan mesin tidak tersedia, jadi status saat ini tidak dapat dibaca.",
   "The override cannot be used on this machine.": "Penggantian ini tidak dapat digunakan pada mesin ini.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "Ini ditolak bila VBIOS GPU bukan yang diukur untuk versi ini, atau bila alat lain sudah memegang penggantian. Kartu ini tidak pernah menimpa penggantian yang bukan ditulisnya: hapus di alat itu, lalu mulai ulang GPU.",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "Pulihkan batas daya GPU asli?",
   "Apply the extra GPU power override?": "Terapkan penggantian daya GPU tambahan?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Ini menghapus penggantian tingkat driver dan memulai ulang GPU. Layar akan menjadi hitam, dan game atau beban kerja GPU yang berjalan akan tertutup.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Ini mengubah pengaturan daya tingkat driver dan memulai ulang GPU. Layar akan menjadi hitam, dan game atau beban kerja GPU yang berjalan akan tertutup. “Pulihkan asli” membatalkannya."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Ini mengubah pengaturan daya tingkat driver dan memulai ulang GPU. Layar akan menjadi hitam, dan game atau beban kerja GPU yang berjalan akan tertutup. “Pulihkan asli” membatalkannya.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "Diukur: GPU menarik sekitar 210 W pada batas 220 W, dibandingkan 175 W asli, dan titik panas tetap di 62 °C.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Batas masukan papan 13,5 A memungkinkan sekitar 267 W, yang bersama 130 W CPU tetap dalam adaptor 420 W.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Diterapkan: batas {0} W · {1} A GPU, {2} A memori, {3} A masukan papan",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Akan diterapkan: batas {0} W · {1} A GPU, {2} A memori, {3} A masukan papan",
+  "Live enforced limit: {0} W": "Batas yang berlaku sekarang: {0} W",
+  "Live enforced limit: not read": "Batas yang berlaku sekarang: tidak terbaca"
 }

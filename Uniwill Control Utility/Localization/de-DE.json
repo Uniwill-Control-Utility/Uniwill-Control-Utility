@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "Übernahme des OEM Control Center prüfen",
   "Extra GPU power": "Zusätzliche GPU-Leistung",
   "Raises the GPU's power ceiling at driver level": "Hebt die Leistungsgrenze der GPU auf Treiberebene an",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "Auf diesem Gerät gemessen: etwa 267 W von der GPU und 130 W von der CPU, also nahezu 397 W des 420-W-Netzteils. Der GPU-Hotspot blieb im Test bei 62 °C.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "Dies überschreibt die Energierichtlinie des Treibers. Die Firmware der GPU bleibt unverändert, und „Original wiederherstellen“ macht es rückgängig.",
   "I understand this changes driver-level settings and restarts the GPU": "Ich verstehe, dass dies Einstellungen auf Treiberebene ändert und die GPU neu startet",
   "Unlock extra GPU power": "Zusätzliche GPU-Leistung freischalten",
   "Restore stock": "Original wiederherstellen",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "Die GPU wird neu gestartet. Der Bildschirm kann bis zu 60 Sekunden lang schwarz bleiben.",
-  "not read": "nicht gelesen",
-  "Ceiling {0} W · enforced limit {1} W": "Grenze {0} W · durchgesetztes Limit {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "Schienen: {0} A GPU, {1} A Speicher, {2} A Board-Eingang",
   "The engine service is not available, so the current state could not be read.": "Der Engine-Dienst ist nicht verfügbar, daher konnte der aktuelle Zustand nicht gelesen werden.",
   "The override cannot be used on this machine.": "Die Überschreibung kann auf diesem Gerät nicht verwendet werden.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "Dies wird abgelehnt, wenn das VBIOS der GPU nicht das ist, auf dem dieser Build gemessen wurde, oder wenn ein anderes Werkzeug die Überschreibung bereits hält. Diese Karte überschreibt nie eine Überschreibung, die sie nicht geschrieben hat: dort entfernen und die GPU neu starten.",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "Ursprüngliches GPU-Leistungslimit wiederherstellen?",
   "Apply the extra GPU power override?": "Überschreibung für zusätzliche GPU-Leistung anwenden?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Dies entfernt die Überschreibung auf Treiberebene und startet die GPU neu. Der Bildschirm wird schwarz, und laufende Spiele oder GPU-Aufgaben werden beendet.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Dies ändert eine Leistungseinstellung auf Treiberebene und startet die GPU neu. Der Bildschirm wird schwarz, und laufende Spiele oder GPU-Aufgaben werden beendet. „Original wiederherstellen“ macht es rückgängig."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Dies ändert eine Leistungseinstellung auf Treiberebene und startet die GPU neu. Der Bildschirm wird schwarz, und laufende Spiele oder GPU-Aufgaben werden beendet. „Original wiederherstellen“ macht es rückgängig.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "Gemessen: Die GPU zog unter der 220-W-Grenze etwa 210 W, gegenüber 175 W im Original, und der Hotspot blieb bei 62 °C.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Die Board-Eingangsgrenze von 13,5 A erlaubt rund 267 W, was zusammen mit den 130 W der CPU innerhalb des 420-W-Netzteils bleibt.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Angewendet: Grenze {0} W · {1} A GPU, {2} A Speicher, {3} A Board-Eingang",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Würde setzen: Grenze {0} W · {1} A GPU, {2} A Speicher, {3} A Board-Eingang",
+  "Live enforced limit: {0} W": "Aktuell erzwungenes Limit: {0} W",
+  "Live enforced limit: not read": "Aktuell erzwungenes Limit: nicht gelesen"
 }

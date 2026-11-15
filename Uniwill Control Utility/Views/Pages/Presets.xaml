@@ -208,7 +208,12 @@
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap"
-                                       Text="Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing." />
+                                       Text="Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C." />
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter." />
                             <TextBlock Margin="0,4,0,0"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -222,11 +227,13 @@
                                         Visibility="Collapsed"
                                         Severity="Informational" />
 
+                            <!-- Tier values and the live driver limit are separate lines on
+                                 purpose: one is what we would set, the other is what is enforced. -->
                             <StackPanel x:Name="spRomReadback"
                                         Margin="0,8,0,0"
                                         Visibility="Collapsed">
-                                <TextBlock x:Name="tbRomCeiling" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRomRails" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRomTier" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRomLive" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <CheckBox x:Name="chkRomConsent"
@@ -237,14 +244,21 @@
                                       Unchecked="chkRomConsent_Changed"
                                       Content="I understand this changes driver-level settings and restarts the GPU" />
 
-                            <ui:Button x:Name="btnRomOverride"
-                                       Margin="0,14,0,0"
-                                       HorizontalAlignment="Left"
-                                       Padding="16,6"
-                                       Appearance="Primary"
-                                       Visibility="Collapsed"
-                                       Click="btnRomOverride_Click"
-                                       Content="Unlock extra GPU power" />
+                            <!-- Both actions stay on the card: the irrelevant one is disabled
+                                 and explained, never hidden and never a silent no-op. -->
+                            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                <ui:Button x:Name="btnRomUnlock"
+                                           Padding="16,6"
+                                           Appearance="Primary"
+                                           Click="btnRomUnlock_Click"
+                                           Content="Unlock extra GPU power" />
+                                <ui:Button x:Name="btnRomRestore"
+                                           Margin="8,0,0,0"
+                                           Padding="16,6"
+                                           Appearance="Secondary"
+                                           Click="btnRomRestore_Click"
+                                           Content="Restore stock" />
+                            </StackPanel>
 
                             <TextBlock x:Name="tbRomOverrideNote"
                                        Margin="0,6,0,0"

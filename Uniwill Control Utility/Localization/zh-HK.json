@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "檢視 OEM Control Center 接管情況",
   "Extra GPU power": "額外 GPU 功耗",
   "Raises the GPU's power ceiling at driver level": "在驅動程式層級提高 GPU 功耗上限",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "本機實測：GPU 約 267 W、CPU 約 130 W，接近 420 W 變壓器的 397 W。測試中 GPU 熱點溫度為 62 °C。",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "這會覆寫驅動程式的功耗原則。它不會修改 GPU 韌體，「還原原始設定」可復原。",
   "I understand this changes driver-level settings and restarts the GPU": "我了解這會變更驅動程式層級的設定並重新啟動 GPU",
   "Unlock extra GPU power": "解除額外 GPU 功耗限制",
   "Restore stock": "還原原始設定",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "正在重新啟動 GPU。畫面可能黑屏長達 60 秒。",
-  "not read": "未讀取",
-  "Ceiling {0} W · enforced limit {1} W": "上限 {0} W · 實際限制 {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "供電軌：{0} A GPU、{1} A 記憶體、{2} A 板輸入",
   "The engine service is not available, so the current state could not be read.": "引擎服務無法使用，因此無法讀取目前狀態。",
   "The override cannot be used on this machine.": "此機器無法使用此覆寫設定。",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "當 GPU 的 VBIOS 不是本版本所量測的版本，或其他工具已持有此覆寫設定時，會拒絕此操作。此卡片絕不會覆寫不是它寫入的設定：請在該工具中移除，然後重新啟動 GPU。",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "要還原 GPU 的原始功耗上限嗎？",
   "Apply the extra GPU power override?": "要套用額外 GPU 功耗覆寫設定嗎？",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "這會移除驅動程式層級的覆寫設定並重新啟動 GPU。畫面會黑屏，正在執行的遊戲或 GPU 工作會被關閉。",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "這會變更驅動程式層級的功耗設定並重新啟動 GPU。畫面會黑屏，正在執行的遊戲或 GPU 工作會被關閉。「還原原始設定」可復原。"
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "這會變更驅動程式層級的功耗設定並重新啟動 GPU。畫面會黑屏，正在執行的遊戲或 GPU 工作會被關閉。「還原原始設定」可復原。",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "實測：在 220 W 上限下 GPU 約消耗 210 W（原始為 175 W），熱點溫度維持在 62 °C。",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "13.5 A 的板輸入上限約允許 267 W，與 CPU 的 130 W 相加仍在 420 W 變壓器之內。",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "已套用：上限 {0} W · {1} A GPU、{2} A 記憶體、{3} A 板輸入",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "將設定：上限 {0} W · {1} A GPU、{2} A 記憶體、{3} A 板輸入",
+  "Live enforced limit: {0} W": "目前實際限制：{0} W",
+  "Live enforced limit: not read": "目前實際限制：未讀取"
 }

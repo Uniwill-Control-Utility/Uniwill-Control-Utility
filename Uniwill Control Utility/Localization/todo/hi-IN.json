@@ -669,15 +669,11 @@
   "Holds the CPU or GPU down and the fans up when either stays too hot, restoring 5 degrees below the threshold": "Holds the CPU or GPU down and the fans up when either stays too hot, restoring 5 degrees below the threshold",
   "Extra GPU power": "Extra GPU power",
   "Raises the GPU's power ceiling at driver level": "Raises the GPU's power ceiling at driver level",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.",
   "I understand this changes driver-level settings and restarts the GPU": "I understand this changes driver-level settings and restarts the GPU",
   "Unlock extra GPU power": "Unlock extra GPU power",
   "Restore stock": "Restore stock",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "Restarting the GPU. The screen may go blank for up to 60 seconds.",
-  "not read": "not read",
-  "Ceiling {0} W · enforced limit {1} W": "Ceiling {0} W · enforced limit {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "Rails: {0} A GPU, {1} A memory, {2} A board input",
   "The engine service is not available, so the current state could not be read.": "The engine service is not available, so the current state could not be read.",
   "The override cannot be used on this machine.": "The override cannot be used on this machine.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.",
@@ -691,5 +687,11 @@
   "Restore the stock GPU power limit?": "Restore the stock GPU power limit?",
   "Apply the extra GPU power override?": "Apply the extra GPU power override?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
+  "Live enforced limit: {0} W": "Live enforced limit: {0} W",
+  "Live enforced limit: not read": "Live enforced limit: not read"
 }

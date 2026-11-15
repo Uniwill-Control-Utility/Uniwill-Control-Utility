@@ -1125,15 +1125,11 @@
   "Review the OEM Control Center takeover": "Provjeri preuzimanje OEM Control Centera",
   "Extra GPU power": "Dodatna snaga GPU-a",
   "Raises the GPU's power ceiling at driver level": "Podiže gornju granicu snage GPU-a na razini upravljačkog programa",
-  "Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing.": "Izmjereno na ovom računalu: oko 267 W iz GPU-a i 130 W iz CPU-a, blizu 397 W od 420 W adaptera. Vruća točka GPU-a ostala je na 62 °C tijekom testiranja.",
   "This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it.": "Ovo zamjenjuje energetsku politiku upravljačkog programa. Ne mijenja firmware GPU-a, a “Vrati izvorno” to poništava.",
   "I understand this changes driver-level settings and restarts the GPU": "Razumijem da ovo mijenja postavke na razini upravljačkog programa i ponovno pokreće GPU",
   "Unlock extra GPU power": "Otključaj dodatnu snagu GPU-a",
   "Restore stock": "Vrati izvorno",
   "Restarting the GPU. The screen may go blank for up to 60 seconds.": "GPU se ponovno pokreće. Zaslon može ostati crn do 60 sekundi.",
-  "not read": "nije očitano",
-  "Ceiling {0} W · enforced limit {1} W": "Granica {0} W · primijenjena granica {1} W",
-  "Rails: {0} A GPU, {1} A memory, {2} A board input": "Tračnice: {0} A GPU, {1} A memorija, {2} A ulaz ploče",
   "The engine service is not available, so the current state could not be read.": "Usluga mehanizma nije dostupna pa trenutačno stanje nije moguće očitati.",
   "The override cannot be used on this machine.": "Ovo se nadjačavanje ne može koristiti na ovom računalu.",
   "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.": "Ovo se odbija kada VBIOS GPU-a nije onaj na kojem je ova verzija mjerena ili kada neki drugi alat već drži nadjačavanje. Ovaj kartica nikad ne prepisuje nadjačavanje koje nije sama napisala: uklonite ga u tom alatu pa ponovno pokrenite GPU.",
@@ -1147,5 +1143,11 @@
   "Restore the stock GPU power limit?": "Vratiti izvornu granicu snage GPU-a?",
   "Apply the extra GPU power override?": "Primijeniti nadjačavanje dodatne snage GPU-a?",
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Ovo uklanja nadjačavanje na razini upravljačkog programa i ponovno pokreće GPU. Zaslon će se ugasiti, a svaka pokrenuta igra ili GPU zadatak zatvorit će se.",
-  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Ovo mijenja postavku napajanja na razini upravljačkog programa i ponovno pokreće GPU. Zaslon će se ugasiti, a svaka pokrenuta igra ili GPU zadatak zatvorit će se. “Vrati izvorno” to poništava."
+  "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Ovo mijenja postavku napajanja na razini upravljačkog programa i ponovno pokreće GPU. Zaslon će se ugasiti, a svaka pokrenuta igra ili GPU zadatak zatvorit će se. “Vrati izvorno” to poništava.",
+  "Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C.": "Izmjereno: GPU je na granici od 220 W povukao oko 210 W, prema 175 W izvorno, a vruća točka ostala je na 62 °C.",
+  "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Njegova granica ulaza ploče od 13,5 A dopušta oko 267 W, što uz 130 W CPU-a ostaje unutar 420 W adaptera.",
+  "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Primijenjeno: granica {0} W · {1} A GPU, {2} A memorija, {3} A ulaz ploče",
+  "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Postavilo bi: granica {0} W · {1} A GPU, {2} A memorija, {3} A ulaz ploče",
+  "Live enforced limit: {0} W": "Trenutačno primijenjena granica: {0} W",
+  "Live enforced limit: not read": "Trenutačno primijenjena granica: nije očitano"
 }
