@@ -693,5 +693,8 @@
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
   "Live enforced limit: {0} W": "Live enforced limit: {0} W",
-  "Live enforced limit: not read": "Live enforced limit: not read"
+  "Live enforced limit: not read": "Live enforced limit: not read",
+  "GPU power control is not available on this machine.": "GPU power control is not available on this machine.",
+  "Board base TGP: {0} W": "Board base TGP: {0} W",
+  "The preset's GPU wattage is measured against this base.": "The preset's GPU wattage is measured against this base."
 }

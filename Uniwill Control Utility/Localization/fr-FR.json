@@ -1149,5 +1149,8 @@
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Appliqué : plafond {0} W · {1} A GPU, {2} A mémoire, {3} A entrée carte",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Appliquerait : plafond {0} W · {1} A GPU, {2} A mémoire, {3} A entrée carte",
   "Live enforced limit: {0} W": "Limite appliquée en direct : {0} W",
-  "Live enforced limit: not read": "Limite appliquée en direct : non lue"
+  "Live enforced limit: not read": "Limite appliquée en direct : non lue",
+  "GPU power control is not available on this machine.": "Le contrôle de puissance du GPU n'est pas disponible sur cette machine.",
+  "Board base TGP: {0} W": "TGP de base de la carte : {0} W",
+  "The preset's GPU wattage is measured against this base.": "La puissance du GPU du profil est mesurée par rapport à cette base."
 }

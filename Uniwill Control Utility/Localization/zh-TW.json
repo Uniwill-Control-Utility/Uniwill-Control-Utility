@@ -1149,5 +1149,8 @@
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "已套用：上限 {0} W · {1} A GPU、{2} A 記憶體、{3} A 板輸入",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "將設定：上限 {0} W · {1} A GPU、{2} A 記憶體、{3} A 板輸入",
   "Live enforced limit: {0} W": "目前實際限制：{0} W",
-  "Live enforced limit: not read": "目前實際限制：未讀取"
+  "Live enforced limit: not read": "目前實際限制：未讀取",
+  "GPU power control is not available on this machine.": "此機器不支援 GPU 功耗控制。",
+  "Board base TGP: {0} W": "顯示卡基礎 TGP：{0} W",
+  "The preset's GPU wattage is measured against this base.": "預設集的 GPU 瓦數以此基礎為基準。"
 }

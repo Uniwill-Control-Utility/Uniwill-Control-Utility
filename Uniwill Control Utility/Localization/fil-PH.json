@@ -1149,5 +1149,8 @@
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Naipatupad: limitasyon {0} W · {1} A GPU, {2} A memory, {3} A board input",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Itatakda: limitasyon {0} W · {1} A GPU, {2} A memory, {3} A board input",
   "Live enforced limit: {0} W": "Kasalukuyang ipinatutupad na limitasyon: {0} W",
-  "Live enforced limit: not read": "Kasalukuyang ipinatutupad na limitasyon: hindi nabasa"
+  "Live enforced limit: not read": "Kasalukuyang ipinatutupad na limitasyon: hindi nabasa",
+  "GPU power control is not available on this machine.": "Hindi available ang kontrol ng power ng GPU sa makinang ito.",
+  "Board base TGP: {0} W": "Base na TGP ng board: {0} W",
+  "The preset's GPU wattage is measured against this base.": "Ang wattage ng GPU ng preset ay sinusukat laban sa base na ito."
 }

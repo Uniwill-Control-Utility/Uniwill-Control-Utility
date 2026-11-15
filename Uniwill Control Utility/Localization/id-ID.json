@@ -1149,5 +1149,8 @@
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Diterapkan: batas {0} W · {1} A GPU, {2} A memori, {3} A masukan papan",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Akan diterapkan: batas {0} W · {1} A GPU, {2} A memori, {3} A masukan papan",
   "Live enforced limit: {0} W": "Batas yang berlaku sekarang: {0} W",
-  "Live enforced limit: not read": "Batas yang berlaku sekarang: tidak terbaca"
+  "Live enforced limit: not read": "Batas yang berlaku sekarang: tidak terbaca",
+  "GPU power control is not available on this machine.": "Kontrol daya GPU tidak tersedia di mesin ini.",
+  "Board base TGP: {0} W": "TGP dasar papan: {0} W",
+  "The preset's GPU wattage is measured against this base.": "Daya GPU preset diukur terhadap dasar ini."
 }

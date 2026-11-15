@@ -1149,5 +1149,8 @@
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Wedi'i gymhwyso: nenfwd {0} W · {1} A GPU, {2} A cof, {3} A mewnbwn bwrdd",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Byddai'n gosod: nenfwd {0} W · {1} A GPU, {2} A cof, {3} A mewnbwn bwrdd",
   "Live enforced limit: {0} W": "Terfyn gorfodedig byw: {0} W",
-  "Live enforced limit: not read": "Terfyn gorfodedig byw: heb ei ddarllen"
+  "Live enforced limit: not read": "Terfyn gorfodedig byw: heb ei ddarllen",
+  "GPU power control is not available on this machine.": "Nid yw rheoli pŵer'r GPU ar gael ar y peiriant hwn.",
+  "Board base TGP: {0} W": "TGP sylfaenol y bwrdd: {0} W",
+  "The preset's GPU wattage is measured against this base.": "Mae pŵer GPU'r rhagosodiad yn cael ei fesur yn erbyn y sylfaen hon."
 }

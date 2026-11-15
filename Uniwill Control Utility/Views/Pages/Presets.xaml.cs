@@ -29,6 +29,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private readonly PresetsNavigationRequest _navigationRequest;
         private string _currentProfile = "Gaming";
 
+        // The engine's GPU power-control answer (the EC published its power table). An
+        // unsupported card is inert, so a preset apply must not write from a guessed base.
+        private bool _gpuPowerSupported;
+
         // V-F curve preset state (managed by CustomPresetStore now)
         private int _vfActivePreset = -1;
         private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
@@ -574,6 +578,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             sdNvidia.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
 
+            // The card is only as live as the EC's own power table: the cTGP offset is
+            // measured from the board base TGP it publishes.
+            if (hasNvidia)
+                await applyGpuPowerGateAsync().ConfigureAwait(true);
+
             // The power-ceiling override is an NVIDIA driver key: no card without one.
             cardRomOverride.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
 
@@ -584,6 +593,48 @@ namespace Uniwill_Control_Utility.Views.Pages
             tbCoreClock.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
             tbMemLabel.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
             tbMemClock.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Gates the GPU tuning card on the engine's answer: a cTGP offset is measured against
+        /// the board's own base TGP (ECSpec), so without that table a request would be written
+        /// from a guess. The card stays visible and readable with the reason either way - a
+        /// control that disappears cannot explain itself. An unanswered read is unsupported.
+        /// </summary>
+        private async Task applyGpuPowerGateAsync()
+        {
+            UCU.Contracts.GpuPowerInfoDto? info = null;
+            try
+            {
+                if (RyzenAdj_To_UCU.EcService is { } ec)
+                {
+                    info = await ec.GetGpuPowerInfoAsync().ConfigureAwait(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"GPU power info unavailable: {ex.Message}");
+            }
+
+            _gpuPowerSupported = info?.Supported == true;
+            sdNvidiaBody.IsEnabled = _gpuPowerSupported;
+            sdNvidiaBody.Opacity = _gpuPowerSupported ? 1.0 : 0.55;
+            tbGpuPowerState.Visibility = Visibility.Visible;
+            tbGpuPowerDetail.Visibility = Visibility.Visible;
+
+            if (_gpuPowerSupported)
+            {
+                tbGpuPowerState.Text = LocalizationService.Format("Board base TGP: {0} W", info!.DefaultTgpWatts);
+                tbGpuPowerDetail.Text = LocalizationService.Get("The preset's GPU wattage is measured against this base.");
+                return;
+            }
+
+            // Expanded as well as visible: the inert sliders and the reason are read together.
+            sdNvidia.IsExpanded = true;
+            tbGpuPowerState.Text = LocalizationService.Get("GPU power control is not available on this machine.");
+            tbGpuPowerDetail.Text = RomReasonLine(string.IsNullOrWhiteSpace(info?.Reason)
+                ? LocalizationService.Get("The engine service is not available, so the current state could not be read.")
+                : info!.Reason);
         }
 
         private bool IsHydroConnected => _waterCooler?.IsConnected == true;
@@ -1885,7 +1936,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // table (OpenRevo's approach) and own no clock offsets.
                         parts.Add("--NVIDIA-Clocks=0-0-0");
                     }
-                    else
+                    // Nothing to write when the EC published no power table: the card is
+                    // inert because the offset would be measured from a guessed base.
+                    else if (_gpuPowerSupported)
                     {
                         int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
                         int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;

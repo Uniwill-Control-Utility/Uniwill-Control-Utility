@@ -1149,5 +1149,8 @@
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Toegepast: plafond {0} W · {1} A GPU, {2} A geheugen, {3} A boardingang",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Zou instellen: plafond {0} W · {1} A GPU, {2} A geheugen, {3} A boardingang",
   "Live enforced limit: {0} W": "Nu opgelegde limiet: {0} W",
-  "Live enforced limit: not read": "Nu opgelegde limiet: niet gelezen"
+  "Live enforced limit: not read": "Nu opgelegde limiet: niet gelezen",
+  "GPU power control is not available on this machine.": "GPU-vermogensregeling is niet beschikbaar op deze machine.",
+  "Board base TGP: {0} W": "Basis-TGP van het board: {0} W",
+  "The preset's GPU wattage is measured against this base.": "Het GPU-vermogen van de preset wordt aan deze basis gemeten."
 }

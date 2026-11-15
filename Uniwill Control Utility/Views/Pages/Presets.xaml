@@ -687,9 +687,25 @@
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="GPU power limit, core and memory clock offsets" />
+                                    <!-- The engine's answer on GPU power control: the cTGP offset is
+                                         measured from the board's own base TGP (ECSpec), so the card
+                                         says what that base is, and why it is inert when there is
+                                         none. In the header so the state is readable even collapsed. -->
+                                    <TextBlock x:Name="tbGpuPowerState"
+                                               Margin="0,4,0,0"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               TextWrapping="Wrap"
+                                               Visibility="Collapsed" />
+                                    <TextBlock x:Name="tbGpuPowerDetail"
+                                               Margin="0,2,0,0"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               TextWrapping="Wrap"
+                                               Visibility="Collapsed" />
                                 </StackPanel>
                             </ui:CardExpander.Header>
-                            <StackPanel>
+                            <StackPanel x:Name="sdNvidiaBody">
                                 <!-- GPU Power Limit (TGP base) -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
