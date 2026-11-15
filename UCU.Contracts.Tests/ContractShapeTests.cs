@@ -271,6 +271,7 @@ public sealed class ContractShapeTests
             new OemStatusDto(), new OemActionDto(),
             new GpuTuningResultDto(),
             new GpuRomOverrideStateDto(),
+            new GpuRailLimitsDto(),
         };
 
         foreach (object result in results)
@@ -308,6 +309,62 @@ public sealed class ContractShapeTests
         // A request nobody made is absent from the payload, like every other null.
         JsonElement requested = EngineSerializer.ToParamsObject(new GpuRomOverrideStateDto());
         Assert.False(requested.TryGetProperty("requestedLimitMilliwatts", out _));
+    }
+
+    [Fact]
+    public void GpuRailLimits_CarriesEachRailsCurrentAndItsLivePolicyRangeOnTheWire()
+    {
+        // The sliders are bounded by the driver's live policy, so that range is part of the
+        // contract: 210/60/11.053 mA before the unlock, 294/84/14.026 after it. Renaming any
+        // of these without the other side is a silent 'not read'.
+        JsonElement element = EngineSerializer.ToParamsObject(new GpuRailLimitsDto
+        {
+            NvvddMilliamps = 250_000,
+            NvvddMinMilliamps = 210_000,
+            NvvddMaxMilliamps = 294_000,
+            MsvddMilliamps = 70_000,
+            MsvddMinMilliamps = 60_000,
+            MsvddMaxMilliamps = 84_000,
+            BoardInputMilliamps = 14_026,
+            BoardInputMinMilliamps = 11_053,
+            BoardInputMaxMilliamps = 14_026,
+        });
+
+        Assert.Equal(250_000, element.GetProperty("nvvddMilliamps").GetInt32());
+        Assert.Equal(210_000, element.GetProperty("nvvddMinMilliamps").GetInt32());
+        Assert.Equal(294_000, element.GetProperty("nvvddMaxMilliamps").GetInt32());
+        Assert.Equal(70_000, element.GetProperty("msvddMilliamps").GetInt32());
+        Assert.Equal(84_000, element.GetProperty("msvddMaxMilliamps").GetInt32());
+        Assert.Equal(14_026, element.GetProperty("boardInputMilliamps").GetInt32());
+        Assert.Equal(11_053, element.GetProperty("boardInputMinMilliamps").GetInt32());
+
+        // A refusal carries the reason and no numbers at all.
+        JsonElement refused = EngineSerializer.ToParamsObject(new GpuRailLimitsDto { Reason = "unavailable" });
+        Assert.Equal("unavailable", refused.GetProperty("reason").GetString());
+        Assert.False(refused.TryGetProperty("nvvddMilliamps", out _));
+        Assert.False(refused.TryGetProperty("nvvddMaxMilliamps", out _));
+    }
+
+    [Fact]
+    public void GpuRomOverrideState_CarriesTheRuntimeRailsNextToTheBudget()
+    {
+        // The records and the runtime rails are two different mechanisms and both belong in
+        // the report: the records widen the policy, the rails are what the card runs.
+        JsonElement element = EngineSerializer.ToParamsObject(new GpuRomOverrideStateDto
+        {
+            BudgetMilliwatts = 225_000,
+            NvvddCurrentMilliamps = 250_000,
+            MsvddCurrentMilliamps = 70_000,
+            BoardInputCurrentMilliamps = 14_026,
+        });
+
+        Assert.Equal(225_000, element.GetProperty("budgetMilliwatts").GetInt32());
+        Assert.Equal(250_000, element.GetProperty("nvvddCurrentMilliamps").GetInt32());
+        Assert.Equal(70_000, element.GetProperty("msvddCurrentMilliamps").GetInt32());
+        Assert.Equal(14_026, element.GetProperty("boardInputCurrentMilliamps").GetInt32());
+
+        // The record maxima keep their own names: 294/84/14.026 are not the runtime rails.
+        Assert.False(element.TryGetProperty("nvvddMilliamps", out _));
     }
 
     private static string[] AllVerbs() =>

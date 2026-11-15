@@ -303,7 +303,8 @@ namespace UCU.Hardware.Gpu
             return true;
         }
 
-        private static bool TryCall(IntPtr gpu, NvApiGpuCall call, byte[] buffer, out int status, out string? reason)
+        /// <summary>A packet handed over between two canary bands, then handed back.</summary>
+        internal static bool TryCall(IntPtr gpu, NvApiGpuCall call, byte[] buffer, out int status, out string? reason)
         {
             status = 0;
             reason = null;

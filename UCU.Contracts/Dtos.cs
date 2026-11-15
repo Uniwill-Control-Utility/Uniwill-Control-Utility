@@ -825,6 +825,52 @@ namespace UCU.Contracts
 
         /// <summary>True when the display adapter was restarted by this call.</summary>
         public bool Restarted { get; init; }
+
+        /// <summary>
+        /// The runtime NVVDD rail current the card carries (mA), read back from the driver.
+        /// The records above only widen the policy; this is a separate NVAPI write, and
+        /// with everything else identical the stock rail held the board at 175-179 W where
+        /// the raised one reaches 205-214 W. Null when the driver could not be asked.
+        /// </summary>
+        public int? NvvddCurrentMilliamps { get; init; }
+
+        /// <summary>The runtime MSVDD rail current (mA), as <see cref="NvvddCurrentMilliamps"/>.</summary>
+        public int? MsvddCurrentMilliamps { get; init; }
+
+        /// <summary>The runtime board-input rail current (mA), as <see cref="NvvddCurrentMilliamps"/>.</summary>
+        public int? BoardInputCurrentMilliamps { get; init; }
+    }
+
+    /// <summary>
+    /// The three runtime rail currents (mA) and the live policy range each is bounded by,
+    /// for the sliders: a slider's bound is the driver's own policy, so it reads
+    /// 210/60/11.053 before the unlock and 294/84/14.026 after it. A refusal (an
+    /// unavailable NVAPI interface, a value outside the policy) sets
+    /// <see cref="Reason"/> and leaves every number null — a slider bounded by a guessed
+    /// range is worse than one that says the driver could not be asked.
+    /// </summary>
+    public sealed record GpuRailLimitsDto
+    {
+        public int? NvvddMilliamps { get; init; }
+
+        public int? NvvddMinMilliamps { get; init; }
+
+        public int? NvvddMaxMilliamps { get; init; }
+
+        public int? MsvddMilliamps { get; init; }
+
+        public int? MsvddMinMilliamps { get; init; }
+
+        public int? MsvddMaxMilliamps { get; init; }
+
+        public int? BoardInputMilliamps { get; init; }
+
+        public int? BoardInputMinMilliamps { get; init; }
+
+        public int? BoardInputMaxMilliamps { get; init; }
+
+        /// <summary>The refusal text; null on a clean answer.</summary>
+        public string? Reason { get; init; }
     }
 
     /// <summary>

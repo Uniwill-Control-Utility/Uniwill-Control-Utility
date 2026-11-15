@@ -389,6 +389,24 @@ namespace UCU.Contracts.Capabilities
         /// key or an unpinned VBIOS is refused with a reason, never forced.
         /// </summary>
         Task<GpuRomOverrideStateDto> SetRomOverrideAsync(bool enabled, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The three runtime rail currents and the live policy range each is bounded by —
+        /// the sliders' read. Cheap enough for a page load; it never writes.
+        /// </summary>
+        Task<GpuRailLimitsDto> GetRailLimitsAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Moves the runtime rail currents (null = leave that rail alone). Live: no GPU
+        /// restart and no screen blank. A value outside the driver's live policy is a
+        /// refusal with a reason (<see cref="GpuRailLimitsDto.Reason"/>), never a silent
+        /// clamp.
+        /// </summary>
+        Task<GpuRailLimitsDto> SetRailLimitsAsync(
+            int? nvvddMilliamps,
+            int? msvddMilliamps,
+            int? boardInputMilliamps,
+            CancellationToken cancellationToken = default);
     }
 
     /// <summary>Engine identity and health; the app uses this for its status display

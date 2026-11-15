@@ -174,6 +174,39 @@ public sealed class DiagnosticsExportTests
     }
 
     [Fact]
+    public void HardwareComposer_RendersTheThreeRuntimeRailsAndTheirPolicyRanges()
+    {
+        // The rails are the lever that took the board from 175-179 W to 205-214 W with every
+        // other number identical, so the report has to name them next to the budget.
+        var rails = new GpuRailLimitsDto
+        {
+            NvvddMilliamps = 250_000,
+            NvvddMinMilliamps = 210_000,
+            NvvddMaxMilliamps = 294_000,
+            MsvddMilliamps = 70_000,
+            MsvddMinMilliamps = 60_000,
+            MsvddMaxMilliamps = 84_000,
+            BoardInputMilliamps = 14_026,
+            BoardInputMinMilliamps = 11_053,
+            BoardInputMaxMilliamps = 14_026,
+        };
+
+        Assert.Contains(
+            "GPU rail currents: NVVDD 250000 mA (policy 210000-294000 mA), " +
+            "MSVDD 70000 mA (policy 60000-84000 mA), board input 14026 mA (policy 11053-14026 mA)",
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected", 225_000, rails));
+
+        Assert.Contains(
+            "GPU rail currents: unknown (engine unreachable)",
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected"));
+
+        Assert.Contains(
+            "GPU rail currents: unknown (NVAPI interface 0x67F31384 unavailable)",
+            DiagnosticsExportService.ComposeHardware(
+                Dump(), "collected", railLimits: new GpuRailLimitsDto { Reason = "NVAPI interface 0x67F31384 unavailable" }));
+    }
+
+    [Fact]
     public void HardwareComposer_SaysWhenTheEcPublishesNoSpec()
     {
         EcHardwareDumpDto dump = Dump() with { EcSpecValid = false };

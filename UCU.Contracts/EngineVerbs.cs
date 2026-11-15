@@ -134,6 +134,19 @@ namespace UCU.Contracts
             /// with an explicit enable flag rather than part of a preset pipeline.
             /// </summary>
             public const string SetRomOverride = "gpu.set_rom_override";
+
+            /// <summary>
+            /// The three runtime rail currents and the live policy range each is bounded by
+            /// (the sliders' read). Read-only; a refusal is the answer, never a fault.
+            /// </summary>
+            public const string GetRailLimits = "gpu.get_rail_limits";
+
+            /// <summary>
+            /// Moves the runtime rail currents (null = leave that rail alone). Live: no GPU
+            /// restart and no screen blank. Machine-wide values, so they are never part of a
+            /// preset; a value outside the driver's live policy is refused with a reason.
+            /// </summary>
+            public const string SetRailLimits = "gpu.set_rail_limits";
         }
 
         public static class Keyboard

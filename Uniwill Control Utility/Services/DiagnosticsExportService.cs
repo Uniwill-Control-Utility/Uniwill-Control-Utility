@@ -127,7 +127,7 @@ namespace Uniwill_Control_Utility.Services
                 }
 
                 await File.WriteAllTextAsync(
-                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote, ReadBudget()), cancellationToken);
+                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote, ReadBudget(), ReadRailLimits()), cancellationToken);
 
                 string? directory = Path.GetDirectoryName(targetZip);
                 if (!string.IsNullOrEmpty(directory))
@@ -198,7 +198,8 @@ namespace Uniwill_Control_Utility.Services
         /// The hardware file's text. Pure: the same dump produces the same bytes, and a
         /// missing dump renders the reason instead of throwing.
         /// </summary>
-        public static string ComposeHardware(EcHardwareDumpDto? dump, string note, int? budgetMilliwatts = null)
+        public static string ComposeHardware(
+            EcHardwareDumpDto? dump, string note, int? budgetMilliwatts = null, GpuRailLimitsDto? railLimits = null)
         {
             var text = new StringBuilder();
             text.AppendLine("Uniwill Control Utility - EC hardware state");
@@ -210,6 +211,11 @@ namespace Uniwill_Control_Utility.Services
             // raised ceiling still enforced 150 W.
             text.AppendLine("GPU power budget (F7): " +
                             (budgetMilliwatts is int budget ? Watts(budget) : "unknown (engine unreachable)"));
+
+            // The runtime rail currents: the records only widen the policy, so with
+            // everything else identical these instead of the stock ones are what took the
+            // board from 175-179 W to 205-214 W. The range is the driver's live policy.
+            text.AppendLine("GPU rail currents: " + RailsLine(railLimits));
 
             if (dump is null)
             {
@@ -270,8 +276,46 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        private static string Watts(int milliwatts) =>
-            (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W (" + milliwatts + " mW)";
+        /// <summary>
+        /// The rails the card carries and the live policy each is bounded by, read-only and
+        /// best-effort: a report without them cannot say why the unlock held 175 W where the
+        /// same records, budget and request reached 205-214 W.
+        /// </summary>
+        private GpuRailLimitsDto? ReadRailLimits()
+        {
+            if (_gpu is null)
+                return null;
+
+            try
+            {
+                using var gpuCts = new CancellationTokenSource(HardwareDumpBudget);
+                return _gpu.GetRailLimitsAsync(gpuCts.Token).GetAwaiter().GetResult();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>One line: each rail's current and the policy range it was checked against.</summary>
+        private static string RailsLine(GpuRailLimitsDto? rails)
+        {
+            if (rails is null)
+                return "unknown (engine unreachable)";
+
+            if (rails.Reason is string reason)
+                return "unknown (" + reason + ")";
+
+            return "NVVDD " + Rail(rails.NvvddMilliamps, rails.NvvddMinMilliamps, rails.NvvddMaxMilliamps) +
+                   ", MSVDD " + Rail(rails.MsvddMilliamps, rails.MsvddMinMilliamps, rails.MsvddMaxMilliamps) +
+                   ", board input " + Rail(rails.BoardInputMilliamps, rails.BoardInputMinMilliamps, rails.BoardInputMaxMilliamps);
+        }
+
+        private static string Rail(int? milliamps, int? min, int? max) =>
+            (milliamps is int value ? value + " mA" : "unknown") +
+            (min is int low && max is int high ? " (policy " + low + "-" + high + " mA)" : string.Empty);
+
+        private static string Watts(int milliwatts) =>            (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W (" + milliwatts + " mW)";
 
         /// <summary>
         /// The EC's per-model power table (ECSpec, IOCTL 0x9C40A500) as one line: the numbers a

@@ -28,6 +28,12 @@ namespace UCU.Hardware.Gpu
     /// is answered with the old 175 W limit, so the ceiling must sit above the target
     /// (measured against MechControl-RE, 2026-11-15: ceiling 220 W + request 220 W →
     /// enforced 175 W; ceiling 250 W + request 220 W → enforced 220 W).
+    ///
+    /// The <c>*MilliAmps</c> values are the record <em>maxima</em>; the
+    /// <c>*CurrentMilliAmps</c> ones are the runtime rail currents, which the driver
+    /// takes through a separate NVAPI call (the records only widen the policy, they do
+    /// not move a rail). Measured 2026-11-15 with everything else identical: stock rails
+    /// 210000/60000/11053 mA → 175-179 W board power, 250000/70000/14026 mA → 205-214 W.
     /// </summary>
     public sealed record GpuPowerTier(
         string Id,
@@ -36,7 +42,10 @@ namespace UCU.Hardware.Gpu
         int TgpTargetMilliwatts,
         int NvVddMilliAmps,
         int MsVddMilliAmps,
-        int BoardInputMilliAmps)
+        int BoardInputMilliAmps,
+        int NvVddCurrentMilliAmps,
+        int MsVddCurrentMilliAmps,
+        int BoardInputCurrentMilliAmps)
     {
         /// <summary>The TGP target in watts, for the EC's cTGP offset and log text.</summary>
         public int TgpTargetWatts => TgpTargetMilliwatts / 1000;
@@ -49,9 +58,9 @@ namespace UCU.Hardware.Gpu
     /// ≈1.4× the ~200-210 W draw.
     ///
     /// The board-input clamp is deliberately NOT MechControl's 17.021 A but 14.026 A:
-    /// it has no runtime NVAPI current setter, while we would only raise the clamp, and
     /// 14.026 A × ~20 V + 130 W CPU stays inside the 420 W adapter whereas 17.021 A
-    /// does not.
+    /// does not. That is also the runtime rail current the board input is set to — the
+    /// clamp is the record maximum, the current is what the driver is told to use.
     /// </summary>
     public static class GpuPowerTiers
     {
@@ -62,7 +71,10 @@ namespace UCU.Hardware.Gpu
             TgpTargetMilliwatts: 225_000,
             NvVddMilliAmps: 294_000,
             MsVddMilliAmps: 84_000,
-            BoardInputMilliAmps: 14_026);
+            BoardInputMilliAmps: 14_026,
+            NvVddCurrentMilliAmps: 250_000,
+            MsVddCurrentMilliAmps: 70_000,
+            BoardInputCurrentMilliAmps: 14_026);
     }
 
     /// <summary>
@@ -75,15 +87,25 @@ namespace UCU.Hardware.Gpu
     {
         public const string PinnedVbiosVersion = "98.03.5E.00.5D";
 
+        /// <summary>
+        /// The runtime rail currents the VBIOS-pinned stock ROM carries (mA). The rails
+        /// are a separate NVAPI write from these records, so a restore has to put these
+        /// back explicitly — the records already carry the same numbers as their stock
+        /// values, but only the runtime setter actually lowers a rail.
+        /// </summary>
+        public const int StockNvVddMilliAmps = 210_000;
+        public const int StockMsVddMilliAmps = 60_000;
+        public const int StockBoardInputMilliAmps = 11_053;
+
         public static readonly RomOverrideField[] Fields =
         {
             new("romOverride00", 0x57C36, 175000, RomOverrideRail.Power),
-            new("romOverride01", 0x57EFC, 11053, RomOverrideRail.BoardInput),
-            new("romOverride02", 0x57F00, 11053, RomOverrideRail.BoardInput),
-            new("romOverride03", 0x58094, 210000, RomOverrideRail.NvVdd),
-            new("romOverride04", 0x58098, 210000, RomOverrideRail.NvVdd),
-            new("romOverride05", 0x580FA, 60000, RomOverrideRail.MsVdd),
-            new("romOverride06", 0x580FE, 60000, RomOverrideRail.MsVdd),
+            new("romOverride01", 0x57EFC, (uint)StockBoardInputMilliAmps, RomOverrideRail.BoardInput),
+            new("romOverride02", 0x57F00, (uint)StockBoardInputMilliAmps, RomOverrideRail.BoardInput),
+            new("romOverride03", 0x58094, (uint)StockNvVddMilliAmps, RomOverrideRail.NvVdd),
+            new("romOverride04", 0x58098, (uint)StockNvVddMilliAmps, RomOverrideRail.NvVdd),
+            new("romOverride05", 0x580FA, (uint)StockMsVddMilliAmps, RomOverrideRail.MsVdd),
+            new("romOverride06", 0x580FE, (uint)StockMsVddMilliAmps, RomOverrideRail.MsVdd),
         };
 
         /// <summary>The stock ceiling the pinned ROM enforces (romOverride00's value).</summary>

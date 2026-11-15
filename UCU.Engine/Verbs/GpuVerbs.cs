@@ -46,6 +46,16 @@ namespace UCU.Engine
                 BoolValueDto dto = EngineSerializer.BindParams<BoolValueDto>(p);
                 return Task.FromResult<object?>(romOverrides.SetEnabled(dto.Value));
             });
+
+            add(EngineVerbs.Gpu.GetRailLimits, (p, ct) =>
+                Task.FromResult<object?>(romOverrides.GetRailLimits()));
+
+            add(EngineVerbs.Gpu.SetRailLimits, (p, ct) =>
+            {
+                GpuRailLimitsDto dto = EngineSerializer.BindParams<GpuRailLimitsDto>(p);
+                return Task.FromResult<object?>(romOverrides.SetRailLimits(
+                    dto.NvvddMilliamps, dto.MsvddMilliamps, dto.BoardInputMilliamps));
+            });
         }
     }
 }

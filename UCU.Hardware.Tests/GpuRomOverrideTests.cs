@@ -768,6 +768,206 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal(0, restarter.Calls);
     }
 
+    [Fact]
+    public void Apply_SetsTheTierRails_AfterTheRestart_AndBeforeTheBudget()
+    {
+        // The A/B this lever comes from: identical records, budget and request, and the
+        // board held 175-179 W on the stock rails where the tier's rails reached 205-214 W.
+        var restarter = new FakeRestarter(_log);
+        var rails = new FakeRails(_log);
+        var budget = new FakeBudget(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), restarter, new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget, rails)
+            .SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Single(rails.Sets);
+        Assert.Equal(250_000, rails.Sets[0].Nvvdd);
+        Assert.Equal(70_000, rails.Sets[0].Msvdd);
+        Assert.Equal(14_026, rails.Sets[0].Board);
+
+        // The applied values are what the card reads back, not what was requested.
+        Assert.Equal(250_000, state.NvvddCurrentMilliamps);
+        Assert.Equal(70_000, state.MsvddCurrentMilliamps);
+        Assert.Equal(14_026, state.BoardInputCurrentMilliamps);
+
+        // The restart reloads the driver's own defaults, so the rails go after it; the
+        // budget and the request follow, as they did before.
+        int restartIndex = _log.IndexOf("restart");
+        int railsIndex = _log.IndexOf("rails.set:250000,70000,14026");
+        int budgetIndex = _log.IndexOf("budget.set:225000,500000");
+        int requestIndex = _log.IndexOf("request:225000");
+        Assert.True(restartIndex >= 0 && restartIndex < railsIndex, string.Join(",", _log));
+        Assert.True(railsIndex < budgetIndex, string.Join(",", _log));
+        Assert.True(budgetIndex < requestIndex, string.Join(",", _log));
+    }
+
+    [Fact]
+    public void Apply_WhenTheRailPolicyDidNotWiden_IsUncertain_NamingTheRailAndBothNumbers()
+    {
+        // The records did not take (or the driver kept the stock policy): the tier's rail
+        // does not fit the live range. That is a refusal with both numbers, never a skip —
+        // a silent skip would report an unlock that cannot draw the watts.
+        var request = new FakeRequest(_log);
+        var rails = new FakeRails(_log)
+        {
+            Refused = "the NVVDD rail 250000 mA is outside the live rail policy 210000-210000 mA",
+        };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, rails: rails)
+            .SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, state.State);
+        Assert.Equal(
+            "the records are staged and the EC is offset, but the runtime rails could not be set to the tier: " +
+            "the NVVDD rail 250000 mA is outside the live rail policy 210000-210000 mA",
+            state.Reason);
+
+        // Nothing past the failed step was done: no budget raise, no request.
+        Assert.Empty(request.Requests);
+    }
+
+    [Fact]
+    public void Apply_WhenTheRailsDoNotHold_IsUncertain()
+    {
+        // The set is accepted and the driver keeps the stock current: the readback after
+        // the request is what catches it.
+        var rails = new FakeRails(_log) { DropSets = true };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), rails: rails)
+            .SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, state.State);
+        Assert.Equal("the NVVDD rail reads 210000 mA, not the tier's 250000 mA", state.Reason);
+        Assert.Equal(210_000, state.NvvddCurrentMilliamps);
+    }
+
+    [Fact]
+    public void Restore_PutsTheRailsBackToStock_BeforeTheRestart()
+    {
+        var rails = new FakeRails(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), new FakeRequest(_log), rails: rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        ceiling.Ceiling = 175_000;
+        _log.Clear();
+        GpuRomOverrideStateDto restored = store.SetEnabled(false);
+
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, restored.State);
+        Assert.Equal(210_000, restored.NvvddCurrentMilliamps);
+        Assert.Equal(60_000, restored.MsvddCurrentMilliamps);
+        Assert.Equal(11_053, restored.BoardInputCurrentMilliamps);
+
+        // budget, records, EC, rails, restart — the rails are runtime values, so they are
+        // put back before the only step that can drop them.
+        int deleteIndex = _log.IndexOf("delete:romOverride00");
+        int deactivateIndex = _log.IndexOf("ec.deactivate");
+        int railsIndex = _log.IndexOf("rails.set:210000,60000,11053");
+        int restartIndex = _log.IndexOf("restart");
+        Assert.True(deleteIndex >= 0 && deleteIndex < deactivateIndex, string.Join(",", _log));
+        Assert.True(deactivateIndex < railsIndex, string.Join(",", _log));
+        Assert.True(railsIndex < restartIndex, string.Join(",", _log));
+    }
+
+    [Fact]
+    public void Restore_WhenTheRailsWillNotComeBack_IsUncertain()
+    {
+        var rails = new FakeRails(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), new FakeRequest(_log), rails: rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        rails.Refused = "the NVVDD rail policy is not available on this driver";
+        ceiling.Ceiling = 175_000;
+        GpuRomOverrideStateDto restored = store.SetEnabled(false);
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, restored.State);
+        Assert.Equal(
+            "the records are gone but the runtime rails were not restored: " +
+            "the NVVDD rail policy is not available on this driver",
+            restored.Reason);
+    }
+
+    [Fact]
+    public void Restore_WithNothingStaged_DoesNotTouchStockRails()
+    {
+        // A no-op restore must not report a rails failure for a mechanism it never set: the
+        // stock currents are left alone, so a machine whose rails interface is unusable still
+        // answers NotUnlocked instead of drifting into Uncertain.
+        var rails = new FakeRails(_log) { Failure = "NVAPI interface 0x67F31384 unavailable" };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log), new FakeEc(_log),
+            new FakeRequest(_log), rails: rails)
+            .SetEnabled(false);
+
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, state.State);
+        Assert.Null(state.Reason);
+        Assert.Empty(rails.Sets);
+    }
+
+    [Fact]
+    public void Restore_WithNothingStaged_PutsStillRaisedRailsBack()
+    {
+        // The records can be gone (a driver reinstall) while the runtime rails still carry the
+        // unlock: they are put back even though the key is already clean, without a restart.
+        var rails = new FakeRails(_log) { NvVddCurrent = 250_000, MsVddCurrent = 70_000, BoardCurrent = 14_026 };
+        var restarter = new FakeRestarter(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), restarter, new FakeCeiling(_log), new FakeEc(_log),
+            new FakeRequest(_log), rails: rails)
+            .SetEnabled(false);
+
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, state.State);
+        Assert.Single(rails.Sets);
+        Assert.Equal(210_000, rails.Sets[0].Nvvdd);
+        Assert.Equal(210_000, state.NvvddCurrentMilliamps);
+        Assert.Equal(0, restarter.Calls);
+    }
+
+    [Fact]
+    public void RailLimits_ReportTheLivePolicy_AndARefusalCarriesNoNumbers()    {
+        // The sliders' bound is the driver's own policy: the stock maxima before the unlock,
+        // the widened ones after it, and nothing at all when the driver cannot be asked.
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log), new FakeEc(_log),
+            new FakeRequest(_log), rails: rails);
+
+        GpuRailLimitsDto stock = store.GetRailLimits();
+        Assert.Null(stock.Reason);
+        Assert.Equal(210_000, stock.NvvddMilliamps);
+        Assert.Equal(294_000, stock.NvvddMaxMilliamps);
+        Assert.Equal(11_053, stock.BoardInputMilliamps);
+        Assert.Equal(14_026, stock.BoardInputMaxMilliamps);
+
+        // The set answers the same shape: values passed through, live ranges alongside.
+        GpuRailLimitsDto moved = store.SetRailLimits(250_000, 70_000, 14_026);
+        Assert.Equal(250_000, moved.NvvddMilliamps);
+        Assert.Equal(70_000, moved.MsvddMilliamps);
+        Assert.Equal(14_026, moved.BoardInputMilliamps);
+        Assert.Equal(84_000, moved.MsvddMaxMilliamps);
+
+        rails.Failure = "NVAPI interface 0x67F31384 unavailable";
+        GpuRailLimitsDto refused = store.GetRailLimits();
+        Assert.Equal("NVAPI interface 0x67F31384 unavailable", refused.Reason);
+        Assert.Null(refused.NvvddMilliamps);
+        Assert.Null(refused.NvvddMaxMilliamps);
+        Assert.Null(refused.BoardInputMilliamps);
+    }
+
     private void AssertRefusal(Action<FakeRomRegistry> seed, string expected, bool withOriginals = false)
     {
         var registry = new FakeRomRegistry(_log);
@@ -800,16 +1000,18 @@ public sealed class GpuRomOverrideTests : IDisposable
         FakeCeiling ceiling,
         FakeEc ec,
         FakeRequest request,
-        FakeBudget? budget = null)
+        FakeBudget? budget = null,
+        FakeRails? rails = null)
     {
         budget ??= new FakeBudget(_log);
+        rails ??= new FakeRails(_log);
         restarter.OnRestart = () =>
         {
             request.Forget();
             budget.Reset();
         };
 
-        return new(registry, restarter, ceiling, ec, request, budget, OriginalsPath);
+        return new(registry, restarter, ceiling, ec, request, budget, rails, OriginalsPath);
     }
 
     private static string Hex(byte[] data) => BitConverter.ToString(data).ToUpperInvariant();
@@ -1069,5 +1271,77 @@ public sealed class GpuRomOverrideTests : IDisposable
             LastRestored = desired;
             return new GpuPowerBudgetState(Current.F7Milliwatts, Current.PlatformMilliwatts, null);
         }
+    }
+
+    /// <summary>
+    /// The runtime rail currents. The policy is what the staged records widen (the stock
+    /// maxima 210000/60000/11053 mA, the tier's 294000/84000/14026), the currents are what
+    /// the driver carries — and the measured point of this lever is that they are two
+    /// different things: the same records held the board at 175-179 W until the rails moved.
+    /// </summary>
+    private sealed class FakeRails : IGpuRailControl
+    {
+        private readonly List<string> _log;
+
+        public FakeRails(List<string> log) => _log = log;
+
+        public (int Min, int Max) NvVddPolicy { get; set; } = (210_000, 294_000);
+
+        public (int Min, int Max) MsVddPolicy { get; set; } = (60_000, 84_000);
+
+        public (int Min, int Max)? BoardPolicy { get; set; } = (11_053, 14_026);
+
+        public int? NvVddCurrent { get; set; } = 210_000;
+
+        public int? MsVddCurrent { get; set; } = 60_000;
+
+        public int? BoardCurrent { get; set; } = 11_053;
+
+        /// <summary>When set, every answer is this refusal.</summary>
+        public string? Failure { get; set; }
+
+        /// <summary>When set, Set answers this refusal instead of writing.</summary>
+        public string? Refused { get; set; }
+
+        /// <summary>When true the set is accepted but the driver keeps what it carried.</summary>
+        public bool DropSets { get; set; }
+
+        public List<(int? Nvvdd, int? Msvdd, int? Board)> Sets { get; } = new();
+
+        public GpuRailLimits Read()
+        {
+            _log.Add("rails.read");
+            return Failure != null ? GpuRailLimits.Refused(Failure) : Answer();
+        }
+
+        public GpuRailLimits Set(int? nvvddMilliamps, int? msvddMilliamps, int? boardInputMilliamps)
+        {
+            Sets.Add((nvvddMilliamps, msvddMilliamps, boardInputMilliamps));
+            _log.Add(
+                $"rails.set:{Show(nvvddMilliamps)},{Show(msvddMilliamps)},{Show(boardInputMilliamps)}");
+
+            if (Failure != null)
+                return GpuRailLimits.Refused(Failure);
+
+            if (Refused != null)
+                return GpuRailLimits.Refused(Refused);
+
+            if (!DropSets)
+            {
+                NvVddCurrent = nvvddMilliamps ?? NvVddCurrent;
+                MsVddCurrent = msvddMilliamps ?? MsVddCurrent;
+                BoardCurrent = boardInputMilliamps ?? BoardCurrent;
+            }
+
+            return Answer();
+        }
+
+        private GpuRailLimits Answer() => new(
+            new GpuRailValue(NvVddCurrent, NvVddPolicy.Min, NvVddPolicy.Max),
+            new GpuRailValue(MsVddCurrent, MsVddPolicy.Min, MsVddPolicy.Max),
+            BoardPolicy is { } board ? new GpuRailValue(BoardCurrent, board.Min, board.Max) : GpuRailValue.Unknown,
+            null);
+
+        private static string Show(int? milliamps) => milliamps?.ToString() ?? "-";
     }
 }

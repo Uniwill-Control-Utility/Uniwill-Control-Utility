@@ -187,4 +187,41 @@ public sealed class GpuVerbsTests
         Assert.Equal(GpuRomOverrideStates.NotUnlocked, state.State);
         Assert.False(overrides.LastEnabled);
     }
+
+    [Fact]
+    public async Task GetRailLimits_AnswersTheLivePolicyBoundedShape()
+    {
+        // The sliders' read: the currents and the policy range each is bounded by. A
+        // refusal is the same DTO with a reason and no numbers, never a fault.
+        var overrides = new FakeGpuRomOverrideService();
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuRomOverrideOverride = overrides });
+
+        GpuRailLimitsDto rails = await host.Gpu.GetRailLimitsAsync();
+
+        Assert.Null(rails.Reason);
+        Assert.Equal(250_000, rails.NvvddMilliamps);
+        Assert.Equal(210_000, rails.NvvddMinMilliamps);
+        Assert.Equal(294_000, rails.NvvddMaxMilliamps);
+        Assert.Equal(70_000, rails.MsvddMilliamps);
+        Assert.Equal(14_026, rails.BoardInputMilliamps);
+        Assert.Equal(11_053, rails.BoardInputMinMilliamps);
+        Assert.Null(overrides.LastRailSet);
+    }
+
+    [Fact]
+    public async Task SetRailLimits_DeliversTheThreeValues_AndAnswersTheReadBack()
+    {
+        var overrides = new FakeGpuRomOverrideService();
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuRomOverrideOverride = overrides });
+
+        GpuRailLimitsDto rails = await host.Gpu.SetRailLimitsAsync(null, 70_000, null);
+
+        Assert.Equal((null, 70_000, null), overrides.LastRailSet);
+        Assert.Equal(70_000, rails.MsvddMilliamps);
+        Assert.Null(rails.Reason);
+    }
 }

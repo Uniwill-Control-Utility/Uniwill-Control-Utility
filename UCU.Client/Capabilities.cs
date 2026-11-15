@@ -446,6 +446,24 @@ namespace UCU.Client
                 EngineVerbs.Gpu.SetRomOverride,
                 EngineSerializer.ToParams(new BoolValueDto { Value = enabled }),
                 cancellationToken);
+
+        public Task<GpuRailLimitsDto> GetRailLimitsAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuRailLimitsDto>(EngineVerbs.Gpu.GetRailLimits, cancellationToken);
+
+        public Task<GpuRailLimitsDto> SetRailLimitsAsync(
+            int? nvvddMilliamps,
+            int? msvddMilliamps,
+            int? boardInputMilliamps,
+            CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuRailLimitsDto>(
+                EngineVerbs.Gpu.SetRailLimits,
+                EngineSerializer.ToParams(new GpuRailLimitsDto
+                {
+                    NvvddMilliamps = nvvddMilliamps,
+                    MsvddMilliamps = msvddMilliamps,
+                    BoardInputMilliamps = boardInputMilliamps,
+                }),
+                cancellationToken);
     }
 
     /// <summary>Engine identity proxies.</summary>
