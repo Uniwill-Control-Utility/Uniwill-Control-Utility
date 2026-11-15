@@ -208,12 +208,12 @@
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap"
-                                       Text="Measured: the GPU drew about 210 W at the 220 W ceiling, against 175 W stock, and the hotspot stayed at 62 °C." />
+                                       Text="The unlock raises the driver's power ceiling to 250 W and asks for 225 W. The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off. Rails: 250 A NVVDD, 70 A MSVDD, 14.026 A board input — stock is 210 A / 60 A / 11.053 A, and the driver allows up to 294 A / 84 A / 14.026 A." />
                             <TextBlock Margin="0,4,0,0"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap"
-                                       Text="Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter." />
+                                       Text="Measured on our unit with a +233 MHz core offset: 214 W board power at 0.975-0.985 V, with PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it." />
                             <TextBlock Margin="0,4,0,0"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -227,20 +227,21 @@
                                         Visibility="Collapsed"
                                         Severity="Informational" />
 
-                            <!-- The tier values are what we would set; the ceiling is the number
-                                 the records raise, and the power limit is the EC's separate
-                                 cTGP control, reported honestly next to it. -->
+                            <!-- The tier values are what we would set; the ceiling is what the
+                                 records raise, and the request and budget are what the driver
+                                 enforces, reported honestly next to it. -->
                             <StackPanel x:Name="spRomReadback"
                                         Margin="0,8,0,0"
                                         Visibility="Collapsed">
                                 <TextBlock x:Name="tbRomTier" FontSize="12" TextWrapping="Wrap" />
                                 <TextBlock x:Name="tbRomCeiling" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRomCurrent" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRomRequest" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRomBudget" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,2,0,0"
                                            FontSize="12"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                            TextWrapping="Wrap"
-                                           Text="The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change." />
+                                           Text="The ceiling is what this card raises. The request is what the driver enforces against it, and the budget is the laptop's own cap: the lower of the two wins." />
                             </StackPanel>
 
                             <CheckBox x:Name="chkRomConsent"
@@ -282,6 +283,116 @@
                                            TextWrapping="Wrap"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                            Text="Restarting the GPU. The screen may go blank for up to 60 seconds." />
+                            </StackPanel>
+
+                            <!-- Advanced: the runtime rail currents. A separate, live NVAPI
+                                 write (no restart, no blank screen, no consent), so it sits
+                                 below the unlock act and follows its state. -->
+                            <Border Height="1" Margin="0,14,0,0" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <StackPanel Margin="0,10,0,0">
+                                <ui:TextBlock FontTypography="BodyStrong" Text="Advanced — current limits" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="These values are machine-wide and are not saved with a preset." />
+
+                                <StackPanel x:Name="spRailControls" Margin="0,10,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="NVVDD (GPU core)" />
+                                            <ui:TextBlock x:Name="tbRailNvvdd"
+                                                           Margin="0,2,0,0"
+                                                           FontTypography="Caption"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           Text="-- A" />
+                                        </StackPanel>
+                                        <Slider x:Name="sdRailNvvdd"
+                                                Grid.Column="1"
+                                                Width="140"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="RailSlider_ValueChanged" />
+                                    </Grid>
+
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="MSVDD (memory)" />
+                                            <ui:TextBlock x:Name="tbRailMsvdd"
+                                                           Margin="0,2,0,0"
+                                                           FontTypography="Caption"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           Text="-- A" />
+                                        </StackPanel>
+                                        <Slider x:Name="sdRailMsvdd"
+                                                Grid.Column="1"
+                                                Width="140"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="RailSlider_ValueChanged" />
+                                    </Grid>
+
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Board input" />
+                                            <ui:TextBlock x:Name="tbRailBoardInput"
+                                                           Margin="0,2,0,0"
+                                                           FontTypography="Caption"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           Text="-- A" />
+                                        </StackPanel>
+                                        <Slider x:Name="sdRailBoardInput"
+                                                Grid.Column="1"
+                                                Width="140"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="RailSlider_ValueChanged" />
+                                    </Grid>
+
+                                    <!-- Warn, never clamp: this is the setting that can outdraw the
+                                         adapter once the CPU is loaded too. -->
+                                    <TextBlock x:Name="tbRailCaution"
+                                               Margin="0,6,0,0"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               Visibility="Collapsed"
+                                               Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                               Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
+
+                                    <ui:Button x:Name="btnRailApply"
+                                               Margin="0,12,0,0"
+                                               Padding="16,6"
+                                               HorizontalAlignment="Left"
+                                               Appearance="Primary"
+                                               Click="btnRailApply_Click"
+                                               Content="Apply limits" />
+                                </StackPanel>
+
+                                <!-- Outside the disabled group: a reason a dimmed control
+                                     cannot state for itself. -->
+                                <TextBlock x:Name="tbRailNote"
+                                           Margin="0,6,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                <TextBlock x:Name="tbRailReason"
+                                           Margin="0,2,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Visibility="Collapsed" />
                             </StackPanel>
                         </StackPanel>
                     </ui:Card>

@@ -69,11 +69,16 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         // Power limit range (watts)
         private const int MinPowerLimitWatts = 5;
         private const int MaxPowerLimitWattsDefault = 175;
-        private const int MaxPowerLimitWattsBoost = 250;
+
+        // The raised ceiling is 250 W and the EC's Dynamic Boost maximum is 25 W, so 225 W is
+        // the most a base-TGP request can be: above it the EC drops what it cannot use (the
+        // 225 W target measured 214 W, where a 250 W request would be answered by the old
+        // 175 W limit). The offset stays target - DefaultTGP, so 225 W is 130 here.
+        private const int MaxPowerLimitWattsBoost = 225;
 
         /// <summary>
         /// Returns the effective maximum power limit based on the user's power boost setting.
-        /// With boost enabled: 250W. Otherwise: 175W.
+        /// With boost enabled: 225W (ceiling minus Dynamic Boost). Otherwise: 175W.
         /// </summary>
         public static int MaxPowerLimitWatts =>
             Properties.Settings.Default.EnablePowerBoostMode

@@ -793,8 +793,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _ => (50, fallbackMax)
             };
 
+            // The ceiling the boost path writes is 225 W (250 W minus Dynamic Boost's 25 W):
+            // a slider that offers more writes an offset the EC ignores.
             sdNvPower.Minimum = min;
-            sdNvPower.Maximum = max;
+            sdNvPower.Maximum = Math.Min(max, NvTuning.MaxPowerLimitWatts);
+            max = (int)sdNvPower.Maximum;
 
             // Clamp current value to new range if above max.
             // The upward bump (max grows, value was at old max) is handled
@@ -2147,6 +2150,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _romOverrideBusy;
         private string? _romOverrideError;
 
+        // The rail currents are a separate, live NVAPI write: their own read, their own
+        // apply, their own failure line. Nothing here restarts the GPU.
+        private UCU.Contracts.GpuRailLimitsDto? _railLimits;
+        private bool _railLimitsBusy;
+        private string? _railLimitsError;
+        private string? _railLimitsNote;
+        private bool _railBinding;
+
         private async Task RefreshRomOverrideAsync()
         {
             _gpuTuning ??= App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
@@ -2172,6 +2183,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             RenderRomOverride();
+
+            // The rails are a second read of the same driver, so they follow the state:
+            // the section is only usable while the unlock is applied.
+            await RefreshRailLimitsAsync();
         }
 
         private void RenderRomOverride()
@@ -2212,9 +2227,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbRomCeiling.Text = state.CeilingLimitMilliwatts is int ceiling
                     ? LocalizationService.Format("Live ceiling: {0} W", ceiling / 1000.0)
                     : LocalizationService.Get("Live ceiling: not read");
-                tbRomCurrent.Text = state.CurrentLimitMilliwatts is int current
-                    ? LocalizationService.Format("Live power limit: {0} W", current / 1000.0)
-                    : LocalizationService.Get("Live power limit: not read");
+                // The request is the number that matters: the driver enforces it against the
+                // ceiling and the laptop's budget, and NVML's limit symbol answers
+                // NOT_SUPPORTED on this driver, so it is not reported at all.
+                tbRomRequest.Text = state.RequestedLimitMilliwatts is int request
+                    ? LocalizationService.Format("Live request: {0} W", request / 1000.0)
+                    : LocalizationService.Get("Live request: not read");
+                tbRomBudget.Text = state.BudgetMilliwatts is int budget
+                    ? LocalizationService.Format("Live budget: {0} W", budget / 1000.0)
+                    : LocalizationService.Get("Live budget: not read");
             }
 
             if (state == null)
@@ -2283,11 +2304,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                     : canUnlock && !consent
                         ? LocalizationService.Get("Tick the statement above first.")
                         : string.Empty;
+
+            // The rail sliders are gated on this same state, so they re-render with it.
+            RenderRailLimits();
         }
 
         private static string RomReasonLine(string? reason) =>
             string.IsNullOrWhiteSpace(reason) ? string.Empty : LocalizationService.Format("Reason: {0}", reason);
-
         private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
 
         private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>
@@ -2357,6 +2380,240 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _romOverrideBusy = false;
                 RenderRomOverride();
+            }
+        }
+
+        #endregion
+
+        #region GPU rail current limits (Extra GPU power, advanced)
+
+        /// <summary>
+        /// The sliders' read: the current each rail carries and the policy range the driver
+        /// bounds it by. Read separately from the override state because a refusal here must
+        /// disable three controls, not a whole card.
+        /// </summary>
+        private async Task RefreshRailLimitsAsync()
+        {
+            _gpuTuning ??= App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
+            _railLimitsError = null;
+
+            if (_gpuTuning == null)
+            {
+                _railLimits = null;
+                RenderRailLimits();
+                return;
+            }
+
+            try
+            {
+                _railLimits = await _gpuTuning.GetRailLimitsAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                // A transport failure is reported as one, never rendered as "stock".
+                DebugLog($"GPU rail limits unavailable: {ex.Message}");
+                _railLimits = null;
+                _railLimitsError = ex.Message;
+            }
+
+            RenderRailLimits();
+        }
+
+        private void RenderRailLimits()
+        {
+            bool applied = _romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked
+                           || _romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain;
+
+            UCU.Contracts.GpuRailLimitsDto? rails = _railLimits;
+            bool bounded;
+            _railBinding = true;
+            try
+            {
+                bounded =
+                    BindRail(sdRailNvvdd, rails?.NvvddMilliamps, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps) &
+                    BindRail(sdRailMsvdd, rails?.MsvddMilliamps, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps) &
+                    BindRail(sdRailBoardInput, rails?.BoardInputMilliamps, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps);
+            }
+            finally
+            {
+                _railBinding = false;
+            }
+
+            // Dimmed as one group, so "not available" never looks like three unrelated
+            // controls that happen to be off.
+            spRailControls.IsEnabled = applied && bounded && !_railLimitsBusy;
+
+            string? refusal = _railLimitsError ?? rails?.Reason;
+            tbRailReason.Text = RomReasonLine(refusal);
+            tbRailReason.Visibility = string.IsNullOrEmpty(tbRailReason.Text) ? Visibility.Collapsed : Visibility.Visible;
+
+            tbRailNote.Text = !applied
+                ? LocalizationService.Get("Available once Extra GPU power is unlocked.")
+                : !bounded
+                    ? LocalizationService.Get("The current limits could not be read.")
+                    : _railLimitsNote ?? string.Empty;
+
+            UpdateRailReadouts();
+            UpdateRailCaution();
+            UpdateRailApply(applied && bounded);
+        }
+
+        /// <summary>
+        /// One rail's slider bounds and position, from the driver's own policy: before an
+        /// unlock that policy is the stock value at both ends, so the slider is inert by
+        /// construction instead of by a rule. False when a number is missing — a guessed
+        /// range is worse than a disabled row.
+        /// </summary>
+        private static bool BindRail(Slider slider, int? current, int? min, int? max)
+        {
+            if (current is not int value || min is not int low || max is not int high || high < low)
+                return false;
+
+            slider.Minimum = low;
+            slider.Maximum = high;
+            slider.Value = Math.Clamp(value, low, high);
+            return true;
+        }
+
+        /// <summary>"250 A · policy 210-294 A": what the rail carries now against the range the
+        /// driver allows, which is what the slider can move it to.</summary>
+        private void UpdateRailReadouts()
+        {
+            UCU.Contracts.GpuRailLimitsDto? rails = _railLimits;
+            tbRailNvvdd.Text = RailText(sdRailNvvdd, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps, 0);
+            tbRailMsvdd.Text = RailText(sdRailMsvdd, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps, 0);
+            tbRailBoardInput.Text = RailText(sdRailBoardInput, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps, 1);
+        }
+
+        private static string RailText(Slider slider, int? min, int? max, int decimals)
+        {
+            if (min is not int low || max is not int high)
+                return "-- A";
+
+            string format = decimals == 0 ? "0" : "0.0";
+            string policy = (low / 1000.0).ToString(format) + "-" + (high / 1000.0).ToString(format);
+            return LocalizationService.Format(
+                "{0} A · policy {1} A",
+                (slider.Value / 1000.0).ToString(format),
+                policy);
+        }
+
+        /// <summary>
+        /// Warn, never clamp: above 14 A the GPU alone can exceed what the adapter supplies
+        /// once the CPU is loaded, which is the combination that fails on this machine.
+        /// </summary>
+        private void UpdateRailCaution() =>
+            // 14.026 A is the tested value the tier ships; warn only when the user goes above it
+            // (which needs a bigger record, i.e. a different policy maximum).
+            tbRailCaution.Visibility = sdRailBoardInput.Value > 14_026 ? Visibility.Visible : Visibility.Collapsed;
+
+        private void UpdateRailApply(bool canApply)
+        {
+            UCU.Contracts.GpuRailLimitsDto? rails = _railLimits;
+            bool changed = rails != null &&
+                (Changed(sdRailNvvdd, rails.NvvddMilliamps, 0) |
+                 Changed(sdRailMsvdd, rails.MsvddMilliamps, 0) |
+                 Changed(sdRailBoardInput, rails.BoardInputMilliamps, 1));
+
+            // Primary while it would do something, dimmed while it would not: the caption
+            // above says why the group can be off, the button says why it is.
+            bool enabled = canApply && !_railLimitsBusy && changed;
+            btnRailApply.IsEnabled = enabled;
+            btnRailApply.Opacity = enabled ? 1.0 : 0.5;
+        }
+
+        /// <summary>The value a slider stands for, snapped to the precision it displays.</summary>
+        private static int Quantize(double milliAmps, int decimals) => decimals == 0
+            ? (int)Math.Round(milliAmps / 1000.0) * 1000
+            : (int)Math.Round(milliAmps / 100.0) * 100;
+
+        private static bool Changed(Slider slider, int? current, int decimals) =>
+            current is int value && Quantize(slider.Value, decimals) != Quantize(value, decimals);
+
+        private static string Amps(int? milliAmps, int decimals) => milliAmps is int value
+            ? (value / 1000.0).ToString(decimals == 0 ? "0" : "0.0")
+            : "--";
+
+        private void RailSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // Bounds are set while the card renders too, so this handler must not react to
+            // its own bind: only a user's move clears the note and re-gates the button.
+            if (_railBinding || btnRailApply == null)
+                return;
+
+            _railLimitsNote = null;
+            UpdateRailReadouts();
+            UpdateRailCaution();
+            UpdateRailApply(_railLimits is { Reason: null } &&
+                            (_romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked ||
+                             _romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain));
+        }
+
+        private async void btnRailApply_Click(object sender, RoutedEventArgs e) => await ApplyRailLimitsAsync();
+
+        private async Task ApplyRailLimitsAsync()
+        {
+            // Live: no restart, no blank screen, and no consent box — the consent belongs to
+            // the unlock. The gates the card renders are re-checked so a stale frame cannot
+            // fire a write it was showing as unavailable.
+            if (_railLimitsBusy || _gpuTuning == null || _railLimits is not { Reason: null } || !spRailControls.IsEnabled)
+            {
+                return;
+            }
+
+            UCU.Contracts.GpuRailLimitsDto rails = _railLimits;
+
+            // Only the rails that moved are sent; null means "leave this one alone".
+            int? nvvdd = Changed(sdRailNvvdd, rails.NvvddMilliamps, 0) ? Quantize(sdRailNvvdd.Value, 0) : null;
+            int? msvdd = Changed(sdRailMsvdd, rails.MsvddMilliamps, 0) ? Quantize(sdRailMsvdd.Value, 0) : null;
+            int? board = Changed(sdRailBoardInput, rails.BoardInputMilliamps, 1) ? Quantize(sdRailBoardInput.Value, 1) : null;
+
+            if (nvvdd == null && msvdd == null && board == null)
+                return;
+
+            _railLimitsBusy = true;
+            _railLimitsError = null;
+            _railLimitsNote = null;
+            RenderRailLimits();
+
+            try
+            {
+                UCU.Contracts.GpuRailLimitsDto answer =
+                    await _gpuTuning.SetRailLimitsAsync(nvvdd, msvdd, board).ConfigureAwait(true);
+
+                if (answer.Reason == null)
+                {
+                    _railLimits = answer;
+                    _railLimitsNote = LocalizationService.Format(
+                        "Applied: {0} A GPU, {1} A memory, {2} A board input",
+                        Amps(answer.NvvddMilliamps, 0), Amps(answer.MsvddMilliamps, 0), Amps(answer.BoardInputMilliamps, 1));
+                }
+                else
+                {
+                    // A refusal carries no numbers: keep the ones on screen and say why.
+                    _railLimitsError = answer.Reason;
+                }
+            }
+            catch (Exception ex)
+            {
+                // A transport failure is not a verdict, so read back what the rails carry now
+                // and keep the exception on screen either way.
+                DebugLog($"GPU rail limits write failed: {ex.Message}");
+                _railLimitsError = ex.Message;
+
+                try
+                {
+                    _railLimits = await _gpuTuning.GetRailLimitsAsync().ConfigureAwait(true);
+                }
+                catch (Exception reread)
+                {
+                    DebugLog($"GPU rail limits re-read failed: {reread.Message}");
+                }
+            }
+            finally
+            {
+                _railLimitsBusy = false;
+                RenderRailLimits();
             }
         }
 

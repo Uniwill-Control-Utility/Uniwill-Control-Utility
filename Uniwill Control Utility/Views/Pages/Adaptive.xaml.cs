@@ -714,7 +714,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var n when n.Contains("rtx 5070") => boostEnabled ? 250 : 115,
                     _ => limits.GpuTgpBaseline
                 };
-                AdpSdNvPower.Maximum = gpuMax;
+                // The slider must not offer a wattage SetPowerLimit refuses (the boosted
+                // maximum is ceiling minus Dynamic Boost, 225 W on this board).
+                AdpSdNvPower.Maximum = Math.Min(gpuMax, NvTuning.MaxPowerLimitWatts);
                 if (AdpSdNvPower.Value > gpuMax)
                     AdpSdNvPower.Value = gpuMax;
 
