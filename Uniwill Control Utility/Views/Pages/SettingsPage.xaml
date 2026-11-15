@@ -248,6 +248,32 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
+                            <!-- Row: Disable the quick-controls pop-up -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Disable the quick-controls pop-up" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Clicking the tray icon opens the main window instead of the pop-up" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbDisableMiniTray"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbDisableMiniTray_Checked"
+                                                 Unchecked="cbDisableMiniTray_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
                             <!-- Row: Disable notification pop-up -->
                             <Grid>
                                 <Grid.ColumnDefinitions>

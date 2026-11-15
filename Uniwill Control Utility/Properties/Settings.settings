@@ -155,6 +155,11 @@
     <Setting Name="MinimizeClose" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <!-- The mini tray quick-controls pop-up is off: a left click on the tray icon
+         (and the title-bar hand-over button) brings the main window back instead. -->
+    <Setting Name="DisableMiniTrayWindow" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="DisableToastPopups" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>

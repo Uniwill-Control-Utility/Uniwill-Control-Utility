@@ -154,6 +154,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbShowStartupProgress.IsChecked = Settings.Default.ShowStartupProgressOverlay;
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
+            cbDisableMiniTray.IsChecked = Settings.Default.DisableMiniTrayWindow;
             cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             tsThermalFailsafe.IsChecked = Settings.Default.ThermalFailsafeEnabled;
@@ -478,6 +479,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbDisableToastPopups_Checked(object sender, RoutedEventArgs e)
         {
             Settings.Default.DisableToastPopups = true;
+            Settings.Default.Save();
+        }
+
+        private void cbDisableMiniTray_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.DisableMiniTrayWindow = true;
+            Settings.Default.Save();
+        }
+
+        private void cbDisableMiniTray_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.DisableMiniTrayWindow = false;
             Settings.Default.Save();
         }
 

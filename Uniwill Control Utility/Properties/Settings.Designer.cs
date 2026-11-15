@@ -679,6 +679,18 @@ namespace Uniwill_Control_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DisableMiniTrayWindow {
+            get {
+                return ((bool)(this["DisableMiniTrayWindow"]));
+            }
+            set {
+                this["DisableMiniTrayWindow"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool DisableToastPopups {
             get {
                 return ((bool)(this["DisableToastPopups"]));

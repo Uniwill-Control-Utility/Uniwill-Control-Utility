@@ -130,6 +130,14 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
             }
 
+            // Quick-controls pop-up switched off: the click brings the main window back
+            // instead of opening the flyout.
+            if (Settings.Default.DisableMiniTrayWindow)
+            {
+                RestoreMainWindow();
+                return;
+            }
+
             _ = _trayWidget.ToggleAsync();
         }
 
@@ -149,7 +157,30 @@ namespace Uniwill_Control_Utility.Views.Windows
             // then show the mini-tray near the tray icon â€” the cursor sits on the title
             // bar here, so anchoring on it would drop the tray at the button's axis.
             this.WindowState = WindowState.Minimized;
+
+            // Quick-controls pop-up switched off: hand over to nothing, just stay in the
+            // tray - the tray icon brings the window back.
+            if (Settings.Default.DisableMiniTrayWindow)
+                return;
+
             _ = _trayWidget.ToggleAsync();
+        }
+
+        /// <summary>
+        /// Brings the main window back to the desktop and to the front: the same restore the
+        /// single-instance handoff runs (App.BringMainWindowToFront), without its re-centring -
+        /// a window minimised from wherever the user put it comes back where it was.
+        /// </summary>
+        private void RestoreMainWindow()
+        {
+            if (!this.IsVisible)
+                this.ShowWindow();
+
+            if (this.WindowState == WindowState.Minimized)
+                this.WindowState = WindowState.Normal;
+
+            this.Activate();
+            _ = this.Focus();
         }
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
