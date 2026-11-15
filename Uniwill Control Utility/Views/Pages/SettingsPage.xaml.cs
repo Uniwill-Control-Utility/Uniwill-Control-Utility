@@ -486,12 +486,24 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             Settings.Default.DisableMiniTrayWindow = true;
             Settings.Default.Save();
+            ApplyTrayHandoverVisibility();
         }
 
         private void cbDisableMiniTray_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.DisableMiniTrayWindow = false;
             Settings.Default.Save();
+            ApplyTrayHandoverVisibility();
+        }
+
+        /// <summary>
+        /// The title-bar hand-over button belongs to the mini-tray, so the main window has to
+        /// re-apply it as soon as this switch changes - no restart, no reactivation.
+        /// </summary>
+        private static void ApplyTrayHandoverVisibility()
+        {
+            if (Application.Current?.MainWindow is Views.Windows.MainWindow mainWindow)
+                mainWindow.ApplyTrayHandoverVisibility();
         }
 
         private void cbDisableToastPopups_Unchecked(object sender, RoutedEventArgs e)

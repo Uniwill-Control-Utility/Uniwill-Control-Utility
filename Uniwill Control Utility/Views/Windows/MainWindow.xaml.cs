@@ -99,6 +99,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             // Ensure tray icon is visible
             niTray.Visibility = Visibility.Visible;
 
+            // The title-bar hand-over button belongs to the mini-tray; drop it before the
+            // window is ever shown when the quick-controls pop-up is switched off.
+            ApplyTrayHandoverVisibility();
+
         }
 
         /// <summary>Toggles the compact quick-control widget when the tray icon is left-clicked.</summary>
@@ -146,6 +150,16 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             _trayWidget.HideIfVisible();
         }
+
+        /// <summary>
+        /// Shows the title-bar hand-over button only while there is a mini-tray to hand over
+        /// to: with the quick-controls pop-up switched off it would only minimise, which reads
+        /// as a broken control. Called at startup and whenever the Settings switch changes.
+        /// </summary>
+        internal void ApplyTrayHandoverVisibility() =>
+            BtnMinimizeToTray.Visibility = Settings.Default.DisableMiniTrayWindow
+                ? Visibility.Collapsed
+                : Visibility.Visible;
 
         /// <summary>Title-bar hand-over: minimize the main window and open the mini-tray widget.</summary>
         private void BtnMinimizeToTray_Click(object sender, RoutedEventArgs e)
