@@ -77,6 +77,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(GpuTuningResultDto))]
     [JsonSerializable(typeof(DrsPreferenceDto))]
     [JsonSerializable(typeof(SetClocksDto))]
+    [JsonSerializable(typeof(GpuRomOverrideStateDto))]
     [JsonSerializable(typeof(List<UCU.Core.Takeover.TakeoverJournalEntry>))]
     public partial class EngineJsonContext : JsonSerializerContext
     {
@@ -137,6 +138,7 @@ namespace UCU.Contracts
             VfCurveOffsetsDto v => ToParams(v),
             DrsPreferenceDto v => ToParams(v),
             SetClocksDto v => ToParams(v),
+            GpuRomOverrideStateDto v => ToParams(v),
             SmuReadResultDto v => ToParams(v),
             _ => throw new ProtocolViolationException($"result type {value.GetType().Name} is not registered in {nameof(EngineJsonContext)}"),
         };

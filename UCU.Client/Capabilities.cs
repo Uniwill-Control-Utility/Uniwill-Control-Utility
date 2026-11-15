@@ -434,6 +434,15 @@ namespace UCU.Client
                 EngineVerbs.Gpu.SetClocks,
                 EngineSerializer.ToParams(new SetClocksDto { CoreOffsetMhz = coreOffsetMhz, MemoryOffsetMhz = memoryOffsetMhz }),
                 cancellationToken);
+
+        public Task<GpuRomOverrideStateDto> GetRomOverrideStateAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuRomOverrideStateDto>(EngineVerbs.Gpu.GetRomOverrideState, cancellationToken);
+
+        public Task<GpuRomOverrideStateDto> SetRomOverrideAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuRomOverrideStateDto>(
+                EngineVerbs.Gpu.SetRomOverride,
+                EngineSerializer.ToParams(new BoolValueDto { Value = enabled }),
+                cancellationToken);
     }
 
     /// <summary>Engine identity proxies.</summary>

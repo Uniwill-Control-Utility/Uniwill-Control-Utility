@@ -109,6 +109,24 @@ namespace UCU.Contracts
             /// and the driver's "performance states read-only" line never
             /// appears - so this is the token, not the driver flag).</summary>
             public const string SetClocks = "gpu.set_clocks";
+
+            /// <summary>
+            /// The GPU power-ceiling override state: reads the display-driver key's
+            /// <c>romOverride*</c> records, the pinned VBIOS version, the tier numbers
+            /// and whether the driver's enforced ceiling actually moved. Read-only and
+            /// cheap enough for a page load; it never writes and never restarts the GPU.
+            /// </summary>
+            public const string GetRomOverrideState = "gpu.get_rom_override_state";
+
+            /// <summary>
+            /// Stages (or removes) the ROM power-policy records and restarts the
+            /// display adapter. The engine writes originals, flushes the key, reads every
+            /// record back and refuses a key another tool owns; the answer is the
+            /// post-action state, so a refusal is data, not a fault. Restarting the GPU
+            /// blanks the screen and kills running games, which is why this is one verb
+            /// with an explicit enable flag rather than part of a preset pipeline.
+            /// </summary>
+            public const string SetRomOverride = "gpu.set_rom_override";
         }
 
         public static class Keyboard

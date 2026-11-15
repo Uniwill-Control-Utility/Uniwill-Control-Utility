@@ -270,6 +270,7 @@ public sealed class ContractShapeTests
             new EngineInfoDto(),
             new OemStatusDto(), new OemActionDto(),
             new GpuTuningResultDto(),
+            new GpuRomOverrideStateDto(),
         };
 
         foreach (object result in results)

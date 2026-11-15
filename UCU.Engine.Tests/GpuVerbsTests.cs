@@ -110,4 +110,74 @@ public sealed class GpuVerbsTests
         Assert.Equal(unchecked((int)0xFFFFFF77), result.Status);
         Assert.Equal("NVAPI_INVALID_USER_PRIVILEGE", result.Detail);
     }
+
+    [Fact]
+    public async Task GetRomOverrideState_AnswersTheTierAndTheVerifiedCeiling()
+    {
+        // The read is what the page renders: the tier's numbers, the staged records'
+        // state, and whether the driver's enforced ceiling moved. A refusal
+        // (Unsupported) is the same DTO with a reason, never a fault.
+        var overrides = new FakeGpuRomOverrideService
+        {
+            Answer = new GpuRomOverrideStateDto
+            {
+                State = GpuRomOverrideStates.Unlocked,
+                VbiosVersion = "98.03.5E.00.5D",
+                TierId = "extra_gpu_power",
+                PowerMilliwatts = 220_000,
+                NvVddMilliAmps = 120_000,
+                MsVddMilliAmps = 50_000,
+                BoardInputMilliAmps = 13_500,
+                EnforcedLimitMilliwatts = 220_000,
+                EnforcedLimitMoved = true,
+                Restarted = true,
+            },
+        };
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuRomOverrideOverride = overrides });
+
+        GpuRomOverrideStateDto state = await host.Gpu.GetRomOverrideStateAsync();
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Equal(220_000, state.PowerMilliwatts);
+        Assert.Equal(13_500, state.BoardInputMilliAmps);
+        Assert.True(state.EnforcedLimitMoved);
+        Assert.True(state.Restarted);
+        Assert.Null(overrides.LastEnabled);
+    }
+
+    [Fact]
+    public async Task SetRomOverride_DeliversTheEnableFlag_AndAnswersTheState()
+    {
+        var overrides = new FakeGpuRomOverrideService
+        {
+            Answer = new GpuRomOverrideStateDto { State = GpuRomOverrideStates.Unlocked, Restarted = true },
+        };
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuRomOverrideOverride = overrides });
+
+        GpuRomOverrideStateDto state = await host.Gpu.SetRomOverrideAsync(enabled: true);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.True(overrides.LastEnabled);
+    }
+
+    [Fact]
+    public async Task SetRomOverride_Restore_ReachesTheClientAsTheRestoredState()
+    {
+        var overrides = new FakeGpuRomOverrideService
+        {
+            Answer = new GpuRomOverrideStateDto { State = GpuRomOverrideStates.NotUnlocked },
+        };
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuRomOverrideOverride = overrides });
+
+        GpuRomOverrideStateDto state = await host.Gpu.SetRomOverrideAsync(enabled: false);
+
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, state.State);
+        Assert.False(overrides.LastEnabled);
+    }
 }

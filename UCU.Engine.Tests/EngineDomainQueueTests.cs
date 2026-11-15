@@ -32,6 +32,11 @@ public sealed class EngineDomainQueueTests
         // A user-session process launch must not queue behind a parked
         // hardware upload.
         Assert.Null(queues.QueueFor(EngineVerbs.Rtss.Start));
+
+        // A GPU restart is a bounded 60 s wait: on the hardware queue the budget
+        // would answer Timeout for a restart that did succeed.
+        Assert.Null(queues.QueueFor(EngineVerbs.Gpu.SetRomOverride));
+        Assert.Null(queues.QueueFor(EngineVerbs.Gpu.GetRomOverrideState));
     }
 
     [Fact]

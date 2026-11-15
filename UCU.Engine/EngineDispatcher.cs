@@ -31,12 +31,13 @@ namespace UCU.Engine
             EngineMetricsSnapshotSource metrics, IPnpDeviceService devices, IFwNvramService nvram,
             IAmdSmuService smu, IIntelMsrService msr, IMiniLedService miniLed,
             IOemTakeoverService oemTakeover, UCU.Hardware.Gpu.IGpuTuningService gpuTuning,
+            UCU.Hardware.Gpu.IGpuRomOverrideService gpuRomOverrides,
             EcRawWriteGuard rawWriteGuard, EngineRuntimeOptions options)
         {
             _gate = gate;
             _queues = queues;
             _appExit = appExit;
-            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, oemTakeover, gpuTuning, rawWriteGuard, options.RtssLaunchOverride);
+            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, oemTakeover, gpuTuning, gpuRomOverrides, rawWriteGuard, options.RtssLaunchOverride);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -107,6 +108,7 @@ namespace UCU.Engine
             EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics,
             IPnpDeviceService devices, IFwNvramService nvram, IAmdSmuService smu, IIntelMsrService msr,
             IMiniLedService miniLed, IOemTakeoverService oem, UCU.Hardware.Gpu.IGpuTuningService gpuTuning,
+            UCU.Hardware.Gpu.IGpuRomOverrideService gpuRomOverrides,
             EcRawWriteGuard rawWriteGuard, Func<string, bool>? rtssLaunch)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
@@ -134,8 +136,10 @@ namespace UCU.Engine
             OemVerbs.Register(Add, oem);
 
             // gpu.* runs on the default (telemetry) queue like oem.*: the two
-            // writes order against each other, away from the EC verbs.
-            GpuVerbs.Register(Add, gpuTuning);
+            // writes order against each other, away from the EC verbs. The ROM
+            // override pair is the exception and runs inline (EngineDomainQueues:
+            // a GPU restart outlives the queue's hardware budget).
+            GpuVerbs.Register(Add, gpuTuning, gpuRomOverrides);
 
             return handlers;
         }

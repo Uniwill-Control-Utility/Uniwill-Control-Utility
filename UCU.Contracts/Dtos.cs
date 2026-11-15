@@ -708,4 +708,62 @@ namespace UCU.Contracts
 
         public int MemoryOffsetMhz { get; init; }
     }
+
+    /// <summary>
+    /// The GPU power-ceiling override (the "extra GPU power" unlock). The engine stages
+    /// the ROM power-policy records on the GPU's display-driver key and restarts the
+    /// adapter; the state names what the key and the driver actually report, never what
+    /// was requested. See <see cref="GpuRomOverrideStates"/>.
+    /// </summary>
+    public sealed record GpuRomOverrideStateDto
+    {
+        /// <summary>NotUnlocked, Unlocked, Unsupported (with a reason) or Uncertain.</summary>
+        public string State { get; init; } = GpuRomOverrideStates.NotUnlocked;
+
+        /// <summary>The refusal/uncertainty text; null on a clean answer.</summary>
+        public string? Reason { get; init; }
+
+        /// <summary>The adapter's VBIOS version as the records spell it, when known.</summary>
+        public string? VbiosVersion { get; init; }
+
+        /// <summary>The tier the engine would stage (its tier id).</summary>
+        public string TierId { get; init; } = string.Empty;
+
+        public int PowerMilliwatts { get; init; }
+
+        public int NvVddMilliAmps { get; init; }
+
+        public int MsVddMilliAmps { get; init; }
+
+        public int BoardInputMilliAmps { get; init; }
+
+        /// <summary>The board-power ceiling the driver enforces right now; null when it
+        /// could not be read (which is not the same as "unchanged").</summary>
+        public int? EnforcedLimitMilliwatts { get; init; }
+
+        /// <summary>True when the driver's enforced ceiling is above the stock ROM's.</summary>
+        public bool EnforcedLimitMoved { get; init; }
+
+        /// <summary>True when the display adapter was restarted by this call.</summary>
+        public bool Restarted { get; init; }
+    }
+
+    /// <summary>
+    /// The override state vocabulary (a string on the wire so a new state is not a
+    /// protocol break, and so the app and the engine cannot drift on the spelling).
+    /// </summary>
+    public static class GpuRomOverrideStates
+    {
+        /// <summary>No records staged: the ROM's own ceiling applies.</summary>
+        public const string NotUnlocked = "NotUnlocked";
+
+        /// <summary>Our records are staged and the driver reports the raised ceiling.</summary>
+        public const string Unlocked = "Unlocked";
+
+        /// <summary>Refused, with a reason: another writer owns the key, or the VBIOS is not pinned.</summary>
+        public const string Unsupported = "Unsupported";
+
+        /// <summary>Partially applied: read back, but the state is not what was asked for.</summary>
+        public const string Uncertain = "Uncertain";
+    }
 }

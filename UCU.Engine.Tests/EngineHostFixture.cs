@@ -17,7 +17,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
 {
     private readonly IHost _host;
 
-    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport, List<string> rtssLaunches, FakeOemTakeoverService oem, FakeGpuTuningService gpu)
+    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport, List<string> rtssLaunches, FakeOemTakeoverService oem, FakeGpuTuningService gpu, FakeGpuRomOverrideService romOverrides)
     {
         _host = host;
         Options = options;
@@ -25,6 +25,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         RtssLaunches = rtssLaunches;
         FakeOem = oem;
         FakeGpu = gpu;
+        FakeRomOverrides = romOverrides;
         Client = new EngineClient(options.PipeName);
         Fan = new FanCapability(Client);
         Power = new PowerCapability(Client);
@@ -67,6 +68,9 @@ public sealed class EngineHostFixture : IAsyncDisposable
     /// <summary>The scripted NVAPI the gpu.* verbs run against.</summary>
     public FakeGpuTuningService FakeGpu { get; }
 
+    /// <summary>The scripted ROM-override store the power-ceiling verbs run against.</summary>
+    public FakeGpuRomOverrideService FakeRomOverrides { get; }
+
     /// <summary>Images the rtss.start verb asked the (overridden) session launcher to start.</summary>
     public IReadOnlyList<string> RtssLaunches { get; }
 
@@ -80,6 +84,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         var rtssLaunches = new List<string>();
         var oem = new FakeOemTakeoverService();
         var gpu = new FakeGpuTuningService();
+        var romOverrides = new FakeGpuRomOverrideService();
 
         var overrides = new EngineRuntimeOptions
         {
@@ -122,6 +127,9 @@ public sealed class EngineHostFixture : IAsyncDisposable
             // Hermetic default: the production service writes REAL NVAPI clock
             // and voltage tables. Tests script the answer through configure.
             GpuTuningOverride = gpu,
+            // Hermetic default: the production store writes REAL records into the
+            // display driver's HKLM key and restarts the display adapter.
+            GpuRomOverrideOverride = romOverrides,
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 
@@ -130,7 +138,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         IHost host = EngineHostFactory.CreateHost(Array.Empty<string>(), isService: false, overrides);
         await host.StartAsync().ConfigureAwait(false);
 
-        return new EngineHostFixture(host, overrides, overrides.TransportOverride!, rtssLaunches, oem, gpu);
+        return new EngineHostFixture(host, overrides, overrides.TransportOverride!, rtssLaunches, oem, gpu, romOverrides);
     }
 
     public FakeEcTransport Fake => (FakeEcTransport)Transport;

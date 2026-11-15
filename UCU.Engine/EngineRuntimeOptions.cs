@@ -142,6 +142,14 @@ namespace UCU.Engine
         /// </summary>
         public UCU.Hardware.Gpu.IGpuTuningService? GpuTuningOverride { get; init; }
 
+        /// <summary>
+        /// GPU ROM override store override, same test seam: the production store
+        /// writes REAL records into the display driver's HKLM key and restarts the
+        /// display adapter, which has no place in a test process. Tests inject a
+        /// scripted store.
+        /// </summary>
+        public UCU.Hardware.Gpu.IGpuRomOverrideService? GpuRomOverrideOverride { get; init; }
+
         /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
         public string EngineVersion { get; init; } = ReadEngineVersion();
 

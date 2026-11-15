@@ -78,6 +78,16 @@ namespace UCU.Engine
             if (domain == EngineDomain || domain == RtssDomain || verb == EngineVerbs.Telemetry.GetMetricsSnapshot)
                 return null;
 
+            // The GPU ROM-override pair runs inline: restarting the display adapter is a
+            // bounded wait (60 s in the restarter), and this queue's hardware budget
+            // (30 s) would cut the ANSWER off a restart that did succeed - the app would
+            // show a timeout for a landed unlock. shortcut: no serialisation between two
+            // concurrent ROM calls, which this single-user, user-initiated pair cannot
+            // reach; the store re-reads ownership on every call, so a race can only
+            // produce a refusal, never a half-written key.
+            if (verb == EngineVerbs.Gpu.GetRomOverrideState || verb == EngineVerbs.Gpu.SetRomOverride)
+                return null;
+
             // The documented fallback, as a lookup that cannot throw: the
             // dispatcher's verb table has already rejected unknown verbs, so a
             // prefix with no queue of its own is a read, and telemetry is the

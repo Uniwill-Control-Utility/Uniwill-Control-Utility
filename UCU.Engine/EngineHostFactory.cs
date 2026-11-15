@@ -99,6 +99,17 @@ namespace UCU.Engine
                 services.AddSingleton<UCU.Hardware.Gpu.IGpuTuningService>(
                     options.GpuTuningOverride ?? new UCU.Hardware.Gpu.NvApiGpuTuning());
 
+                // The GPU power-ceiling override: HKLM records on the display
+                // driver's key plus a display-adapter restart. It resolves the
+                // adapter through the same PnP service the device rows use, so a
+                // stale duplicate driver key on the machine is never written.
+                services.AddSingleton<UCU.Hardware.Gpu.IGpuRomOverrideService>(sp =>
+                    options.GpuRomOverrideOverride ?? new UCU.Hardware.Gpu.GpuRomOverrideStore(
+                        new UCU.Hardware.Gpu.DisplayDriverRomRegistry(
+                            sp.GetRequiredService<UCU.Hardware.Devices.IPnpDeviceService>()),
+                        new UCU.Hardware.Gpu.PnputilGpuRestarter(),
+                        new UCU.Hardware.Gpu.NvmlPowerCeilingProbe()));
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
         // Keeps the EC activated (0x0741 bit 0) and re-initialises it after a resume.

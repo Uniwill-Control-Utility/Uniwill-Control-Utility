@@ -365,6 +365,21 @@ namespace UCU.Contracts.Capabilities
         /// a driver that declares performance states read-only are answers with
         /// <see cref="GpuTuningResultDto.Succeeded"/> false, never a silent success.</summary>
         Task<GpuTuningResultDto> SetClocksAsync(int coreOffsetMhz, int memoryOffsetMhz, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The GPU power-ceiling override state: the staged ROM records, the pinned
+        /// VBIOS version, the tier's numbers and whether the driver's enforced ceiling
+        /// has actually moved. Read-only.
+        /// </summary>
+        Task<GpuRomOverrideStateDto> GetRomOverrideStateAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Raise (true) or restore (false) the GPU's power ceiling. The engine writes
+        /// its originals, stages/removes the ROM records, flushes, reads back, restarts
+        /// the display adapter and answers the state it can verify — a foreign override
+        /// key or an unpinned VBIOS is refused with a reason, never forced.
+        /// </summary>
+        Task<GpuRomOverrideStateDto> SetRomOverrideAsync(bool enabled, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Engine identity and health; the app uses this for its status display
