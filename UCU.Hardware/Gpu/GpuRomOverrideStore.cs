@@ -71,8 +71,9 @@ namespace UCU.Hardware.Gpu
 
     /// <summary>
     /// The ROM override store for the pinned VBIOS: stage the tier's seven records on
-    /// the GPU's display-driver key, raise the EC's cTGP offset, restart the GPU, then
-    /// make the driver's own power request — and restore by undoing all of it.
+    /// the GPU's display-driver key, raise the EC's cTGP offset, restart the GPU, raise
+    /// the laptop's own power budget, then make the driver's own power request — and
+    /// restore by undoing all of it.
     ///
     /// Safety rules, all from the measured reference (MechControl-RE nvidia_store.cpp):
     /// the originals file is written (tmp + flush + move) BEFORE the first registry
@@ -84,8 +85,10 @@ namespace UCU.Hardware.Gpu
     ///
     /// The records alone deliver nothing (measured 2026-11-15): they only raise the
     /// policy ceiling, while the card keeps enforcing what the EC derives (~150 W) until
-    /// a request is made against that ceiling. So an apply is three moves — EC offset,
-    /// records + restart, driver request — and Unlocked means all three hold.
+    /// a request is made against that ceiling. The request alone delivers nothing either
+    /// (measured the same day): the driver enforces min(request, laptop power budget),
+    /// and the EC publishes a 150 W budget, so the unlock is four moves — EC offset,
+    /// records + restart, budget raise, driver request — and Unlocked means all of them.
     /// </summary>
     public sealed class GpuRomOverrideStore : IGpuRomOverrideService
     {
@@ -94,6 +97,7 @@ namespace UCU.Hardware.Gpu
         private readonly IGpuPowerCeilingProbe _ceiling;
         private readonly IEcGpuPowerControl _ec;
         private readonly IGpuPowerRequest _request;
+        private readonly INvApiPowerBudget _budget;
         private readonly GpuPowerTier _tier;
         private readonly string _originalsPath;
 
@@ -103,6 +107,7 @@ namespace UCU.Hardware.Gpu
             IGpuPowerCeilingProbe ceiling,
             IEcGpuPowerControl ec,
             IGpuPowerRequest request,
+            INvApiPowerBudget budget,
             string? originalsPath = null,
             GpuPowerTier? tier = null)
         {
@@ -111,6 +116,7 @@ namespace UCU.Hardware.Gpu
             _ceiling = ceiling;
             _ec = ec;
             _request = request;
+            _budget = budget;
             _tier = tier ?? GpuPowerTiers.ExtraGpuPower;
             _originalsPath = originalsPath ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
@@ -123,37 +129,41 @@ namespace UCU.Hardware.Gpu
         {
             GpuPowerLimits limits = _ceiling.Read();
             GpuPowerRequestState request = _request.Read();
+            GpuPowerBudgetState budget = _budget.Read();
 
             try
             {
                 string? version = _registry.ReadVbiosVersion();
                 if (version == null)
-                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request, budget: budget);
 
                 if (!RomOverrideLayout.IsPinned(version))
-                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request, budget: budget);
 
                 IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
                 if (records.Count == 0)
-                    return State(GpuRomOverrideStates.NotUnlocked, null, version, limits, request);
+                    return State(GpuRomOverrideStates.NotUnlocked, null, version, limits, request, budget: budget);
 
                 if (!TryReadOriginals(out Originals? originals, out string? fileError))
-                    return State(GpuRomOverrideStates.Unsupported, fileError, version, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, fileError, version, limits, request, budget: budget);
 
                 if (ForeignRecordReason(records, originals) is string foreign)
-                    return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request, budget: budget);
 
                 if (CeilingReason(limits) is string unmoved)
-                    return State(GpuRomOverrideStates.Uncertain, unmoved, version, limits, request);
+                    return State(GpuRomOverrideStates.Uncertain, unmoved, version, limits, request, budget: budget);
 
-                return RequestReason(request) is string notAsked
-                    ? State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request)
-                    : State(GpuRomOverrideStates.Unlocked, null, version, limits, request);
+                if (RequestReason(request) is string notAsked)
+                    return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, budget: budget);
+
+                return BudgetReason(budget) is string capped
+                    ? State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, budget: budget)
+                    : State(GpuRomOverrideStates.Unlocked, null, version, limits, request, budget: budget);
             }
             catch (Exception ex)
             {
                 Log.Information("gpu.get_rom_override_state: {Type} {Message}", ex.GetType().Name, ex.Message);
-                return State(GpuRomOverrideStates.Uncertain, ex.Message, null, limits, request);
+                return State(GpuRomOverrideStates.Uncertain, ex.Message, null, limits, request, budget: budget);
             }
         }
 
@@ -163,23 +173,24 @@ namespace UCU.Hardware.Gpu
         {
             GpuPowerLimits limits = new(null, null);
             GpuPowerRequestState request = new(null, null, null, null);
+            GpuPowerBudgetState budget = new(null, null, null);
             string? version = null;
 
             try
             {
                 version = _registry.ReadVbiosVersion();
                 if (version == null)
-                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request, budget: budget);
 
                 if (!RomOverrideLayout.IsPinned(version))
-                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request, budget: budget);
 
                 IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
                 if (!TryReadOriginals(out Originals? originals, out string? fileError))
-                    return State(GpuRomOverrideStates.Unsupported, fileError, version, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, fileError, version, limits, request, budget: budget);
 
                 if (ForeignRecordReason(records, originals) is string foreign)
-                    return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request);
+                    return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request, budget: budget);
 
                 // (a) The EC's cTGP offset, against this board's own DefaultTGP. The
                 // declared TgpOffsetMax is not enforced (130 → 225 W was accepted).
@@ -234,44 +245,95 @@ namespace UCU.Hardware.Gpu
                     restarted = _restarter.Restart(_registry.InstanceId);
                 }
 
-                // (d) The request: without it the ceiling moves and the card stays on its
+                // (d) The laptop's own power budget. The driver enforces
+                // min(request, budget) and the EC publishes a ~150 W budget, so the
+                // request alone is answered with 150 W (measured 2026-11-15) — this is
+                // the lever that makes the raised ceiling reachable.
+                budget = _budget.Read();
+                if (budget.Budget is not GpuPowerBudget current)
+                {
+                    return State(
+                        GpuRomOverrideStates.Uncertain,
+                        "the records are staged and the EC is offset, but the laptop power budget " +
+                        $"could not be read: {budget.Reason}",
+                        version, limits, request, restarted, budget);
+                }
+
+                // The reference's budget_original_: captured once, before the first raise,
+                // and kept in the originals file so a restore after an app restart still
+                // knows the stock values.
+                if (originals?.Budget == null)
+                    WriteOriginals(version, current);
+
+                if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
+                {
+                    if (!current.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised))
+                    {
+                        return State(
+                            GpuRomOverrideStates.Uncertain,
+                            "the records are staged and the EC is offset, but the raised laptop power budget overflows",
+                            version, limits, request, restarted, budget);
+                    }
+
+                    GpuPowerBudgetState set = _budget.Set(raised);
+                    if (set.Budget is not GpuPowerBudget appliedBudget)
+                    {
+                        return State(
+                            GpuRomOverrideStates.Uncertain,
+                            "the records are staged and the EC is offset, but the laptop power budget " +
+                            $"could not be raised to {Watts(_tier.TgpTargetMilliwatts)}: {set.Reason}",
+                            version, limits, request, restarted, set);
+                    }
+
+                    // Set only answers after its own exact F7 readback matched.
+                    budget = set;
+                    Log.Information(
+                        "gpu.set_rom_override: laptop budget raised {FromF7} -> {F7} mW, platform {Platform} mW",
+                        current.F7Milliwatts, appliedBudget.F7Milliwatts, appliedBudget.PlatformMilliwatts);
+                }
+
+                // (e) The request: without it the ceiling moves and the card stays on its
                 // EC-derived limit, which is the failure this tier shipped with.
                 request = _request.Request(_tier.TgpTargetMilliwatts);
                 limits = _ceiling.Read();
 
                 Log.Information(
-                    "gpu.set_rom_override: {Tier} staged on {Version} ({Records} records), GPU restart {Restart}, ceiling {Ceiling} mW, current limit {Current} mW, request {Request} mW",
+                    "gpu.set_rom_override: {Tier} staged on {Version} ({Records} records), GPU restart {Restart}, ceiling {Ceiling} mW, current limit {Current} mW, budget {Budget} mW, request {Request} mW",
                     _tier.Id, version, desired.Count, restarted ? "yes" : "no",
                     limits.CeilingMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
                     limits.CurrentMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                    budget.F7Milliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
                     request.RequestedMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "none");
 
-                // (e) All three, or it is Uncertain and the reason names the failed step.
+                // (f) All four, or it is Uncertain and the reason names the failed step.
                 if (request.Reason is string refused)
                 {
                     return State(
                         GpuRomOverrideStates.Uncertain,
                         $"the records are staged and the ceiling is {CeilingText(limits)}, " +
                         $"but the {Watts(_tier.TgpTargetMilliwatts)} power request failed: {refused}",
-                        version, limits, request, restarted);
+                        version, limits, request, restarted, budget);
                 }
 
                 if (CeilingReason(limits) is string shortfall)
-                    return State(GpuRomOverrideStates.Uncertain, shortfall, version, limits, request, restarted);
+                    return State(GpuRomOverrideStates.Uncertain, shortfall, version, limits, request, restarted, budget);
 
                 if (RequestReason(request) is string notAsked)
-                    return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, restarted);
+                    return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, restarted, budget);
+
+                if (BudgetReason(budget) is string capped)
+                    return State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, restarted, budget);
 
                 return State(
                     GpuRomOverrideStates.Unlocked,
                     staged ? "the records were already staged; the GPU was not restarted" : null,
-                    version, limits, request, restarted);
+                    version, limits, request, restarted, budget);
             }
             catch (Exception ex)
             {
                 // Past the first registry write the key state is unknown: say so.
                 Log.Information("gpu.set_rom_override: {Type} {Message}", ex.GetType().Name, ex.Message);
-                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, limits, request);
+                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, limits, request, budget: budget);
             }
         }
 
@@ -279,6 +341,8 @@ namespace UCU.Hardware.Gpu
         {
             string? version = null;
             GpuPowerRequestState request = new(null, null, null, null);
+            GpuPowerBudgetState budget = new(null, null, null);
+            string? budgetReason = null;
 
             try
             {
@@ -288,21 +352,43 @@ namespace UCU.Hardware.Gpu
                 if (!TryReadOriginals(out Originals? originals, out string? fileError))
                     return State(GpuRomOverrideStates.Unsupported, fileError, version, _ceiling.Read(), _request.Read());
 
+                // The captured budget goes back before anything else: the raise is one of
+                // the staged moves, and doing it first means the F7 value never outlives
+                // the records even if a later step fails. (The GPU restart below also
+                // resets the budget to what the EC publishes.)
+                if (originals?.Budget is GpuPowerBudget baseline)
+                {
+                    GpuPowerBudget applied = baseline.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised)
+                        ? raised
+                        : baseline;
+
+                    GpuPowerBudgetState restored = _budget.Restore(baseline, applied);
+                    budget = restored;
+                    if (!restored.Succeeded)
+                        budgetReason = $"the laptop power budget was not restored: {restored.Reason}";
+                }
+
                 if (records.Count == 0)
                 {
                     // Nothing staged: a no-op, and a stale originals file is dropped so the
-                    // next apply writes fresh stock values.
+                    // next apply writes fresh stock values. A budget that would not go back
+                    // keeps the file: it is the only record of the stock values.
                     if (originals != null)
                     {
-                        DiscardOriginals();
-                        return State(GpuRomOverrideStates.NotUnlocked, "no overrides were staged; the stale originals file was removed", version, _ceiling.Read(), _request.Read());
+                        if (budgetReason is null)
+                        {
+                            DiscardOriginals();
+                            return State(GpuRomOverrideStates.NotUnlocked, "no overrides were staged; the stale originals file was removed", version, _ceiling.Read(), _request.Read());
+                        }
+
+                        return State(GpuRomOverrideStates.Uncertain, budgetReason, version, _ceiling.Read(), _request.Read(), budget: budget);
                     }
 
-                    return State(GpuRomOverrideStates.NotUnlocked, null, version, _ceiling.Read(), _request.Read());
+                    return State(GpuRomOverrideStates.NotUnlocked, budgetReason, version, _ceiling.Read(), _request.Read(), budget: budget);
                 }
 
                 if (ForeignRecordReason(records, originals) is string foreign)
-                    return State(GpuRomOverrideStates.Unsupported, foreign, version, _ceiling.Read(), _request.Read());
+                    return State(GpuRomOverrideStates.Unsupported, foreign, version, _ceiling.Read(), _request.Read(), budget: budget);
 
                 foreach (string name in records.Keys)
                     _registry.DeleteRecord(name);
@@ -311,7 +397,7 @@ namespace UCU.Hardware.Gpu
 
                 IReadOnlyDictionary<string, byte[]> readback = _registry.ReadRecords();
                 if (readback.Count != 0)
-                    return State(GpuRomOverrideStates.Uncertain, "not every override record disappeared from the driver key", version, _ceiling.Read(), _request.Read());
+                    return State(GpuRomOverrideStates.Uncertain, "not every override record disappeared from the driver key", version, _ceiling.Read(), _request.Read(), budget: budget);
 
                 // The EC byte goes back to the value captured before our activation, then
                 // the restart — which is also what clears the driver's request.
@@ -322,10 +408,11 @@ namespace UCU.Hardware.Gpu
                 request = _request.Read();
 
                 Log.Information(
-                    "gpu.set_rom_override: stock restored on {Version}, GPU restart {Restart}, ceiling {Ceiling} mW, current limit {Current} mW, request {Request} mW",
+                    "gpu.set_rom_override: stock restored on {Version}, GPU restart {Restart}, ceiling {Ceiling} mW, current limit {Current} mW, budget {Budget} mW, request {Request} mW",
                     version, restarted ? "yes" : "no",
                     limits.CeilingMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
                     limits.CurrentMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                    budget.F7Milliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
                     request.RequestedMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "none");
 
                 // The records are gone; a ceiling still above stock is the driver holding
@@ -335,7 +422,7 @@ namespace UCU.Hardware.Gpu
                     return State(
                         GpuRomOverrideStates.Uncertain,
                         $"the records are gone but the driver still reports a {Watts(ceiling)} ceiling, not {Watts(RomOverrideLayout.StockPowerMilliwatts)}",
-                        version, limits, request, restarted);
+                        version, limits, request, restarted, budget);
                 }
 
                 // A restart is what clears the request; one that survived would keep the
@@ -345,7 +432,7 @@ namespace UCU.Hardware.Gpu
                     return State(
                         GpuRomOverrideStates.Uncertain,
                         $"the records are gone but the power request could not be read back: {unread}",
-                        version, limits, request, restarted);
+                        version, limits, request, restarted, budget);
                 }
 
                 if (request.RequestedMilliwatts is int stillSet)
@@ -353,16 +440,19 @@ namespace UCU.Hardware.Gpu
                     return State(
                         GpuRomOverrideStates.Uncertain,
                         $"the records are gone but the driver still carries a {Watts(stillSet)} power request",
-                        version, limits, request, restarted);
+                        version, limits, request, restarted, budget);
                 }
 
+                if (budgetReason is string notRestored)
+                    return State(GpuRomOverrideStates.Uncertain, $"the records are gone but {notRestored}", version, limits, request, restarted, budget);
+
                 DiscardOriginals();
-                return State(GpuRomOverrideStates.NotUnlocked, null, version, limits, request, restarted);
+                return State(GpuRomOverrideStates.NotUnlocked, null, version, limits, request, restarted, budget);
             }
             catch (Exception ex)
             {
                 Log.Information("gpu.set_rom_override: {Type} {Message}", ex.GetType().Name, ex.Message);
-                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, new GpuPowerLimits(null, null), request);
+                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, new GpuPowerLimits(null, null), request, budget: budget);
             }
         }
 
@@ -372,7 +462,8 @@ namespace UCU.Hardware.Gpu
             string? version,
             GpuPowerLimits limits,
             GpuPowerRequestState? request = null,
-            bool restarted = false) => new()
+            bool restarted = false,
+            GpuPowerBudgetState? budget = null) => new()
         {
             State = state,
             Reason = reason,
@@ -384,6 +475,7 @@ namespace UCU.Hardware.Gpu
             BoardInputMilliAmps = _tier.BoardInputMilliAmps,
             CeilingLimitMilliwatts = limits.CeilingMilliwatts,
             CurrentLimitMilliwatts = limits.CurrentMilliwatts,
+            BudgetMilliwatts = budget?.F7Milliwatts,
             RequestedLimitMilliwatts = request?.RequestedMilliwatts,
             EnforcedLimitMoved = limits.CeilingMilliwatts is int ceiling && ceiling > RomOverrideLayout.StockPowerMilliwatts,
             Restarted = restarted,
@@ -417,6 +509,18 @@ namespace UCU.Hardware.Gpu
 
         private static string CeilingText(GpuPowerLimits limits) =>
             limits.CeilingMilliwatts is int ceiling ? Watts(ceiling) : "unknown";
+
+        /// <summary>
+        /// Why the laptop's own budget cannot carry the tier, or null when it can. The
+        /// driver enforces min(request, budget), so a budget below the target would cap
+        /// the request no matter what the ceiling says.
+        /// </summary>
+        private string? BudgetReason(GpuPowerBudgetState budget) =>
+            budget.Budget is not GpuPowerBudget current
+                ? $"the laptop power budget could not be read: {budget.Reason}"
+                : current.F7Milliwatts >= _tier.TgpTargetMilliwatts
+                    ? null
+                    : $"the driver reports a {Watts(current.F7Milliwatts)} laptop power budget, not {Watts(_tier.TgpTargetMilliwatts)}";
 
         private static string Watts(int milliwatts) =>
             (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W";
@@ -495,6 +599,9 @@ namespace UCU.Hardware.Gpu
             }
 
             var values = new Dictionary<uint, uint>();
+            int? f7 = null;
+            int? platform = null;
+
             for (int i = 1; i < lines.Length; i++)
             {
                 string line = lines[i].Trim();
@@ -502,8 +609,50 @@ namespace UCU.Hardware.Gpu
                     continue;
 
                 int equal = line.IndexOf('=');
-                if (equal <= 0 ||
-                    !uint.TryParse(line.AsSpan(0, equal), NumberStyles.None, CultureInfo.InvariantCulture, out uint offset) ||
+                if (equal <= 0)
+                {
+                    error = "the UCU GPU originals file is malformed";
+                    return false;
+                }
+
+                // The captured laptop budget rides the same file (f7 / platform lines):
+                // a restore after an app restart must still know the stock values.
+                string name = line.Substring(0, equal).Trim();
+                if (name.Equals("f7", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("platform", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!int.TryParse(line.AsSpan(equal + 1), NumberStyles.None, CultureInfo.InvariantCulture, out int milliwatts) ||
+                        milliwatts <= 0)
+                    {
+                        error = "the UCU GPU originals file is malformed";
+                        return false;
+                    }
+
+                    if (name.Equals("f7", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (f7 != null)
+                        {
+                            error = "the UCU GPU originals file is malformed";
+                            return false;
+                        }
+
+                        f7 = milliwatts;
+                    }
+                    else
+                    {
+                        if (platform != null)
+                        {
+                            error = "the UCU GPU originals file is malformed";
+                            return false;
+                        }
+
+                        platform = milliwatts;
+                    }
+
+                    continue;
+                }
+
+                if (!uint.TryParse(line.AsSpan(0, equal), NumberStyles.None, CultureInfo.InvariantCulture, out uint offset) ||
                     !uint.TryParse(line.AsSpan(equal + 1), NumberStyles.None, CultureInfo.InvariantCulture, out uint value) ||
                     !values.TryAdd(offset, value))
                 {
@@ -512,15 +661,26 @@ namespace UCU.Hardware.Gpu
                 }
             }
 
-            originals = new Originals(version, values);
+            if (f7.HasValue != platform.HasValue)
+            {
+                error = "the UCU GPU originals file carries only half of the captured power budget";
+                return false;
+            }
+
+            originals = new Originals(
+                version,
+                values,
+                f7 is int budgetF7 && platform is int budgetPlatform ? new GpuPowerBudget(budgetF7, budgetPlatform) : null);
             return true;
         }
 
         /// <summary>
         /// The stock values, written tmp → fsync → move BEFORE the first registry write:
-        /// a torn key can always be traced back to the values the ROM had.
+        /// a torn key can always be traced back to the values the ROM had. The laptop
+        /// budget is only known after the GPU restart, so it is written by a second pass
+        /// (same atomic write) as soon as it has been read.
         /// </summary>
-        private void WriteOriginals(string version)
+        private void WriteOriginals(string version, GpuPowerBudget? budget = null)
         {
             string? directory = Path.GetDirectoryName(_originalsPath);
             if (!string.IsNullOrEmpty(directory))
@@ -533,6 +693,16 @@ namespace UCU.Hardware.Gpu
                     .Append(field.Offset.ToString(CultureInfo.InvariantCulture))
                     .Append('=')
                     .Append(field.StockValue.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (budget is GpuPowerBudget captured)
+            {
+                text.Append('\n')
+                    .Append("f7=")
+                    .Append(captured.F7Milliwatts.ToString(CultureInfo.InvariantCulture))
+                    .Append('\n')
+                    .Append("platform=")
+                    .Append(captured.PlatformMilliwatts.ToString(CultureInfo.InvariantCulture));
             }
 
             string temporary = _originalsPath + ".tmp";
@@ -553,7 +723,7 @@ namespace UCU.Hardware.Gpu
                 File.Delete(_originalsPath);
         }
 
-        private sealed record Originals(string Version, Dictionary<uint, uint> Values);
+        private sealed record Originals(string Version, Dictionary<uint, uint> Values, GpuPowerBudget? Budget);
     }
 
     /// <summary>

@@ -22,6 +22,7 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
         BoardInputMilliAmps = 14_026,
         CeilingLimitMilliwatts = 175_000,
         CurrentLimitMilliwatts = 95_000,
+        BudgetMilliwatts = 150_000,
         RequestedLimitMilliwatts = null,
     };
 

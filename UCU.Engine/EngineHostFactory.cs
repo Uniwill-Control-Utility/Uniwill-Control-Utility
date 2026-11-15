@@ -100,7 +100,9 @@ namespace UCU.Engine
                     options.GpuTuningOverride ?? new UCU.Hardware.Gpu.NvApiGpuTuning());
 
                 // The GPU power-ceiling override: HKLM records on the display
-                // driver's key plus a display-adapter restart. It resolves the
+                // driver's key plus a display-adapter restart, then the laptop's own
+                // power budget (the driver's F7 value — the cap the request is
+                // answered with) and the driver's power request. It resolves the
                 // adapter through the same PnP service the device rows use, so a
                 // stale duplicate driver key on the machine is never written.
                 services.AddSingleton<UCU.Hardware.Gpu.IGpuRomOverrideService>(sp =>
@@ -110,7 +112,8 @@ namespace UCU.Engine
                         new UCU.Hardware.Gpu.PnputilGpuRestarter(),
                         new UCU.Hardware.Gpu.NvmlPowerCeilingProbe(),
                         new GatedEcGpuPower(sp.GetRequiredService<EcEngineGate>()),
-                        new UCU.Hardware.Gpu.NvApiPowerRequest()));
+                        new UCU.Hardware.Gpu.NvApiPowerRequest(),
+                        new UCU.Hardware.Gpu.NvApiPowerBudget()));
 
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();

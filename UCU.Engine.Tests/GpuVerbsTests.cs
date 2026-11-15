@@ -130,6 +130,7 @@ public sealed class GpuVerbsTests
                 BoardInputMilliAmps = 14_026,
                 CeilingLimitMilliwatts = 250_000,
                 CurrentLimitMilliwatts = 150_000,
+                BudgetMilliwatts = 225_000,
                 RequestedLimitMilliwatts = 225_000,
                 EnforcedLimitMoved = true,
                 Restarted = true,
@@ -146,6 +147,7 @@ public sealed class GpuVerbsTests
         Assert.Equal(14_026, state.BoardInputMilliAmps);
         Assert.Equal(250_000, state.CeilingLimitMilliwatts);
         Assert.Equal(150_000, state.CurrentLimitMilliwatts);
+        Assert.Equal(225_000, state.BudgetMilliwatts);
         Assert.Equal(225_000, state.RequestedLimitMilliwatts);
         Assert.True(state.EnforcedLimitMoved);
         Assert.True(state.Restarted);

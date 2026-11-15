@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -60,11 +61,13 @@ namespace Uniwill_Control_Utility.Services
 
         private readonly IEngineCapability _engine;
         private readonly IOemCapability _oem;
+        private readonly IGpuTuningCapability? _gpu;
 
-        public DiagnosticsExportService(IEngineCapability engine, IOemCapability oem)
+        public DiagnosticsExportService(IEngineCapability engine, IOemCapability oem, IGpuTuningCapability? gpu = null)
         {
             _engine = engine;
             _oem = oem;
+            _gpu = gpu;
         }
 
         /// <summary>Writes the bundle to <paramref name="targetZip"/> and answers
@@ -124,7 +127,7 @@ namespace Uniwill_Control_Utility.Services
                 }
 
                 await File.WriteAllTextAsync(
-                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote), cancellationToken);
+                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote, ReadBudget()), cancellationToken);
 
                 string? directory = Path.GetDirectoryName(targetZip);
                 if (!string.IsNullOrEmpty(directory))
@@ -195,12 +198,18 @@ namespace Uniwill_Control_Utility.Services
         /// The hardware file's text. Pure: the same dump produces the same bytes, and a
         /// missing dump renders the reason instead of throwing.
         /// </summary>
-        public static string ComposeHardware(EcHardwareDumpDto? dump, string note)
+        public static string ComposeHardware(EcHardwareDumpDto? dump, string note, int? budgetMilliwatts = null)
         {
             var text = new StringBuilder();
             text.AppendLine("Uniwill Control Utility - EC hardware state");
             text.AppendLine("Generated: " + DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"));
             text.AppendLine("Collection: " + (string.IsNullOrWhiteSpace(note) ? "unknown" : note));
+
+            // The laptop's own power budget (the driver's F7 value): the driver enforces
+            // min(request, budget), so without this number a report cannot say why a
+            // raised ceiling still enforced 150 W.
+            text.AppendLine("GPU power budget (F7): " +
+                            (budgetMilliwatts is int budget ? Watts(budget) : "unknown (engine unreachable)"));
 
             if (dump is null)
             {
@@ -240,6 +249,29 @@ namespace Uniwill_Control_Utility.Services
             text.AppendLine("  GPU duty     " + HexBytes(dump.GpuDuty));
             return text.ToString();
         }
+
+        /// <summary>
+        /// The F7 budget the engine sees, read-only and best-effort: an unreachable engine
+        /// renders "unknown" instead of failing the export.
+        /// </summary>
+        private int? ReadBudget()
+        {
+            if (_gpu is null)
+                return null;
+
+            try
+            {
+                using var gpuCts = new CancellationTokenSource(HardwareDumpBudget);
+                return _gpu.GetRomOverrideStateAsync(gpuCts.Token).GetAwaiter().GetResult().BudgetMilliwatts;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string Watts(int milliwatts) =>
+            (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W (" + milliwatts + " mW)";
 
         /// <summary>
         /// The EC's per-model power table (ECSpec, IOCTL 0x9C40A500) as one line: the numbers a

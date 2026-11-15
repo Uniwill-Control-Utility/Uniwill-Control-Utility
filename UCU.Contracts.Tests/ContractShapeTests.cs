@@ -283,10 +283,11 @@ public sealed class ContractShapeTests
     }
 
     [Fact]
-    public void GpuRomOverrideState_CarriesTheCeilingTheCurrentLimitAndTheRequestOnTheWire()
+    public void GpuRomOverrideState_CarriesTheCeilingTheCurrentLimitTheBudgetAndTheRequestOnTheWire()
     {
-        // The card renders all three, so the names are part of the contract: the ceiling
-        // is the constraint max the records raise, the current limit is what NVML enforces
+        // The card renders all four, so the names are part of the contract: the ceiling
+        // is the constraint max the records raise, the current limit is what NVML enforces,
+        // the budget is the laptop's own F7 cap (the driver enforces min(request, budget))
         // and the request is what the driver was asked for (the number that delivers the
         // watts — a ceiling alone leaves the card on its EC-derived limit). Renaming any of
         // them without the other side is a silent 'not read'.
@@ -294,11 +295,13 @@ public sealed class ContractShapeTests
         {
             CeilingLimitMilliwatts = 250_000,
             CurrentLimitMilliwatts = 150_000,
+            BudgetMilliwatts = 225_000,
             RequestedLimitMilliwatts = 225_000,
         });
 
         Assert.Equal(250_000, element.GetProperty("ceilingLimitMilliwatts").GetInt32());
         Assert.Equal(150_000, element.GetProperty("currentLimitMilliwatts").GetInt32());
+        Assert.Equal(225_000, element.GetProperty("budgetMilliwatts").GetInt32());
         Assert.Equal(225_000, element.GetProperty("requestedLimitMilliwatts").GetInt32());
         Assert.False(element.TryGetProperty("enforcedLimitMilliwatts", out _));
 

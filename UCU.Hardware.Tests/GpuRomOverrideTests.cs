@@ -140,8 +140,9 @@ public sealed class GpuRomOverrideTests : IDisposable
         var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
         var ec = new FakeEc(_log) { DefaultTgpWatts = 95 };
         var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
 
-        GpuRomOverrideStateDto state = NewStore(registry, restarter, ceiling, ec, request).SetEnabled(true);
+        GpuRomOverrideStateDto state = NewStore(registry, restarter, ceiling, ec, request, budget).SetEnabled(true);
 
         Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
         Assert.Null(state.Reason);
@@ -170,25 +171,36 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal(225_000, state.RequestedLimitMilliwatts!.Value);
         Assert.Equal(250_000, state.CeilingLimitMilliwatts!.Value);
 
-        // Ordering: EC first, then the records, then the restart, then the request.
+        // The laptop budget is what the request is capped by: measured 150 W / 425 W, so
+        // the raise takes 75 W of headroom and the platform follows to 500 W.
+        Assert.Equal(new[] { new GpuPowerBudget(225_000, 500_000) }, budget.Sets);
+        Assert.Equal(225_000, state.BudgetMilliwatts!.Value);
+
+        // Ordering: EC first, then the records, then the restart, then the budget, then
+        // the request (a raise before the restart is undone by it).
         int ecIndex = _log.IndexOf("ec.activate:130,0");
         int writeIndex = _log.IndexOf("write:romOverride00");
         int flushIndex = _log.IndexOf("flush");
         int restartIndex = _log.IndexOf("restart");
+        int budgetIndex = _log.IndexOf("budget.set:225000,500000");
         int requestIndex = _log.IndexOf("request:225000");
         Assert.True(ecIndex >= 0 && ecIndex < writeIndex, string.Join(",", _log));
         Assert.True(writeIndex < flushIndex, string.Join(",", _log));
         Assert.True(flushIndex < restartIndex, string.Join(",", _log));
-        Assert.True(restartIndex < requestIndex, string.Join(",", _log));
+        Assert.True(restartIndex < budgetIndex, string.Join(",", _log));
+        Assert.True(budgetIndex < requestIndex, string.Join(",", _log));
 
-        // version line, then offset=value lines (decimal, as the reference writes them).
+        // version line, then offset=value lines (decimal, as the reference writes them),
+        // then the captured budget a restore after an app restart still needs.
         string[] lines = File.ReadAllLines(OriginalsPath);
         Assert.Equal("98.03.5E.00.5D", lines[0]);
         Assert.Equal("359478=175000", lines[1]);   // 0x57C36
         Assert.Equal("360192=11053", lines[3]);    // 0x57F00
         Assert.Equal("360600=210000", lines[5]);   // 0x58098
         Assert.Equal("360702=60000", lines[7]);    // 0x580FE
-        Assert.Equal(8, lines.Length);
+        Assert.Equal("f7=150000", lines[8]);
+        Assert.Equal("platform=425000", lines[9]);
+        Assert.Equal(10, lines.Length);
     }
 
     [Fact]
@@ -418,8 +430,136 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
-    public void Apply_WhenNvmlRefuses_ReportsBothLimitsAsUnread_AndStaysUncertain()
+    public void Apply_WhenTheBudgetCannotBeRead_IsUncertain_AndDoesNotAskTheDriver()
     {
+        // The F7 value is unreadable (measured after a driver reset): the records and the
+        // EC are already staged, so the state is partial and says which move failed. The
+        // request is not made — it would be capped by a budget nobody can read.
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log) { Failure = "the laptop power budget is unreadable; restart the GPU" };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget)
+            .SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, state.State);
+        Assert.Equal(
+            "the records are staged and the EC is offset, but the laptop power budget could not be read: " +
+            "the laptop power budget is unreadable; restart the GPU",
+            state.Reason);
+        Assert.True(state.Restarted);
+        Assert.Empty(request.Requests);
+        Assert.Null(state.BudgetMilliwatts);
+    }
+
+    [Fact]
+    public void Apply_WhenTheBudgetRefusesTheRaise_IsUncertain_AndNamesTheFailedStep()
+    {
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log) { Refused = "the F7 dispatch signature was not found in this nvapi64" };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget)
+            .SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, state.State);
+        Assert.Equal(
+            "the records are staged and the EC is offset, but the laptop power budget could not be raised to 225 W: " +
+            "the F7 dispatch signature was not found in this nvapi64",
+            state.Reason);
+        Assert.Empty(request.Requests);
+        Assert.Equal(150_000, state.BudgetMilliwatts);
+    }
+
+    [Fact]
+    public void Apply_WhenTheBudgetIsAlreadyAboveTheTarget_DoesNotLowerIt()
+    {
+        // The EC can publish more than the tier asks for (Dynamic Boost): that is not a
+        // raise, and the budget is never brought down to the target.
+        var budget = new FakeBudget(_log) { Original = new GpuPowerBudget(250_000, 500_000) };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget)
+            .SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Empty(budget.Sets);
+        Assert.Equal(250_000, state.BudgetMilliwatts);
+    }
+
+    [Fact]
+    public void GetState_ReportsTheBudgetAndSaysWhenItIsUnreadable()
+    {
+        var budget = new FakeBudget(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        Assert.Equal(225_000, store.GetState().BudgetMilliwatts);
+
+        budget.Failure = "the laptop power budget is unreadable; restart the GPU";
+        GpuRomOverrideStateDto unread = store.GetState();
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, unread.State);
+        Assert.Equal(
+            "the laptop power budget could not be read: the laptop power budget is unreadable; restart the GPU",
+            unread.Reason);
+        Assert.Null(unread.BudgetMilliwatts);
+    }
+
+    [Fact]
+    public void Restore_PutsTheBudgetBackBeforeTheRecordsGo()
+    {
+        var budget = new FakeBudget(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling,
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        Assert.Equal(new GpuPowerBudget(225_000, 500_000), budget.Current);
+
+        ceiling.Ceiling = 175_000;
+        _log.Clear();
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+
+        // The captured baseline comes back, and it happens before the records are dropped:
+        // the raise is one of the staged moves and must not outlive them.
+        Assert.Equal(new GpuPowerBudget(150_000, 425_000), budget.LastRestored);
+        int restoreIndex = _log.IndexOf("budget.restore:150000,425000");
+        int deleteIndex = _log.IndexOf("delete:romOverride00");
+        int deactivateIndex = _log.IndexOf("ec.deactivate");
+        int restartIndex = _log.IndexOf("restart");
+        Assert.True(restoreIndex >= 0 && restoreIndex < deleteIndex, string.Join(",", _log));
+        Assert.True(deleteIndex < deactivateIndex, string.Join(",", _log));
+        Assert.True(deactivateIndex < restartIndex, string.Join(",", _log));
+    }
+
+    [Fact]
+    public void Restore_LeavesAPlatformBudgetAnotherWriterMoved()
+    {
+        // The reference's restore only rewrites a half that still carries what we applied:
+        // a platform budget someone else raised is theirs to keep.
+        var budget = new FakeBudget(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling,
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        budget.Current = new GpuPowerBudget(225_000, 460_000);   // platform moved by another writer
+
+        ceiling.Ceiling = 175_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+        Assert.Equal(new GpuPowerBudget(150_000, 460_000), budget.LastRestored);
+    }
+
+    [Fact]
+    public void Apply_WhenNvmlRefuses_ReportsBothLimitsAsUnread_AndStaysUncertain()    {
         // A refused read is unknown, never "not moved": the card shows 'not read'.
         GpuRomOverrideStateDto state = NewStore(
             new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log), new FakeEc(_log), new FakeRequest(_log))
@@ -659,10 +799,17 @@ public sealed class GpuRomOverrideTests : IDisposable
         FakeRestarter restarter,
         FakeCeiling ceiling,
         FakeEc ec,
-        FakeRequest request)
+        FakeRequest request,
+        FakeBudget? budget = null)
     {
-        restarter.OnRestart = request.Forget;
-        return new(registry, restarter, ceiling, ec, request, OriginalsPath);
+        budget ??= new FakeBudget(_log);
+        restarter.OnRestart = () =>
+        {
+            request.Forget();
+            budget.Reset();
+        };
+
+        return new(registry, restarter, ceiling, ec, request, budget, OriginalsPath);
     }
 
     private static string Hex(byte[] data) => BitConverter.ToString(data).ToUpperInvariant();
@@ -846,5 +993,81 @@ public sealed class GpuRomOverrideTests : IDisposable
 
         private static GpuPowerRequestState From(uint? milliwatts) =>
             new(milliwatts is uint value ? (int)value : (int?)null, 5_000, 250_000, null);
+    }
+
+    /// <summary>
+    /// The laptop's power budget. The measured machine published f7 150 W and a 425 W
+    /// platform budget; a raise takes the headroom from the platform half (225 W -> 500 W)
+    /// and a GPU restart republishes the EC's own values.
+    /// </summary>
+    private sealed class FakeBudget : INvApiPowerBudget
+    {
+        private readonly List<string> _log;
+
+        public FakeBudget(List<string> log)
+        {
+            _log = log;
+            Current = Original;
+        }
+
+        /// <summary>The EC's published budget: what the driver carries after a restart.</summary>
+        public GpuPowerBudget Original { get; set; } = new(150_000, 425_000);
+
+        public GpuPowerBudget Current { get; set; }
+
+        /// <summary>When set, every answer is this refusal.</summary>
+        public string? Failure { get; set; }
+
+        /// <summary>When set, Set answers the refusal instead of accepting the target.</summary>
+        public string? Refused { get; set; }
+
+        public List<GpuPowerBudget> Sets { get; } = new();
+
+        /// <summary>The budget a restore left behind (the restart republishes after it).</summary>
+        public GpuPowerBudget? LastRestored { get; private set; }
+
+        /// <summary>What the GPU restart does to the budget on the measured machine.</summary>
+        public void Reset() => Current = Original;
+
+        public GpuPowerBudgetState Read()
+        {
+            _log.Add("budget.read");
+            return Failure != null
+                ? new GpuPowerBudgetState(null, null, Failure)
+                : new GpuPowerBudgetState(Current.F7Milliwatts, Current.PlatformMilliwatts, null);
+        }
+
+        public GpuPowerBudgetState Set(GpuPowerBudget target)
+        {
+            Sets.Add(target);
+            _log.Add($"budget.set:{target.F7Milliwatts},{target.PlatformMilliwatts}");
+
+            if (Failure != null)
+                return new GpuPowerBudgetState(null, null, Failure);
+
+            if (Refused != null)
+                return new GpuPowerBudgetState(Current.F7Milliwatts, Current.PlatformMilliwatts, Refused);
+
+            Current = target;
+            return new GpuPowerBudgetState(target.F7Milliwatts, target.PlatformMilliwatts, null);
+        }
+
+        public GpuPowerBudgetState Restore(GpuPowerBudget baseline, GpuPowerBudget applied)
+        {
+            _log.Add($"budget.restore:{baseline.F7Milliwatts},{baseline.PlatformMilliwatts}");
+
+            if (Failure != null)
+                return new GpuPowerBudgetState(null, null, Failure);
+
+            GpuPowerBudget desired = Current;
+            if (Current.F7Milliwatts == applied.F7Milliwatts)
+                desired = desired with { F7Milliwatts = baseline.F7Milliwatts };
+            if (Current.PlatformMilliwatts == applied.PlatformMilliwatts)
+                desired = desired with { PlatformMilliwatts = baseline.PlatformMilliwatts };
+
+            Current = desired;
+            LastRestored = desired;
+            return new GpuPowerBudgetState(Current.F7Milliwatts, Current.PlatformMilliwatts, null);
+        }
     }
 }

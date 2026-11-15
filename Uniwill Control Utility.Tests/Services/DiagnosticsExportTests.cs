@@ -94,6 +94,7 @@ public sealed class DiagnosticsExportTests
             string hardwareText = hardwareReader.ReadToEnd();
             Assert.Contains("EC hardware state", hardwareText);
             Assert.Contains("No EC state was read", hardwareText);
+            Assert.Contains("GPU power budget (F7): unknown", hardwareText);
         }
         finally
         {
@@ -161,6 +162,15 @@ public sealed class DiagnosticsExportTests
         Assert.Contains("TCC raw 10", text);               // the raw byte: its meaning is machine-dependent
         Assert.DoesNotContain("95 C)", text);               // never a derived ceiling - 95 would read as 10 C
         Assert.Contains("DB CPU TDP n/a", text);           // 0xFF is "not applicable", not a wattage
+    }
+
+    [Fact]
+    public void HardwareComposer_RendersTheLaptopPowerBudget()
+    {
+        // The driver enforces min(request, budget): a report without this number cannot
+        // explain why a raised ceiling still enforced 150 W.
+        Assert.Contains("GPU power budget (F7): 225 W (225000 mW)", DiagnosticsExportService.ComposeHardware(Dump(), "collected", 225_000));
+        Assert.Contains("GPU power budget (F7): unknown", DiagnosticsExportService.ComposeHardware(Dump(), "collected"));
     }
 
     [Fact]

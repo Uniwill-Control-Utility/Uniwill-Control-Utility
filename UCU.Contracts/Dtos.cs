@@ -807,6 +807,13 @@ namespace UCU.Contracts
         public int? CurrentLimitMilliwatts { get; init; }
 
         /// <summary>
+        /// The laptop's own power budget (the driver's F7 value) in mW. The driver
+        /// enforces min(request, budget), so a request above this budget is answered with
+        /// the budget — null when it could not be read, which is not the same as "no cap".
+        /// </summary>
+        public int? BudgetMilliwatts { get; init; }
+
+        /// <summary>
         /// The board-power request the driver carries - the number it actually enforces
         /// against the ceiling. Null when no request is set (the card then stays on its
         /// EC-derived limit) or when it could not be read; <see cref="Reason"/> says which.
