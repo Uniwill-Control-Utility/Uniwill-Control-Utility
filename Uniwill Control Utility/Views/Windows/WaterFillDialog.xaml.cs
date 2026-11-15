@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Controls;
 
 namespace Uniwill_Control_Utility.Views.Windows
@@ -25,7 +26,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // Hide start button, center cancel button
             btnStart.Visibility = Visibility.Collapsed;
             Grid.SetColumn(btnCancel, 2);
-            btnCancel.Content = "Cancel";
+            btnCancel.Content = LocalizationService.Get("Cancel");
             btnCancel.IsEnabled = true;
             ProgressPanel.Visibility = Visibility.Visible;
 
@@ -47,8 +48,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // Completed normally
                 Dispatcher.Invoke(() =>
                 {
-                    StatusText.Text = "Water filling complete.";
-                    btnCancel.Content = "Close";
+                    StatusText.Text = LocalizationService.Get("Water filling complete.");
+                    btnCancel.Content = LocalizationService.Get("Close");
                     btnCancel.IsEnabled = true;
                 });
             }
@@ -56,8 +57,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 Dispatcher.Invoke(() =>
                 {
-                    StatusText.Text = "Filling cycle cancelled.";
-                    btnCancel.Content = "Close";
+                    StatusText.Text = LocalizationService.Get("Filling cycle cancelled.");
+                    btnCancel.Content = LocalizationService.Get("Close");
                     btnCancel.IsEnabled = true;
                 });
             }
@@ -72,7 +73,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (_primingCts != null)
             {
                 btnCancel.IsEnabled = false;
-                StatusText.Text = "Cancelling...";
+                StatusText.Text = LocalizationService.Get("Cancelling...");
                 _primingCts.Cancel();
             }
             else

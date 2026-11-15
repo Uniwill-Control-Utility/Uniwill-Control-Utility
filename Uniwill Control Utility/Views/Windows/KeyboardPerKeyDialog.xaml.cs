@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
+using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Controls;
 using Wpf.Ui.Controls;
 
@@ -58,7 +59,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // Defer to Render so the visualizer Viewbox has measured its children.
             Application.Current.Dispatcher.InvokeAsync(() => LoadColors(),
                 System.Windows.Threading.DispatcherPriority.Render);
-            _statusText.Text = "Ready — click keys and choose a color, then Apply.";
+            _statusText.Text = LocalizationService.Get("Ready — click keys and choose a color, then Apply.");
         }
 
         private void LoadColors()
@@ -73,13 +74,13 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
             _visualizer.SelectAll();
-            _statusText.Text = "All keys selected. Pick a color and click Apply.";
+            _statusText.Text = LocalizationService.Get("All keys selected. Pick a color and click Apply.");
         }
 
         private void ClearSelection_Click(object sender, RoutedEventArgs e)
         {
             _visualizer.ClearSelection();
-            _statusText.Text = "Selection cleared.";
+            _statusText.Text = LocalizationService.Get("Selection cleared.");
         }
 
         private void FillAll_Click(object sender, RoutedEventArgs e)
@@ -97,7 +98,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             var selected = _visualizer.GetSelectedZoneIndices();
             if (selected.Count == 0)
             {
-                _statusText.Text = "No keys selected — click keys on the keyboard first.";
+                _statusText.Text = LocalizationService.Get("No keys selected — click keys on the keyboard first.");
                 return;
             }
 

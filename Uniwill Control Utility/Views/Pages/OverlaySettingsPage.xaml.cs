@@ -94,7 +94,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 RtssStatusIcon.Glyph = "\uE930"; // Positive
                 RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorSuccessBrush") as System.Windows.Media.Brush;
-                RtssStatusText.Text = "RTSS running";
+                RtssStatusText.Text = LocalizationService.Get("RTSS running");
                 RtssStatusText.Foreground = Application.Current.FindResource("TextFillColorSecondaryBrush") as System.Windows.Media.Brush;
                 RtssStartButton.Visibility = Visibility.Collapsed;
                 RtssStartButton.IsEnabled = true;
@@ -103,7 +103,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 RtssStatusIcon.Glyph = "\uE7BA"; // Warning
                 RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
-                RtssStatusText.Text = "RTSS not running";
+                RtssStatusText.Text = LocalizationService.Get("RTSS not running");
                 RtssStatusText.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
 
                 // The Start affordance: installed, image located, idle (the

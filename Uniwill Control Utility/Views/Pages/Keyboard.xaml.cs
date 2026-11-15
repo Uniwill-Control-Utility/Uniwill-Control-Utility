@@ -436,7 +436,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             UpdateStreamerRowsVisibility();
             UpdateSpeedSliderRange();
             if (isPerKey)
-                _statusText.Text = "Select keys to edit their color.";
+                _statusText.Text = LocalizationService.Get("Select keys to edit their color.");
             else
                 UpdateBetterRgbStatus();
 
@@ -614,18 +614,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             var streamer = App.GetService<BetterRgbStreamService>();
             if (streamer == null)
             {
-                _statusText.Text = "Hardware MCU";
+                _statusText.Text = LocalizationService.Get("Hardware MCU");
                 return;
             }
             if (streamer.IsUnsupported)
             {
-                _statusText.Text = "Streamer unsupported (hardware fallback active)";
+                _statusText.Text = LocalizationService.Get("Streamer unsupported (hardware fallback active)");
                 return;
             }
             if (streamer.IsRunning)
                 _statusText.Text = $"Streamer: running @{streamer.EffectiveFps} FPS — {streamer.TotalRenderedFrames:N0} frames";
             else
-                _statusText.Text = "Hardware MCU";
+                _statusText.Text = LocalizationService.Get("Hardware MCU");
         }
 
         /// <summary>
@@ -1374,7 +1374,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Visible;
-                MultiColorTitle.Text = "Effect Colors";
+                MultiColorTitle.Text = LocalizationService.Get("Effect Colors");
                 MultiColorSubtitle.Text = "7 colors required for this effect";
                 MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 7);
             }
@@ -1382,7 +1382,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Visible;
-                MultiColorTitle.Text = "WASD & Arrow Keys";
+                MultiColorTitle.Text = LocalizationService.Get("WASD & Arrow Keys");
                 MultiColorSubtitle.Text = "4 colors for gaming keys";
                 MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 4);
             }
@@ -1764,7 +1764,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (indices.Count == 0)
             {
-                _statusText.Text = "Select keys to edit their color.";
+                _statusText.Text = LocalizationService.Get("Select keys to edit their color.");
                 return;
             }
             _statusText.Text = $"{indices.Count} key{(indices.Count > 1 ? "s" : "")} selected. Pick a color and click Apply.";
@@ -1799,20 +1799,20 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
             _visualizer.SelectAll();
-            _statusText.Text = "All keys selected. Pick a color and click Apply.";
+            _statusText.Text = LocalizationService.Get("All keys selected. Pick a color and click Apply.");
         }
 
         private void ClearSelection_Click(object sender, RoutedEventArgs e)
         {
             _visualizer.ClearSelection();
-            _statusText.Text = "Selection cleared.";
+            _statusText.Text = LocalizationService.Get("Selection cleared.");
         }
 
         private void FillAll_Click(object sender, RoutedEventArgs e)
         {
             if (_hidService == null || !_hidService.IsAvailable)
             {
-                _statusText.Text = "HID controller not available.";
+                _statusText.Text = LocalizationService.Get("HID controller not available.");
                 return;
             }
 
@@ -1854,7 +1854,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             catch (ObjectDisposedException)
             {
-                _statusText.Text = "HID controller disconnected. Please navigate away and back.";
+                _statusText.Text = LocalizationService.Get("HID controller disconnected. Please navigate away and back.");
             }
             catch (Exception ex)
             {
@@ -1866,7 +1866,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_hidService == null || !_hidService.IsAvailable)
             {
-                _statusText.Text = "HID controller not available.";
+                _statusText.Text = LocalizationService.Get("HID controller not available.");
                 return;
             }
 
@@ -1874,7 +1874,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (selected.Count == 0)
             {
-                _statusText.Text = "No keys selected. Click keys on the keyboard first.";
+                _statusText.Text = LocalizationService.Get("No keys selected. Click keys on the keyboard first.");
                 return;
             }
 
@@ -1922,7 +1922,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             catch (ObjectDisposedException)
             {
-                _statusText.Text = "HID controller disconnected. Please navigate away and back.";
+                _statusText.Text = LocalizationService.Get("HID controller disconnected. Please navigate away and back.");
             }
             catch (Exception ex)
             {

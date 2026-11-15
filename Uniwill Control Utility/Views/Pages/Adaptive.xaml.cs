@@ -188,7 +188,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdBs2Pro.Visibility = Visibility.Visible;
 
             bool isBs1 = deviceType == ConnectedDeviceType.BS1;
-            tbBs2ProTitle.Text = "Flydigi Cooler";
+            tbBs2ProTitle.Text = LocalizationService.Get("Flydigi Cooler");
 
             // BS1 has no RGB — hide the RGB Mode row (the divider above it follows that row)
             if (spBs2ProRgbMode is not null)
@@ -2186,7 +2186,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 spWcSmartModeBadge.Visibility = Visibility.Visible;
                 bool tempRgb = _hydroUIService?.GetSettings().SmartModeTemperatureRgb == true;
                 spWcRgb.Visibility = tempRgb ? Visibility.Collapsed : Visibility.Visible;
-                tbWcSmartModeBadgeText.Text = "Smart Mode ON";
+                tbWcSmartModeBadgeText.Text = LocalizationService.Get("Smart Mode ON");
             }
             else
             {
@@ -2500,7 +2500,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     spWcPumpFan.Visibility = Visibility.Collapsed;
                     spWcSmartModeBadge.Visibility = Visibility.Visible;
-                    tbWcSmartModeBadgeText.Text = "Smart Mode ON";
+                    tbWcSmartModeBadgeText.Text = LocalizationService.Get("Smart Mode ON");
 
                     // Hide RGB controls when Smart Mode temperature-based RGB is active
                     bool tempRgb = _hydroUIService?.GetSettings().SmartModeTemperatureRgb == true;
@@ -3566,7 +3566,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 spKbColor.Visibility = Visibility.Collapsed;
                 spKbMultiColor.Visibility = Visibility.Visible;
-                tbKbMultiColorTitle.Text = "Effect Colors";
+                tbKbMultiColorTitle.Text = LocalizationService.Get("Effect Colors");
                 tbKbMultiColorSubtitle.Text = "7 colors required for this effect. Click a swatch to edit.";
                 KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 7);
             }
@@ -3574,7 +3574,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 spKbColor.Visibility = Visibility.Collapsed;
                 spKbMultiColor.Visibility = Visibility.Visible;
-                tbKbMultiColorTitle.Text = "WASD & Arrow Keys";
+                tbKbMultiColorTitle.Text = LocalizationService.Get("WASD & Arrow Keys");
                 tbKbMultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
                 KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 4);
             }

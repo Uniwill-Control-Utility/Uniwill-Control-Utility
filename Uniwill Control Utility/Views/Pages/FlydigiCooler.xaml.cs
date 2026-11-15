@@ -2163,7 +2163,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ApplyAccentGlow();
 
                 // Restore button text (may have been left as "Connecting..." from the click handler)
-                btnDisconnect.Content = "Disconnect";
+                btnDisconnect.Content = LocalizationService.Get("Disconnect");
 
                 // Show control panels when connected
                 spControls.Visibility = Visibility.Visible;
@@ -2256,7 +2256,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 UpdateDeviceImage(0);
 
-                btnConnect.Content = "Connect";
+                btnConnect.Content = LocalizationService.Get("Connect");
                 btnScan.IsEnabled = true;
 
                 spControls.Visibility = Visibility.Collapsed;
@@ -2492,7 +2492,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private async void btnScan_Click(object sender, RoutedEventArgs e)
         {
             btnScan.IsEnabled = false;
-            btnScan.Content = "Scanning...";
+            btnScan.Content = LocalizationService.Get("Scanning...");
 
             try
             {
@@ -2546,7 +2546,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             btnScan.IsEnabled = true;
-            btnScan.Content = "Scan";
+            btnScan.Content = LocalizationService.Get("Scan");
         }
 
         /// <summary>
@@ -2562,7 +2562,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     btnScan.IsEnabled = false;
-                    btnScan.Content = "Scanning...";
+                    btnScan.Content = LocalizationService.Get("Scanning...");
                 });
 
                 try
@@ -2603,7 +2603,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             });
                             cbxDevices.SelectedIndex = 0;
                             btnScan.IsEnabled = true;
-                            btnScan.Content = "Scan";
+                            btnScan.Content = LocalizationService.Get("Scan");
 
                             // If already connected (e.g., auto-connect from previous session),
                             // just update the UI instead of trying to connect again.
@@ -2632,12 +2632,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                             }
                             cbxDevices.SelectedIndex = 0;
                             btnScan.IsEnabled = true;
-                            btnScan.Content = "Scan";
+                            btnScan.Content = LocalizationService.Get("Scan");
                         }
                         else
                         {
                             btnScan.IsEnabled = true;
-                            btnScan.Content = "Scan";
+                            btnScan.Content = LocalizationService.Get("Scan");
                         }
                     });
                 }
@@ -2647,7 +2647,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         btnScan.IsEnabled = true;
-                        btnScan.Content = "Scan";
+                        btnScan.Content = LocalizationService.Get("Scan");
                     });
                 }
             });
@@ -2781,7 +2781,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_coolerService == null && _bs1Service == null) return;
 
-            btnConnect.Content = "Connecting...";
+            btnConnect.Content = LocalizationService.Get("Connecting...");
             btnConnect.IsEnabled = false;
 
             try
@@ -2849,14 +2849,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             finally
             {
-                btnConnect.Content = "Connect";
+                btnConnect.Content = LocalizationService.Get("Connect");
                 btnConnect.IsEnabled = true;
             }
         }
 
         private async void btnDisconnect_Click(object sender, RoutedEventArgs e)
         {
-            btnDisconnect.Content = "Disconnecting...";
+            btnDisconnect.Content = LocalizationService.Get("Disconnecting...");
 
             try
             {

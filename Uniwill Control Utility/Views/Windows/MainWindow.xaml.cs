@@ -437,11 +437,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void SetupUI()
         {
-            ModelNameText.Text = "Uniwill Control Utility";
+            ModelNameText.Text = LocalizationService.Get("Uniwill Control Utility");
             LaptopNameText.Text = LaptopDetector.GetDisplayName().ToUpperInvariant();
             VersionText.Text = GetVersionString();
 
-            tbMain.Title = "Uniwill Control Utility";
+            tbMain.Title = LocalizationService.Get("Uniwill Control Utility");
 
             // Migrate legacy custom_presets.json to the new dual-mode file structure.
             Models.CustomPresetStore.MigrateLegacyFile();

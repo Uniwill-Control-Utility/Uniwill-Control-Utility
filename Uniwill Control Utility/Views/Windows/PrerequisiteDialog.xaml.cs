@@ -38,7 +38,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (installed)
             {
                 UpdateButtonContent(EcDriverButton, true, "Installed", "Download");
-                EcDriverDescription.Text = "Kernel driver required for EC communication (fan control, battery, power limits). This driver is installed and ready to use.";
+                EcDriverDescription.Text = LocalizationService.Get("Kernel driver required for EC communication (fan control, battery, power limits). This driver is installed and ready to use.");
             }
             else
             {
@@ -50,13 +50,13 @@ namespace Uniwill_Control_Utility.Views.Windows
                                             manufacturer.Equals("PCSpecialist", StringComparison.OrdinalIgnoreCase)))
                 {
                     // XMG or PCSpecialist — link to official driver page
-                    EcDriverDescription.Text = "Kernel driver required for EC communication (fan control, battery, power limits). Install your manufacturer's Control Center, then uninstall it — the driver persists on disk.";
+                    EcDriverDescription.Text = LocalizationService.Get("Kernel driver required for EC communication (fan control, battery, power limits). Install your manufacturer's Control Center, then uninstall it — the driver persists on disk.");
                     UpdateButtonContent(EcDriverButton, false, "Installed", "Driver Page");
                 }
                 else
                 {
                     // Other brands — generic instructions with Tuxedo fallback
-                    EcDriverDescription.Text = "Kernel driver required for EC communication (fan control, battery, power limits). Download your manufacturer's Control Center software. If unavailable, try the Tuxedo Control Center (at your own risk).";
+                    EcDriverDescription.Text = LocalizationService.Get("Kernel driver required for EC communication (fan control, battery, power limits). Download your manufacturer's Control Center software. If unavailable, try the Tuxedo Control Center (at your own risk).");
                     UpdateButtonContent(EcDriverButton, false, "Installed", "Download");
                 }
             }

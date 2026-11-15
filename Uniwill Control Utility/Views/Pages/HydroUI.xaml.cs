@@ -355,7 +355,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_hydroUIService == null || _selectedDeviceAddress == null) return;
 
             btnConnect.IsEnabled = false;
-            btnConnect.Content = "Connecting...";
+            btnConnect.Content = LocalizationService.Get("Connecting...");
 
             var connected = await _hydroUIService.ConnectAsync(_selectedDeviceAddress);
 
@@ -395,7 +395,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
-                btnConnect.Content = "Connect";
+                btnConnect.Content = LocalizationService.Get("Connect");
                 btnConnect.IsEnabled = true;
             }
         }
@@ -852,7 +852,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                         spConnectedState.Visibility = Visibility.Collapsed;
                         spDisconnectedState.Visibility = Visibility.Visible;
-                        btnConnect.Content = "Connect";
+                        btnConnect.Content = LocalizationService.Get("Connect");
                         btnConnect.IsEnabled = _selectedDeviceAddress != null;
                         SetControlsEnabled(false);
                         spControls.Visibility = Visibility.Collapsed;
@@ -870,7 +870,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         UpdateDeviceImage();
 
                         // Reset page title
-                        tbPageTitle.Text = "Hydro UI";
+                        tbPageTitle.Text = LocalizationService.Get("Hydro UI");
 
                         // Re-show manual pump and fan control on disconnect (smart mode is stopped by service)
                         PumpVoltageCard.Visibility = Visibility.Visible;
@@ -1267,13 +1267,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (isStandby)
             {
                 StandbyIcon.Glyph = "\uE768"; // Sun/Resume
-                StandbyText.Text = "Resume";
+                StandbyText.Text = LocalizationService.Get("Resume");
                 btnStandby.ToolTip = "Resume all outputs.";
             }
             else
             {
                 StandbyIcon.Glyph = "\uE769"; // Power
-                StandbyText.Text = "Standby";
+                StandbyText.Text = LocalizationService.Get("Standby");
                 btnStandby.ToolTip = "Pause all outputs while keeping BLE connected.";
             }
         }
