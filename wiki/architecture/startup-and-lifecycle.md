@@ -90,7 +90,7 @@ Bounded tasks report at `Warning` when they outlive their budget, so the log dis
 - The app calls the engine first from `ScheduledTaskService` and keeps the local registration as the fallback for a dev run with no service.
 - `MigrateLegacyAutostartTask` moves the pre-engine **"UCU"** task (highest privileges, for the old `requireAdministrator` manifest) to the new task once, preserving the delay setting.
 - `RetireGuardianTask` removes the retired **"UCU Guardian"** watchdog task (the supervisor in the engine replaced it) and clears the vestigial `GuardianEnabled` setting.
-- `SelfHealScheduledTask` re-points the task at the running exe when a moved install (zip → MSI migration) baked an old path.
+- `ReconcileAutostartTask` (policy: `UCU.Core\Supervision\AutostartPolicy`) makes the task match the saved toggle on every launch, in both directions: enabled + missing or foreign path -> register; disabled + present -> remove. Intent is the settings file, never the task's existence - an uninstall deletes the task while `%LOCALAPPDATA%\UCU` survives, so inferring "the user disabled it" from a missing task leaves the Settings row reading ON with no logon entry (field 2026-11-15, a tester had to toggle the row after a reinstall). It runs after the engine ensure, because registration has to come from the service.
 
 ## Crash supervision (engine-side)
 

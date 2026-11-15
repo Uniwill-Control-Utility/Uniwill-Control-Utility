@@ -38,6 +38,7 @@ using Wpf.Ui.Abstractions;
 using UCU.Contracts;
 using UCU.Client;
 using UCU.Contracts.Capabilities;
+using UCU.Core.Supervision;
 
 namespace Uniwill_Control_Utility
 {
@@ -1256,6 +1257,12 @@ namespace Uniwill_Control_Utility
 
             await ApplyDeferredEcSettingsIfPendingAsync(outcome);
 
+            // The saved toggle is the user's intent; the task is only the machine's state, and
+            // the removal routes delete the task while the settings file survives. Reconcile
+            // here because registration needs the engine (an unelevated app cannot create a
+            // task), or "Autostart" reads ON and no logon entry exists.
+            ReconcileAutostartTask();
+
             return outcome;
         }
 
@@ -1375,10 +1382,9 @@ namespace Uniwill_Control_Utility
             // the feature enabled drops its "UCU Guardian" task on this start.
             RetireGuardianTask();
 
-            // Self-heal the scheduled task action paths: the path is baked at
-            // registration time, so installs that moved (zip → MSI migration)
-            // would otherwise autostart the old exe.
-            SelfHealScheduledTask(AutostartTaskName, "", null, TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds), "Start UCU");
+            // The logon task is reconciled with the saved toggle by
+            // ReconcileAutostartTask once the engine is up (see the ensure chain):
+            // registration has to come from the service.
 
             // Point the per-user Add/Remove Programs entry (Velopack writes
             // HKCU\...\Uninstall\Uniwill-Control-Utility) at the layout's
@@ -1659,28 +1665,43 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Re-registers a scheduled task when its action path no longer points
-        /// at the running executable (install moved, e.g. zip → MSI migration).
-        /// Never creates tasks that the user has not enabled.
+        /// Makes the logon task match the saved autostart toggle, in both directions.
+        ///
+        /// The old shape ("re-point the task when its path moved, and never create a
+        /// task the user has not enabled") inferred intent from the task's existence,
+        /// which is wrong after a reinstall: the uninstall removed the task while the
+        /// settings file survived, so the toggle read ON with no entry behind it.
+        /// Idempotent, so the ensure chain may call it on every launch.
         /// </summary>
-        private static void SelfHealScheduledTask(string taskName, string arguments, string? exePath, TimeSpan delay, string description)
+        private static void ReconcileAutostartTask()
         {
             try
             {
-                var registeredPath = ScheduledTaskService.GetActionPath(taskName);
-                if (registeredPath is null)
-                    return; // task not registered — nothing to heal
+                AutostartReconcileAction action = AutostartPolicy.Decide(
+                    Settings.Default.StartOnBoot,
+                    ScheduledTaskService.GetActionPath(AutostartTaskName),
+                    ScheduledTaskService.CurrentExePath);
 
-                string expectedPath = exePath ?? ScheduledTaskService.CurrentExePath;
-                if (!string.Equals(registeredPath, expectedPath, StringComparison.OrdinalIgnoreCase))
+                switch (action)
                 {
-                    ScheduledTaskService.Register(taskName, description, arguments, delay, exePath);
-                    _logger?.LogInformation("Re-pointed the {Task} scheduled task at {Path}", taskName, expectedPath);
+                    case AutostartReconcileAction.Register:
+                        ScheduledTaskService.Register(
+                            AutostartTaskName, "Start UCU", "",
+                            TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds));
+                        _logger?.LogInformation(
+                            "Registered the {Task} scheduled task from the saved autostart toggle", AutostartTaskName);
+                        break;
+
+                    case AutostartReconcileAction.Unregister:
+                        ScheduledTaskService.Unregister(AutostartTaskName);
+                        _logger?.LogInformation(
+                            "Removed the {Task} scheduled task: the saved autostart toggle is off", AutostartTaskName);
+                        break;
                 }
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Failed to self-heal the {Task} scheduled task", taskName);
+                _logger?.LogWarning(ex, "Failed to reconcile the {Task} scheduled task", AutostartTaskName);
             }
         }
 
