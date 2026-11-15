@@ -99,9 +99,13 @@ internal static class UninstallShim
         {
             cmds.Add("echo @echo off> \"" + verbScript + "\"");
             cmds.Add("echo \"" + verbExe + "\" --uninstall-engine >> \"" + verbScript + "\"");
-            cmds.Add("schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
+            // Guarded at RUN time, not here: the msiexec pass above deletes the engine
+            // exe on a plain machine (only a System-IL layout keeps it alive), and a
+            // task whose target is already gone never reaches the sweep - it just sits
+            // in Task Scheduler forever (field 2026-11-15: a tester deleted it by hand).
+            cmds.Add("if exist \"" + verbExe + "\" schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
                 verbScript + "\" /sc once /st 23:59 /ru SYSTEM /f");
-            cmds.Add("schtasks /run /tn \"UCU Uninstall Verb\"");
+            cmds.Add("if exist \"" + verbExe + "\" schtasks /run /tn \"UCU Uninstall Verb\"");
         }
         cmds.Add("schtasks /delete /tn UCU /f");
         cmds.Add("schtasks /delete /tn \"UCU Autostart\" /f");
@@ -125,6 +129,10 @@ internal static class UninstallShim
         cmds.Add("rd /s /q \"" + root + "\"");
         cmds.Add("ping -n 4 127.0.0.1 >nul");
         cmds.Add("rd /s /q \"" + root + "\"");
+        // The verb deletes its own task, but only when it actually ran; this is the
+        // unconditional sweep. Idempotent, and harmless while the verb is still
+        // running (deleting a running task's definition leaves the instance alive).
+        cmds.Add("schtasks /delete /tn \"UCU Uninstall Verb\" /f");
         cmds.Add(Echo("stage5-done"));
 
         // Stop the engine service first, synchronously: a force-killed app
