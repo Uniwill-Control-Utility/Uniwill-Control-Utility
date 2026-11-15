@@ -354,26 +354,41 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
         }
 
-        // Debounce logging so the debug output doesn't flood at 2 Hz.
+        // Debounce logging so the debug output doesn't flood at the sample rate. The key is the
+        // stable part of the state: the message may carry volatile detail (a live frame rate),
+        // and keying on the message made the debounce useless - the frame rate changes almost
+        // every sample, so nearly every call took the "new state" branch and logged in full,
+        // at 4 Hz. A repeat now costs one line per LogRepeatIntervalSeconds, carrying the count.
         private static readonly object _logSync = new();
-        private static string? _lastLogState;
+        private static string? _lastLogKey;
+        private static DateTime _lastLogUtc;
         private static int _logCount;
 
-        private static void LogOnce(string message)
+        private const int LogRepeatIntervalSeconds = 30;
+
+        private static void LogOnce(string key, string message)
         {
             lock (_logSync)
             {
-                if (message == _lastLogState)
+                DateTime now = DateTime.UtcNow;
+                bool sameState = key == _lastLogKey;
+
+                if (sameState)
                 {
                     _logCount++;
-                    if (_logCount >= 10)
-                        DiagnosticLogger.LogDebug($"RTSS: {message} (repeated {_logCount}x)");
-                    return;
+                    if ((now - _lastLogUtc).TotalSeconds < LogRepeatIntervalSeconds)
+                        return;
+                }
+                else
+                {
+                    _logCount = 1;
+                    _lastLogKey = key;
                 }
 
-                _lastLogState = message;
-                _logCount = 1;
-                DiagnosticLogger.LogDebug($"RTSS: {message}");
+                _lastLogUtc = now;
+                DiagnosticLogger.LogDebug(_logCount > 1
+                    ? $"RTSS: {message} (repeated {_logCount}x)"
+                    : $"RTSS: {message}");
             }
         }
 
@@ -395,7 +410,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             {
                 if (!AcquireMappingLocked(out IntPtr viewPtr, out ulong viewSize))
                 {
-                    LogOnce("Could not acquire RTSS mapping — RTSS not running or mapping inaccessible");
+                    LogOnce("no-mapping", "Could not acquire RTSS mapping - RTSS not running or mapping inaccessible");
                     return false;
                 }
 
@@ -439,13 +454,13 @@ namespace Uniwill_Control_Utility.Services.Performance
                 if (bestFallback != null && bestFallback.Value.Fps > 0)
                 {
                     data = bestFallback.Value;
-                    LogOnce($"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
+                    LogOnce($"fallback:{data.ProcessId}", $"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
                     return true;
                 }
 
                 // Log all apps once for diagnostics (debounced by LogOnce).
                 string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
-                LogOnce($"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
+                LogOnce($"apps:{allApps.Count}", $"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
 
                 return false;
             }
