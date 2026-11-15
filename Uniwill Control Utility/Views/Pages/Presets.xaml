@@ -227,13 +227,20 @@
                                         Visibility="Collapsed"
                                         Severity="Informational" />
 
-                            <!-- Tier values and the live driver limit are separate lines on
-                                 purpose: one is what we would set, the other is what is enforced. -->
+                            <!-- The tier values are what we would set; the ceiling is the number
+                                 the records raise, and the power limit is the EC's separate
+                                 cTGP control, reported honestly next to it. -->
                             <StackPanel x:Name="spRomReadback"
                                         Margin="0,8,0,0"
                                         Visibility="Collapsed">
                                 <TextBlock x:Name="tbRomTier" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRomLive" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRomCeiling" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRomCurrent" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,2,0,0"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change." />
                             </StackPanel>
 
                             <CheckBox x:Name="chkRomConsent"

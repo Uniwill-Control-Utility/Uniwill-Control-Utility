@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "حد دخل اللوحة البالغ 13.5 أمبير يسمح بنحو 267 واط، وهو مع 130 واط للمعالج يبقى داخل محول 420 واط.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "مطبَّق: السقف {0} واط · {1} أمبير للمعالج الرسوميات، {2} أمبير للذاكرة، {3} أمبير لدخل اللوحة",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "سيطبّق: السقف {0} واط · {1} أمبير للمعالج الرسوميات، {2} أمبير للذاكرة، {3} أمبير لدخل اللوحة",
-  "Live enforced limit: {0} W": "الحد المطبَّق حالياً: {0} واط",
-  "Live enforced limit: not read": "الحد المطبَّق حالياً: لم تُقرأ",
+  "Live ceiling: {0} W": "السقف المباشر: {0} واط",
+  "Live ceiling: not read": "السقف المباشر: لم تُقرأ",
+  "Live power limit: {0} W": "حد الطاقة المباشر: {0} واط",
+  "Live power limit: not read": "حد الطاقة المباشر: لم تُقرأ",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "السقف هو ما ترفعه هذه البطاقة. حد الطاقة يضبطه تحكّم الطاقة في وحدة EC، وهو تحكّم منفصل لا تغيّره هذه البطاقة.",
   "GPU power control is not available on this machine.": "التحكم في طاقة وحدة معالجة الرسوميات غير متاح على هذا الجهاز.",
   "Board base TGP: {0} W": "قدرة TGP الأساسية للوحة: {0} واط",
   "The preset's GPU wattage is measured against this base.": "تُقاس طاقة وحدة معالجة الرسوميات في الإعداد المسبق بالنسبة إلى هذه القيمة."

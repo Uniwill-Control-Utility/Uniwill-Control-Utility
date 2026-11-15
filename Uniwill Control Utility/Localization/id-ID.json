@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Batas masukan papan 13,5 A memungkinkan sekitar 267 W, yang bersama 130 W CPU tetap dalam adaptor 420 W.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Diterapkan: batas {0} W · {1} A GPU, {2} A memori, {3} A masukan papan",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Akan diterapkan: batas {0} W · {1} A GPU, {2} A memori, {3} A masukan papan",
-  "Live enforced limit: {0} W": "Batas yang berlaku sekarang: {0} W",
-  "Live enforced limit: not read": "Batas yang berlaku sekarang: tidak terbaca",
+  "Live ceiling: {0} W": "Batas atas langsung: {0} W",
+  "Live ceiling: not read": "Batas atas langsung: tidak terbaca",
+  "Live power limit: {0} W": "Batas daya langsung: {0} W",
+  "Live power limit: not read": "Batas daya langsung: tidak terbaca",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Batas atas adalah yang dinaikkan kartu ini. Batas daya diatur oleh kontrol daya GPU dari EC, kontrol terpisah yang tidak diubah kartu ini.",
   "GPU power control is not available on this machine.": "Kontrol daya GPU tidak tersedia di mesin ini.",
   "Board base TGP: {0} W": "TGP dasar papan: {0} W",
   "The preset's GPU wattage is measured against this base.": "Daya GPU preset diukur terhadap dasar ini."

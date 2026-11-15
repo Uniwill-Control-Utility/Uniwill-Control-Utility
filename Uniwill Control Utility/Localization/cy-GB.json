@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Mae ei derfyn mewnbwn bwrdd o 13.5 A yn caniatáu tua 267 W, sydd ynghyd â 130 W y CPU yn aros o fewn yr addasydd 420 W.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Wedi'i gymhwyso: nenfwd {0} W · {1} A GPU, {2} A cof, {3} A mewnbwn bwrdd",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Byddai'n gosod: nenfwd {0} W · {1} A GPU, {2} A cof, {3} A mewnbwn bwrdd",
-  "Live enforced limit: {0} W": "Terfyn gorfodedig byw: {0} W",
-  "Live enforced limit: not read": "Terfyn gorfodedig byw: heb ei ddarllen",
+  "Live ceiling: {0} W": "Nenfwd byw: {0} W",
+  "Live ceiling: not read": "Nenfwd byw: heb ei ddarllen",
+  "Live power limit: {0} W": "Terfyn pŵer byw: {0} W",
+  "Live power limit: not read": "Terfyn pŵer byw: heb ei ddarllen",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Y nenfwd yw'r hyn y mae'r cerdyn hwn yn ei godi. Mae'r terfyn pŵer yn cael ei osod gan reolaeth pŵer GPU yr EC, sy'n rheolaeth ar wahân nad yw'r cerdyn hwn yn ei newid.",
   "GPU power control is not available on this machine.": "Nid yw rheoli pŵer'r GPU ar gael ar y peiriant hwn.",
   "Board base TGP: {0} W": "TGP sylfaenol y bwrdd: {0} W",
   "The preset's GPU wattage is measured against this base.": "Mae pŵer GPU'r rhagosodiad yn cael ei fesur yn erbyn y sylfaen hon."

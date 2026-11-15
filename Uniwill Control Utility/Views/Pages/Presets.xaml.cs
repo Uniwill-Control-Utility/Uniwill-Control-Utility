@@ -2209,9 +2209,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     : LocalizationService.Format(
                         "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
                         ceilingW, nvVddA, msVddA, boardA);
-                tbRomLive.Text = state.EnforcedLimitMilliwatts is int limit
-                    ? LocalizationService.Format("Live enforced limit: {0} W", limit / 1000.0)
-                    : LocalizationService.Get("Live enforced limit: not read");
+                tbRomCeiling.Text = state.CeilingLimitMilliwatts is int ceiling
+                    ? LocalizationService.Format("Live ceiling: {0} W", ceiling / 1000.0)
+                    : LocalizationService.Get("Live ceiling: not read");
+                tbRomCurrent.Text = state.CurrentLimitMilliwatts is int current
+                    ? LocalizationService.Format("Live power limit: {0} W", current / 1000.0)
+                    : LocalizationService.Get("Live power limit: not read");
             }
 
             if (state == null)

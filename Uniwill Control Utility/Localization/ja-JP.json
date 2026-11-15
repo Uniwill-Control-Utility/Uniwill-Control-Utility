@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "ボード入力の上限 13.5 A は約 267 W を許容し、CPU の 130 W と合わせても 420 W アダプターの範囲内です。",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "適用中: 上限 {0} W · {1} A GPU、{2} A メモリ、{3} A ボード入力",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "適用予定: 上限 {0} W · {1} A GPU、{2} A メモリ、{3} A ボード入力",
-  "Live enforced limit: {0} W": "現在適用中の制限: {0} W",
-  "Live enforced limit: not read": "現在適用中の制限: 読み取り不可",
+  "Live ceiling: {0} W": "現在の上限: {0} W",
+  "Live ceiling: not read": "現在の上限: 読み取り不可",
+  "Live power limit: {0} W": "現在の電力制限: {0} W",
+  "Live power limit: not read": "現在の電力制限: 読み取り不可",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "上限はこのカードが引き上げる値です。電力制限は EC の GPU 電力制御が設定する別の制御であり、このカードは変更しません。",
   "GPU power control is not available on this machine.": "このマシンでは GPU の電力制御を利用できません。",
   "Board base TGP: {0} W": "ボードの基準 TGP: {0} W",
   "The preset's GPU wattage is measured against this base.": "プリセットの GPU ワット数はこの基準に対して測定されます。"

@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Had input papan 13.5 A membenarkan kira-kira 267 W, yang bersama 130 W CPU kekal dalam penyesuai 420 W.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Dilaksanakan: had {0} W · {1} A GPU, {2} A memori, {3} A input papan",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Akan ditetapkan: had {0} W · {1} A GPU, {2} A memori, {3} A input papan",
-  "Live enforced limit: {0} W": "Had yang dikuatkuasakan kini: {0} W",
-  "Live enforced limit: not read": "Had yang dikuatkuasakan kini: tidak dibaca",
+  "Live ceiling: {0} W": "Siling langsung: {0} W",
+  "Live ceiling: not read": "Siling langsung: tidak dibaca",
+  "Live power limit: {0} W": "Had kuasa langsung: {0} W",
+  "Live power limit: not read": "Had kuasa langsung: tidak dibaca",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Siling ialah nilai yang dinaikkan oleh kad ini. Had kuasa ditetapkan oleh kawalan kuasa GPU EC, kawalan berasingan yang tidak diubah oleh kad ini.",
   "GPU power control is not available on this machine.": "Kawalan kuasa GPU tidak tersedia pada mesin ini.",
   "Board base TGP: {0} W": "TGP asas papan: {0} W",
   "The preset's GPU wattage is measured against this base.": "Watt GPU praset diukur berbanding asas ini."

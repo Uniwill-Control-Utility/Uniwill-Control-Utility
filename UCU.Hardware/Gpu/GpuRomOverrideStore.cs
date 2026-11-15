@@ -5,7 +5,9 @@ using System.Text;
 using Microsoft.Win32;
 using Serilog;
 using UCU.Contracts;
+using UCU.Core.Ec;
 using UCU.Hardware.Devices;
+using UCU.Hardware.Ec;
 
 namespace UCU.Hardware.Gpu
 {
@@ -45,13 +47,17 @@ namespace UCU.Hardware.Gpu
     }
 
     /// <summary>
-    /// The driver's enforced board-power ceiling (mW), for "did the unlock land".
-    /// Null when the driver answers nothing, which is reported as unknown, never
-    /// as "not moved".
+    /// The driver's board-power limits (mW), for "did the unlock land". The ceiling is
+    /// the constraint maximum — the number the ROM records raise. The current limit is
+    /// what the EC's cTGP asks for, a separate mechanism, so it is reported and never
+    /// used as the witness. Null means the driver answered nothing, which is reported
+    /// as unknown, never as "not moved".
     /// </summary>
+    public sealed record GpuPowerLimits(int? CeilingMilliwatts, int? CurrentMilliwatts);
+
     public interface IGpuPowerCeilingProbe
     {
-        int? ReadEnforcedLimitMilliwatts();
+        GpuPowerLimits Read();
     }
 
     /// <summary>The two gpu.* ROM verbs' target.</summary>
@@ -65,7 +71,8 @@ namespace UCU.Hardware.Gpu
 
     /// <summary>
     /// The ROM override store for the pinned VBIOS: stage the tier's seven records on
-    /// the GPU's display-driver key, restart the GPU, and restore by deleting them.
+    /// the GPU's display-driver key, raise the EC's cTGP offset, restart the GPU, then
+    /// make the driver's own power request — and restore by undoing all of it.
     ///
     /// Safety rules, all from the measured reference (MechControl-RE nvidia_store.cpp):
     /// the originals file is written (tmp + flush + move) BEFORE the first registry
@@ -74,12 +81,19 @@ namespace UCU.Hardware.Gpu
     /// (a 'VBIOS' marker, an unknown value name, a record from another VBIOS or a
     /// malformed one) is refused untouched; and every failure after the first write is
     /// reported as Uncertain, because the key state is then no longer ours to assume.
+    ///
+    /// The records alone deliver nothing (measured 2026-11-15): they only raise the
+    /// policy ceiling, while the card keeps enforcing what the EC derives (~150 W) until
+    /// a request is made against that ceiling. So an apply is three moves — EC offset,
+    /// records + restart, driver request — and Unlocked means all three hold.
     /// </summary>
     public sealed class GpuRomOverrideStore : IGpuRomOverrideService
     {
         private readonly IGpuRomRegistry _registry;
         private readonly IGpuRestarter _restarter;
         private readonly IGpuPowerCeilingProbe _ceiling;
+        private readonly IEcGpuPowerControl _ec;
+        private readonly IGpuPowerRequest _request;
         private readonly GpuPowerTier _tier;
         private readonly string _originalsPath;
 
@@ -87,12 +101,16 @@ namespace UCU.Hardware.Gpu
             IGpuRomRegistry registry,
             IGpuRestarter restarter,
             IGpuPowerCeilingProbe ceiling,
+            IEcGpuPowerControl ec,
+            IGpuPowerRequest request,
             string? originalsPath = null,
             GpuPowerTier? tier = null)
         {
             _registry = registry;
             _restarter = restarter;
             _ceiling = ceiling;
+            _ec = ec;
+            _request = request;
             _tier = tier ?? GpuPowerTiers.ExtraGpuPower;
             _originalsPath = originalsPath ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
@@ -103,33 +121,39 @@ namespace UCU.Hardware.Gpu
 
         public GpuRomOverrideStateDto GetState()
         {
-            int? ceiling = _ceiling.ReadEnforcedLimitMilliwatts();
+            GpuPowerLimits limits = _ceiling.Read();
+            GpuPowerRequestState request = _request.Read();
 
             try
             {
                 string? version = _registry.ReadVbiosVersion();
                 if (version == null)
-                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, ceiling);
+                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request);
 
                 if (!RomOverrideLayout.IsPinned(version))
-                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, ceiling);
+                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request);
 
                 IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
                 if (records.Count == 0)
-                    return State(GpuRomOverrideStates.NotUnlocked, null, version, ceiling);
+                    return State(GpuRomOverrideStates.NotUnlocked, null, version, limits, request);
 
                 if (!TryReadOriginals(out Originals? originals, out string? fileError))
-                    return State(GpuRomOverrideStates.Unsupported, fileError, version, ceiling);
+                    return State(GpuRomOverrideStates.Unsupported, fileError, version, limits, request);
 
                 if (ForeignRecordReason(records, originals) is string foreign)
-                    return State(GpuRomOverrideStates.Unsupported, foreign, version, ceiling);
+                    return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request);
 
-                return State(GpuRomOverrideStates.Unlocked, null, version, ceiling);
+                if (CeilingReason(limits) is string unmoved)
+                    return State(GpuRomOverrideStates.Uncertain, unmoved, version, limits, request);
+
+                return RequestReason(request) is string notAsked
+                    ? State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request)
+                    : State(GpuRomOverrideStates.Unlocked, null, version, limits, request);
             }
             catch (Exception ex)
             {
                 Log.Information("gpu.get_rom_override_state: {Type} {Message}", ex.GetType().Name, ex.Message);
-                return State(GpuRomOverrideStates.Uncertain, ex.Message, null, ceiling);
+                return State(GpuRomOverrideStates.Uncertain, ex.Message, null, limits, request);
             }
         }
 
@@ -137,78 +161,124 @@ namespace UCU.Hardware.Gpu
 
         private GpuRomOverrideStateDto Apply()
         {
-            int? ceiling = null;
+            GpuPowerLimits limits = new(null, null);
+            GpuPowerRequestState request = new(null, null, null, null);
             string? version = null;
 
             try
             {
                 version = _registry.ReadVbiosVersion();
                 if (version == null)
-                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, null);
+                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request);
 
                 if (!RomOverrideLayout.IsPinned(version))
-                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, null);
+                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request);
 
                 IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
                 if (!TryReadOriginals(out Originals? originals, out string? fileError))
-                    return State(GpuRomOverrideStates.Unsupported, fileError, version, null);
+                    return State(GpuRomOverrideStates.Unsupported, fileError, version, limits, request);
 
                 if (ForeignRecordReason(records, originals) is string foreign)
-                    return State(GpuRomOverrideStates.Unsupported, foreign, version, null);
+                    return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request);
+
+                // (a) The EC's cTGP offset, against this board's own DefaultTGP. The
+                // declared TgpOffsetMax is not enforced (130 → 225 W was accepted).
+                // Nothing is written yet, so a refusal here is clean.
+                GpuPowerInfoDto info;
+                try
+                {
+                    info = _ec.GetGpuPowerInfo();
+                }
+                catch (Exception ex)
+                {
+                    return State(
+                        GpuRomOverrideStates.Unsupported,
+                        $"the EC could not answer the GPU power table request: {ex.Message}",
+                        version, limits, request);
+                }
+
+                if (!info.Supported)
+                {
+                    return State(
+                        GpuRomOverrideStates.Unsupported,
+                        $"the EC publishes no usable DefaultTGP, so the cTGP offset cannot be computed: {info.Reason}",
+                        version, limits, request);
+                }
+
+                int offset = EcSpecCodec.CtgpOffsetForTgp(_tier.TgpTargetWatts, info.DefaultTgpWatts);
+                _ec.ActivateGpuPowerControl(offset, 0);
 
                 IReadOnlyList<(string Name, byte[] Data)> desired = RomOverrideLayout.BuildRecords(_tier, version);
+                bool staged = Matches(records, desired);
+                bool restarted = false;
 
-                if (Matches(records, desired))
+                if (!staged)
                 {
-                    // Idempotent: the key already carries exactly our tier.
-                    ceiling = _ceiling.ReadEnforcedLimitMilliwatts();
-                    Log.Information("gpu.set_rom_override: {Tier} records already staged on {Version}", _tier.Id, version);
-                    return State(GpuRomOverrideStates.Unlocked, "the records were already staged; the GPU was not restarted", version, ceiling, restarted: false);
+                    // (b) The records: originals first, then write and read back.
+                    if (originals == null)
+                        WriteOriginals(version);
+
+                    foreach ((string name, byte[] data) in desired)
+                        _registry.WriteRecord(name, data);
+
+                    _registry.Flush();
+
+                    IReadOnlyDictionary<string, byte[]> readback = _registry.ReadRecords();
+                    foreach ((string name, byte[] data) in desired)
+                    {
+                        if (!readback.TryGetValue(name, out byte[]? written) || !written.AsSpan().SequenceEqual(data))
+                            return State(GpuRomOverrideStates.Uncertain, $"the '{name}' record did not read back as written", version, limits, request);
+                    }
+
+                    // (c) Only a driver restart makes it re-read the records.
+                    restarted = _restarter.Restart(_registry.InstanceId);
                 }
 
-                if (originals == null)
-                    WriteOriginals(version);
-
-                foreach ((string name, byte[] data) in desired)
-                    _registry.WriteRecord(name, data);
-
-                _registry.Flush();
-
-                IReadOnlyDictionary<string, byte[]> readback = _registry.ReadRecords();
-                foreach ((string name, byte[] data) in desired)
-                {
-                    if (!readback.TryGetValue(name, out byte[]? written) || !written.AsSpan().SequenceEqual(data))
-                        return State(GpuRomOverrideStates.Uncertain, $"the '{name}' record did not read back as written", version, null);
-                }
-
-                bool restarted = _restarter.Restart(_registry.InstanceId);
-                ceiling = _ceiling.ReadEnforcedLimitMilliwatts();
+                // (d) The request: without it the ceiling moves and the card stays on its
+                // EC-derived limit, which is the failure this tier shipped with.
+                request = _request.Request(_tier.TgpTargetMilliwatts);
+                limits = _ceiling.Read();
 
                 Log.Information(
-                    "gpu.set_rom_override: {Tier} staged on {Version} ({Records} records), GPU restart {Restart}, enforced ceiling {Ceiling} mW",
-                    _tier.Id, version, desired.Count, restarted ? "yes" : "no", ceiling?.ToString(CultureInfo.InvariantCulture) ?? "unknown");
+                    "gpu.set_rom_override: {Tier} staged on {Version} ({Records} records), GPU restart {Restart}, ceiling {Ceiling} mW, current limit {Current} mW, request {Request} mW",
+                    _tier.Id, version, desired.Count, restarted ? "yes" : "no",
+                    limits.CeilingMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                    limits.CurrentMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                    request.RequestedMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "none");
 
-                if (ceiling is int limit && limit <= RomOverrideLayout.StockPowerMilliwatts)
+                // (e) All three, or it is Uncertain and the reason names the failed step.
+                if (request.Reason is string refused)
                 {
                     return State(
                         GpuRomOverrideStates.Uncertain,
-                        $"the records are staged but the driver still enforces {limit} mW; a reboot may be required",
-                        version, ceiling, restarted);
+                        $"the records are staged and the ceiling is {CeilingText(limits)}, " +
+                        $"but the {Watts(_tier.TgpTargetMilliwatts)} power request failed: {refused}",
+                        version, limits, request, restarted);
                 }
 
-                return State(GpuRomOverrideStates.Unlocked, null, version, ceiling, restarted);
+                if (CeilingReason(limits) is string shortfall)
+                    return State(GpuRomOverrideStates.Uncertain, shortfall, version, limits, request, restarted);
+
+                if (RequestReason(request) is string notAsked)
+                    return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, restarted);
+
+                return State(
+                    GpuRomOverrideStates.Unlocked,
+                    staged ? "the records were already staged; the GPU was not restarted" : null,
+                    version, limits, request, restarted);
             }
             catch (Exception ex)
             {
                 // Past the first registry write the key state is unknown: say so.
                 Log.Information("gpu.set_rom_override: {Type} {Message}", ex.GetType().Name, ex.Message);
-                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, ceiling);
+                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, limits, request);
             }
         }
 
         private GpuRomOverrideStateDto Restore()
         {
             string? version = null;
+            GpuPowerRequestState request = new(null, null, null, null);
 
             try
             {
@@ -216,7 +286,7 @@ namespace UCU.Hardware.Gpu
                 IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
 
                 if (!TryReadOriginals(out Originals? originals, out string? fileError))
-                    return State(GpuRomOverrideStates.Unsupported, fileError, version, _ceiling.ReadEnforcedLimitMilliwatts());
+                    return State(GpuRomOverrideStates.Unsupported, fileError, version, _ceiling.Read(), _request.Read());
 
                 if (records.Count == 0)
                 {
@@ -225,14 +295,14 @@ namespace UCU.Hardware.Gpu
                     if (originals != null)
                     {
                         DiscardOriginals();
-                        return State(GpuRomOverrideStates.NotUnlocked, "no overrides were staged; the stale originals file was removed", version, _ceiling.ReadEnforcedLimitMilliwatts());
+                        return State(GpuRomOverrideStates.NotUnlocked, "no overrides were staged; the stale originals file was removed", version, _ceiling.Read(), _request.Read());
                     }
 
-                    return State(GpuRomOverrideStates.NotUnlocked, null, version, _ceiling.ReadEnforcedLimitMilliwatts());
+                    return State(GpuRomOverrideStates.NotUnlocked, null, version, _ceiling.Read(), _request.Read());
                 }
 
                 if (ForeignRecordReason(records, originals) is string foreign)
-                    return State(GpuRomOverrideStates.Unsupported, foreign, version, _ceiling.ReadEnforcedLimitMilliwatts());
+                    return State(GpuRomOverrideStates.Unsupported, foreign, version, _ceiling.Read(), _request.Read());
 
                 foreach (string name in records.Keys)
                     _registry.DeleteRecord(name);
@@ -241,35 +311,68 @@ namespace UCU.Hardware.Gpu
 
                 IReadOnlyDictionary<string, byte[]> readback = _registry.ReadRecords();
                 if (readback.Count != 0)
-                    return State(GpuRomOverrideStates.Uncertain, "not every override record disappeared from the driver key", version, _ceiling.ReadEnforcedLimitMilliwatts());
+                    return State(GpuRomOverrideStates.Uncertain, "not every override record disappeared from the driver key", version, _ceiling.Read(), _request.Read());
+
+                // The EC byte goes back to the value captured before our activation, then
+                // the restart — which is also what clears the driver's request.
+                _ec.DeactivateGpuPowerControl();
 
                 bool restarted = _restarter.Restart(_registry.InstanceId);
-                int? ceiling = _ceiling.ReadEnforcedLimitMilliwatts();
+                GpuPowerLimits limits = _ceiling.Read();
+                request = _request.Read();
 
                 Log.Information(
-                    "gpu.set_rom_override: stock restored on {Version}, GPU restart {Restart}, enforced ceiling {Ceiling} mW",
-                    version, restarted ? "yes" : "no", ceiling?.ToString(CultureInfo.InvariantCulture) ?? "unknown");
+                    "gpu.set_rom_override: stock restored on {Version}, GPU restart {Restart}, ceiling {Ceiling} mW, current limit {Current} mW, request {Request} mW",
+                    version, restarted ? "yes" : "no",
+                    limits.CeilingMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                    limits.CurrentMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                    request.RequestedMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "none");
 
-                if (ceiling is int limit && limit > RomOverrideLayout.StockPowerMilliwatts)
+                // The records are gone; a ceiling still above stock is the driver holding
+                // the old policy, which no restart of ours accounted for.
+                if (limits.CeilingMilliwatts is int ceiling && ceiling > RomOverrideLayout.StockPowerMilliwatts)
                 {
                     return State(
                         GpuRomOverrideStates.Uncertain,
-                        $"the records are gone but the driver still enforces {limit} mW; a reboot may be required",
-                        version, ceiling, restarted);
+                        $"the records are gone but the driver still reports a {Watts(ceiling)} ceiling, not {Watts(RomOverrideLayout.StockPowerMilliwatts)}",
+                        version, limits, request, restarted);
+                }
+
+                // A restart is what clears the request; one that survived would keep the
+                // card at the raised limit with stock records.
+                if (request.Reason is string unread)
+                {
+                    return State(
+                        GpuRomOverrideStates.Uncertain,
+                        $"the records are gone but the power request could not be read back: {unread}",
+                        version, limits, request, restarted);
+                }
+
+                if (request.RequestedMilliwatts is int stillSet)
+                {
+                    return State(
+                        GpuRomOverrideStates.Uncertain,
+                        $"the records are gone but the driver still carries a {Watts(stillSet)} power request",
+                        version, limits, request, restarted);
                 }
 
                 DiscardOriginals();
-                return State(GpuRomOverrideStates.NotUnlocked, null, version, ceiling, restarted);
+                return State(GpuRomOverrideStates.NotUnlocked, null, version, limits, request, restarted);
             }
             catch (Exception ex)
             {
                 Log.Information("gpu.set_rom_override: {Type} {Message}", ex.GetType().Name, ex.Message);
-                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, null);
+                return State(GpuRomOverrideStates.Uncertain, ex.Message, version, new GpuPowerLimits(null, null), request);
             }
         }
 
         private GpuRomOverrideStateDto State(
-            string state, string? reason, string? version, int? ceiling, bool restarted = false) => new()
+            string state,
+            string? reason,
+            string? version,
+            GpuPowerLimits limits,
+            GpuPowerRequestState? request = null,
+            bool restarted = false) => new()
         {
             State = state,
             Reason = reason,
@@ -279,10 +382,44 @@ namespace UCU.Hardware.Gpu
             NvVddMilliAmps = _tier.NvVddMilliAmps,
             MsVddMilliAmps = _tier.MsVddMilliAmps,
             BoardInputMilliAmps = _tier.BoardInputMilliAmps,
-            EnforcedLimitMilliwatts = ceiling,
-            EnforcedLimitMoved = ceiling is int limit && limit > RomOverrideLayout.StockPowerMilliwatts,
+            CeilingLimitMilliwatts = limits.CeilingMilliwatts,
+            CurrentLimitMilliwatts = limits.CurrentMilliwatts,
+            RequestedLimitMilliwatts = request?.RequestedMilliwatts,
+            EnforcedLimitMoved = limits.CeilingMilliwatts is int ceiling && ceiling > RomOverrideLayout.StockPowerMilliwatts,
             Restarted = restarted,
         };
+
+        /// <summary>
+        /// Why the ceiling is not confirmed, or null when it is. The ceiling is the
+        /// number the records raise, so it is the witness the records were consumed; a
+        /// null read is unknown, which is reported as such instead of as "not moved".
+        /// </summary>
+        private string? CeilingReason(GpuPowerLimits limits) =>
+            limits.CeilingMilliwatts is not int ceiling
+                ? "the driver did not report a power ceiling, so the records could not be confirmed"
+                : ceiling >= _tier.TgpTargetMilliwatts
+                    ? null
+                    : $"the driver reports a {Watts(ceiling)} ceiling, not {Watts(_tier.TgpTargetMilliwatts)}";
+
+        /// <summary>
+        /// Why the driver's own request is not the tier's target, or null when it is.
+        /// The request is what the driver enforces: a staged ceiling without it leaves
+        /// the card on its EC-derived limit.
+        /// </summary>
+        private string? RequestReason(GpuPowerRequestState request) =>
+            request.Reason is string unread
+                ? $"the driver's power request could not be read: {unread}"
+                : request.RequestedMilliwatts is not int requested
+                    ? "the driver carries no power request, so the card stays on its EC-derived limit"
+                    : requested == _tier.TgpTargetMilliwatts
+                        ? null
+                        : $"the driver reports a {Watts(requested)} power request, not {Watts(_tier.TgpTargetMilliwatts)}";
+
+        private static string CeilingText(GpuPowerLimits limits) =>
+            limits.CeilingMilliwatts is int ceiling ? Watts(ceiling) : "unknown";
+
+        private static string Watts(int milliwatts) =>
+            (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W";
 
         private static string UnpinnedReason(string version) =>
             $"VBIOS {version} is not pinned; the ROM offsets are only known for {RomOverrideLayout.PinnedVbiosVersion}";
@@ -590,26 +727,34 @@ namespace UCU.Hardware.Gpu
     }
 
     /// <summary>
-    /// The driver's enforced board-power ceiling through NVML (mW). Read-only, and the
-    /// only witness that the new ROM maximum was actually consumed: the records can be
-    /// staged and read back perfectly while the driver keeps running the old ceiling.
+    /// The driver's power limits through NVML (mW). Read-only, and the only witness that
+    /// the new ROM maximum was actually consumed: the records can be staged and read back
+    /// perfectly while the driver keeps running the old ceiling.
     /// </summary>
     public sealed class NvmlPowerCeilingProbe : IGpuPowerCeilingProbe
     {
-        public int? ReadEnforcedLimitMilliwatts()
+        public GpuPowerLimits Read()
         {
             try
             {
                 if (NvmlInit() != 0)
-                    return null;
+                    return new GpuPowerLimits(null, null);
 
                 try
                 {
                     // shortcut: the first NVML device; this fork's boxes are single-GPU.
                     if (NvmlDeviceGetHandleByIndex(0, out IntPtr device) != 0)
-                        return null;
+                        return new GpuPowerLimits(null, null);
 
-                    return NvmlDeviceGetEnforcedPowerLimit(device, out uint limit) == 0 ? (int)limit : null;
+                    // The ceiling the records raise is the constraint max. The current
+                    // limit is what the EC's cTGP asks for — a separate mechanism, so it
+                    // is reported next to the ceiling and never compared against it.
+                    int constraint = NvmlDeviceGetPowerManagementLimitConstraints(device, out _, out uint maxMilliwatts);
+                    int current = NvmlDeviceGetPowerManagementLimit(device, out uint limitMilliwatts);
+
+                    return new GpuPowerLimits(
+                        constraint == 0 ? (int)maxMilliwatts : null,
+                        current == 0 ? (int)limitMilliwatts : null);
                 }
                 finally
                 {
@@ -618,11 +763,11 @@ namespace UCU.Hardware.Gpu
             }
             catch (DllNotFoundException)
             {
-                return null;
+                return new GpuPowerLimits(null, null);
             }
             catch (EntryPointNotFoundException)
             {
-                return null;
+                return new GpuPowerLimits(null, null);
             }
         }
 
@@ -635,7 +780,13 @@ namespace UCU.Hardware.Gpu
         [DllImport("nvml.dll", EntryPoint = "nvmlDeviceGetHandleByIndex_v2")]
         private static extern int NvmlDeviceGetHandleByIndex(uint index, out IntPtr device);
 
-        [DllImport("nvml.dll", EntryPoint = "nvmlDeviceGetEnforcedPowerLimit")]
-        private static extern int NvmlDeviceGetEnforcedPowerLimit(IntPtr device, out uint limit);
+        [DllImport("nvml.dll", EntryPoint = "nvmlDeviceGetPowerManagementLimitConstraints")]
+        private static extern int NvmlDeviceGetPowerManagementLimitConstraints(
+            IntPtr device,
+            out uint minMilliwatts,
+            out uint maxMilliwatts);
+
+        [DllImport("nvml.dll", EntryPoint = "nvmlDeviceGetPowerManagementLimit")]
+        private static extern int NvmlDeviceGetPowerManagementLimit(IntPtr device, out uint limitMilliwatts);
     }
 }

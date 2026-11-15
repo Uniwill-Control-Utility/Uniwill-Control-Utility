@@ -282,6 +282,31 @@ public sealed class ContractShapeTests
         Assert.Throws<ProtocolViolationException>(() => EngineSerializer.ToParamsObject(new UnregisteredDto()));
     }
 
+    [Fact]
+    public void GpuRomOverrideState_CarriesTheCeilingTheCurrentLimitAndTheRequestOnTheWire()
+    {
+        // The card renders all three, so the names are part of the contract: the ceiling
+        // is the constraint max the records raise, the current limit is what NVML enforces
+        // and the request is what the driver was asked for (the number that delivers the
+        // watts — a ceiling alone leaves the card on its EC-derived limit). Renaming any of
+        // them without the other side is a silent 'not read'.
+        JsonElement element = EngineSerializer.ToParamsObject(new GpuRomOverrideStateDto
+        {
+            CeilingLimitMilliwatts = 250_000,
+            CurrentLimitMilliwatts = 150_000,
+            RequestedLimitMilliwatts = 225_000,
+        });
+
+        Assert.Equal(250_000, element.GetProperty("ceilingLimitMilliwatts").GetInt32());
+        Assert.Equal(150_000, element.GetProperty("currentLimitMilliwatts").GetInt32());
+        Assert.Equal(225_000, element.GetProperty("requestedLimitMilliwatts").GetInt32());
+        Assert.False(element.TryGetProperty("enforcedLimitMilliwatts", out _));
+
+        // A request nobody made is absent from the payload, like every other null.
+        JsonElement requested = EngineSerializer.ToParamsObject(new GpuRomOverrideStateDto());
+        Assert.False(requested.TryGetProperty("requestedLimitMilliwatts", out _));
+    }
+
     private static string[] AllVerbs() =>
         typeof(EngineVerbs)
             .GetNestedTypes(BindingFlags.Public)

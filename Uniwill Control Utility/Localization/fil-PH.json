@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Ang 13.5 A na board-input limit nito ay nagpapahintulot ng mga 267 W, na kasama ng 130 W ng CPU ay nananatili sa loob ng 420 W na adapter.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Naipatupad: limitasyon {0} W · {1} A GPU, {2} A memory, {3} A board input",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Itatakda: limitasyon {0} W · {1} A GPU, {2} A memory, {3} A board input",
-  "Live enforced limit: {0} W": "Kasalukuyang ipinatutupad na limitasyon: {0} W",
-  "Live enforced limit: not read": "Kasalukuyang ipinatutupad na limitasyon: hindi nabasa",
+  "Live ceiling: {0} W": "Live na kisame: {0} W",
+  "Live ceiling: not read": "Live na kisame: hindi nabasa",
+  "Live power limit: {0} W": "Live na limitasyon ng kuryente: {0} W",
+  "Live power limit: not read": "Live na limitasyon ng kuryente: hindi nabasa",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Ang kisame ang itinataas ng card na ito. Ang limitasyon ng kuryente ay itinatakda ng kontrol ng kuryente ng GPU sa EC, isang hiwalay na kontrol na hindi binabago ng card na ito.",
   "GPU power control is not available on this machine.": "Hindi available ang kontrol ng power ng GPU sa makinang ito.",
   "Board base TGP: {0} W": "Base na TGP ng board: {0} W",
   "The preset's GPU wattage is measured against this base.": "Ang wattage ng GPU ng preset ay sinusukat laban sa base na ito."

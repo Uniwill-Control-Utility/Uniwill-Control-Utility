@@ -27,7 +27,7 @@ namespace UCU.Hardware.Ec
     /// here is sequencing: the EC state machine (handshake, table-then-enable order),
     /// the delays the firmware needs, and serialising access under one lock.
     /// </summary>
-    public sealed class EcEngine : IDisposable
+    public sealed class EcEngine : IDisposable, IEcGpuPowerControl
     {
         #region EC Register Addresses (from uniwill-laptop-driver)
 

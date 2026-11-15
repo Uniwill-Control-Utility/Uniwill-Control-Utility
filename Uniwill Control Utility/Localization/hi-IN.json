@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "इसकी 13.5 A बोर्ड इनपुट सीमा लगभग 267 W की अनुमति देती है, जो CPU के 130 W के साथ 420 W एडाप्टर के भीतर रहता है।",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "लागू: सीमा {0} W · {1} A GPU, {2} A मेमोरी, {3} A बोर्ड इनपुट",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "लागू होगा: सीमा {0} W · {1} A GPU, {2} A मेमोरी, {3} A बोर्ड इनपुट",
-  "Live enforced limit: {0} W": "अभी लागू सीमा: {0} W",
-  "Live enforced limit: not read": "अभी लागू सीमा: नहीं पढ़ी गई",
+  "Live ceiling: {0} W": "लाइव ऊपरी सीमा: {0} W",
+  "Live ceiling: not read": "लाइव ऊपरी सीमा: नहीं पढ़ी गई",
+  "Live power limit: {0} W": "लाइव पावर सीमा: {0} W",
+  "Live power limit: not read": "लाइव पावर सीमा: नहीं पढ़ी गई",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "यह कार्ड ऊपरी सीमा को बढ़ाता है। पावर सीमा EC के GPU पावर नियंत्रण द्वारा तय की जाती है, जो एक अलग नियंत्रण है और यह कार्ड उसे नहीं बदलता।",
   "GPU power control is not available on this machine.": "इस मशीन पर GPU पावर नियंत्रण उपलब्ध नहीं है।",
   "Board base TGP: {0} W": "बोर्ड का आधार TGP: {0} W",
   "The preset's GPU wattage is measured against this base.": "प्रीसेट की GPU वाटेज इस आधार के सापेक्ष मापी जाती है।"

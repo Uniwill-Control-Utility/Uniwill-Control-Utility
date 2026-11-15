@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "13,5 A'lik kart giriş limiti yaklaşık 267 W'a izin verir; CPU'nun 130 W'ı ile birlikte 420 W adaptörün içinde kalır.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Uygulanan: üst sınır {0} W · {1} A GPU, {2} A bellek, {3} A kart girişi",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Ayarlanacak: üst sınır {0} W · {1} A GPU, {2} A bellek, {3} A kart girişi",
-  "Live enforced limit: {0} W": "Şu anda uygulanan limit: {0} W",
-  "Live enforced limit: not read": "Şu anda uygulanan limit: okunamadı",
+  "Live ceiling: {0} W": "Anlık üst sınır: {0} W",
+  "Live ceiling: not read": "Anlık üst sınır: okunamadı",
+  "Live power limit: {0} W": "Anlık güç limiti: {0} W",
+  "Live power limit: not read": "Anlık güç limiti: okunamadı",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Üst sınır, bu kartın yükselttiği değerdir. Güç limitini EC'nin GPU güç denetimi belirler; bu kart o ayrı denetimi değiştirmez.",
   "GPU power control is not available on this machine.": "GPU güç denetimi bu makinede kullanılamıyor.",
   "Board base TGP: {0} W": "Kartın temel TGP değeri: {0} W",
   "The preset's GPU wattage is measured against this base.": "Ön ayarın GPU watt değeri bu temele göre ölçülür."

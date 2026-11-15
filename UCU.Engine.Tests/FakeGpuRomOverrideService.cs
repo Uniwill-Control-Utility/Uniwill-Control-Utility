@@ -16,10 +16,13 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
     {
         State = GpuRomOverrideStates.NotUnlocked,
         TierId = "extra_gpu_power",
-        PowerMilliwatts = 220_000,
-        NvVddMilliAmps = 120_000,
-        MsVddMilliAmps = 50_000,
-        BoardInputMilliAmps = 13_500,
+        PowerMilliwatts = 250_000,
+        NvVddMilliAmps = 294_000,
+        MsVddMilliAmps = 84_000,
+        BoardInputMilliAmps = 14_026,
+        CeilingLimitMilliwatts = 175_000,
+        CurrentLimitMilliwatts = 95_000,
+        RequestedLimitMilliwatts = null,
     };
 
     public GpuRomOverrideStateDto GetState() => Answer;

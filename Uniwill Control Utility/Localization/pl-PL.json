@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Limit wejścia płyty 13,5 A pozwala na około 267 W, co razem ze 130 W CPU mieści się w zasilaczu 420 W.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Zastosowano: limit {0} W · {1} A GPU, {2} A pamięć, {3} A wejście płyty",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Ustawiłoby: limit {0} W · {1} A GPU, {2} A pamięć, {3} A wejście płyty",
-  "Live enforced limit: {0} W": "Aktualnie stosowany limit: {0} W",
-  "Live enforced limit: not read": "Aktualnie stosowany limit: nie odczytano",
+  "Live ceiling: {0} W": "Bieżący sufit: {0} W",
+  "Live ceiling: not read": "Bieżący sufit: nie odczytano",
+  "Live power limit: {0} W": "Bieżący limit mocy: {0} W",
+  "Live power limit: not read": "Bieżący limit mocy: nie odczytano",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Sufit to wartość, którą podnosi ta karta. Limit mocy ustawia kontrola zasilania GPU w EC — osobna kontrola, której ta karta nie zmienia.",
   "GPU power control is not available on this machine.": "Sterowanie mocą GPU nie jest dostępne na tym komputerze.",
   "Board base TGP: {0} W": "Bazowy TGP płyty: {0} W",
   "The preset's GPU wattage is measured against this base.": "Moc GPU w profilu jest mierzona względem tej podstawy."

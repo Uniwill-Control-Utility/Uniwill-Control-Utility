@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Njegova granica ulaza ploče od 13,5 A dopušta oko 267 W, što uz 130 W CPU-a ostaje unutar 420 W adaptera.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Primijenjeno: granica {0} W · {1} A GPU, {2} A memorija, {3} A ulaz ploče",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Postavilo bi: granica {0} W · {1} A GPU, {2} A memorija, {3} A ulaz ploče",
-  "Live enforced limit: {0} W": "Trenutačno primijenjena granica: {0} W",
-  "Live enforced limit: not read": "Trenutačno primijenjena granica: nije očitano",
+  "Live ceiling: {0} W": "Trenutačna gornja granica: {0} W",
+  "Live ceiling: not read": "Trenutačna gornja granica: nije očitano",
+  "Live power limit: {0} W": "Trenutačno ograničenje snage: {0} W",
+  "Live power limit: not read": "Trenutačno ograničenje snage: nije očitano",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Gornju granicu podiže ova kartica. Ograničenje snage postavlja EC-ova kontrola napajanja GPU-a, zasebna kontrola koju ova kartica ne mijenja.",
   "GPU power control is not available on this machine.": "Upravljanje napajanjem GPU-a nije dostupno na ovom računalu.",
   "Board base TGP: {0} W": "Osnovni TGP ploče: {0} W",
   "The preset's GPU wattage is measured against this base.": "Snaga GPU-a u profilu mjeri se prema ovoj osnovi."

@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
-  "Live enforced limit: {0} W": "Live enforced limit: {0} W",
-  "Live enforced limit: not read": "Live enforced limit: not read",
+  "Live ceiling: {0} W": "Live ceiling: {0} W",
+  "Live ceiling: not read": "Live ceiling: not read",
+  "Live power limit: {0} W": "Live power limit: {0} W",
+  "Live power limit: not read": "Live power limit: not read",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.",
   "GPU power control is not available on this machine.": "GPU power control is not available on this machine.",
   "Board base TGP: {0} W": "Board base TGP: {0} W",
   "The preset's GPU wattage is measured against this base.": "The preset's GPU wattage is measured against this base."

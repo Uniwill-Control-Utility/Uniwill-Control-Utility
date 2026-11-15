@@ -797,11 +797,23 @@ namespace UCU.Contracts
 
         public int BoardInputMilliAmps { get; init; }
 
-        /// <summary>The board-power ceiling the driver enforces right now; null when it
-        /// could not be read (which is not the same as "unchanged").</summary>
-        public int? EnforcedLimitMilliwatts { get; init; }
+        /// <summary>The driver's power ceiling — the constraint maximum, the number the
+        /// records raise. Null when it could not be read (which is not the same as
+        /// "unchanged").</summary>
+        public int? CeilingLimitMilliwatts { get; init; }
 
-        /// <summary>True when the driver's enforced ceiling is above the stock ROM's.</summary>
+        /// <summary>The limit the driver currently enforces (the EC's cTGP, a separate
+        /// mechanism). Null when it could not be read.</summary>
+        public int? CurrentLimitMilliwatts { get; init; }
+
+        /// <summary>
+        /// The board-power request the driver carries - the number it actually enforces
+        /// against the ceiling. Null when no request is set (the card then stays on its
+        /// EC-derived limit) or when it could not be read; <see cref="Reason"/> says which.
+        /// </summary>
+        public int? RequestedLimitMilliwatts { get; init; }
+
+        /// <summary>True when the driver's reported ceiling is above the stock ROM's.</summary>
         public bool EnforcedLimitMoved { get; init; }
 
         /// <summary>True when the display adapter was restarted by this call.</summary>

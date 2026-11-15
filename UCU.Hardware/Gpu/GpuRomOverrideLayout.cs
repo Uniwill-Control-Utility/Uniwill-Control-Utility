@@ -21,30 +21,48 @@ namespace UCU.Hardware.Gpu
     /// <summary>
     /// A power tier's numbers, in the units the ROM records use. The records are
     /// computed from this, never hardcoded at the write site.
+    ///
+    /// <see cref="PowerMilliwatts"/> is the policy <em>ceiling</em> (the number the
+    /// driver honours a request against) and <see cref="TgpTargetMilliwatts"/> is the
+    /// TGP actually asked for. They differ on purpose: a request equal to the ceiling
+    /// is answered with the old 175 W limit, so the ceiling must sit above the target
+    /// (measured against MechControl-RE, 2026-11-15: ceiling 220 W + request 220 W →
+    /// enforced 175 W; ceiling 250 W + request 220 W → enforced 220 W).
     /// </summary>
     public sealed record GpuPowerTier(
         string Id,
         string Name,
         int PowerMilliwatts,
+        int TgpTargetMilliwatts,
         int NvVddMilliAmps,
         int MsVddMilliAmps,
-        int BoardInputMilliAmps);
+        int BoardInputMilliAmps)
+    {
+        /// <summary>The TGP target in watts, for the EC's cTGP offset and log text.</summary>
+        public int TgpTargetWatts => TgpTargetMilliwatts / 1000;
+    }
 
     /// <summary>
-    /// The tiers to ship. "Extra GPU power" is the measured easy win (artifacts/notes/
-    /// power-boost-mode-tier-spec.md): 220 W ceiling, rails ≈1.5× the ~208 W draw, and
-    /// the board-input clamp raised with the ceiling — leaving it at stock 11.053 A
-    /// while asking for more is the config that browns out and reports out-of-memory.
+    /// The tiers to ship. "Extra GPU power" is the measured unlock: 250 W ceiling,
+    /// 225 W TGP target (the ceiling minus the 25 W Dynamic Boost maximum — the EC's
+    /// own limit for this board), rails at MechControl-RE's measured values, i.e.
+    /// ≈1.4× the ~200-210 W draw.
+    ///
+    /// The board-input clamp is deliberately NOT MechControl's 17.021 A but 14.026 A:
+    /// it has no runtime NVAPI current setter, while we would only raise the clamp, and
+    /// 14.026 A × ~20 V + 130 W CPU stays inside the 420 W adapter whereas 17.021 A
+    /// does not.
     /// </summary>
     public static class GpuPowerTiers
     {
         public static readonly GpuPowerTier ExtraGpuPower = new(
             Id: "extra_gpu_power",
             Name: "Extra GPU power",
-            PowerMilliwatts: 220_000,
-            NvVddMilliAmps: 120_000,
-            MsVddMilliAmps: 50_000,
-            BoardInputMilliAmps: 13_500);
+            PowerMilliwatts: 250_000,
+            TgpTargetMilliwatts: 225_000,
+            NvVddMilliAmps: 294_000,
+            MsVddMilliAmps: 84_000,
+            BoardInputMilliAmps: 14_026);
     }
 
     /// <summary>

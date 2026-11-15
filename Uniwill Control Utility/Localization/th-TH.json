@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "ขีดจำกัดอินพุตบอร์ด 13.5 A อนุญาตประมาณ 267 W ซึ่งเมื่อรวมกับ 130 W ของ CPU แล้วยังอยู่ในอะแดปเตอร์ 420 W",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "นำไปใช้แล้ว: เพดาน {0} W · {1} A GPU, {2} A หน่วยความจำ, {3} A อินพุตบอร์ด",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "จะตั้งเป็น: เพดาน {0} W · {1} A GPU, {2} A หน่วยความจำ, {3} A อินพุตบอร์ด",
-  "Live enforced limit: {0} W": "ขีดจำกัดที่บังคับใช้อยู่: {0} W",
-  "Live enforced limit: not read": "ขีดจำกัดที่บังคับใช้อยู่: อ่านไม่ได้",
+  "Live ceiling: {0} W": "เพดานปัจจุบัน: {0} W",
+  "Live ceiling: not read": "เพดานปัจจุบัน: อ่านไม่ได้",
+  "Live power limit: {0} W": "ขีดจำกัดกำลังไฟปัจจุบัน: {0} W",
+  "Live power limit: not read": "ขีดจำกัดกำลังไฟปัจจุบัน: อ่านไม่ได้",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "เพดานคือค่าที่การ์ดนี้เพิ่มขึ้น ขีดจำกัดกำลังไฟถูกกำหนดโดยการควบคุมกำลังไฟ GPU ของ EC ซึ่งเป็นการควบคุมแยกที่การ์ดนี้ไม่เปลี่ยน",
   "GPU power control is not available on this machine.": "การควบคุมพลังงาน GPU ไม่สามารถใช้ได้บนเครื่องนี้",
   "Board base TGP: {0} W": "TGP พื้นฐานของบอร์ด: {0} W",
   "The preset's GPU wattage is measured against this base.": "วัตต์ของ GPU ในพรีเซ็ตวัดเทียบกับค่านี้"

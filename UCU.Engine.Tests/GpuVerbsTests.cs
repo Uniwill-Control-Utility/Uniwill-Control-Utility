@@ -115,8 +115,8 @@ public sealed class GpuVerbsTests
     public async Task GetRomOverrideState_AnswersTheTierAndTheVerifiedCeiling()
     {
         // The read is what the page renders: the tier's numbers, the staged records'
-        // state, and whether the driver's enforced ceiling moved. A refusal
-        // (Unsupported) is the same DTO with a reason, never a fault.
+        // state, whether the driver's ceiling moved and what the driver was asked for. A
+        // refusal (Unsupported) is the same DTO with a reason, never a fault.
         var overrides = new FakeGpuRomOverrideService
         {
             Answer = new GpuRomOverrideStateDto
@@ -124,11 +124,13 @@ public sealed class GpuVerbsTests
                 State = GpuRomOverrideStates.Unlocked,
                 VbiosVersion = "98.03.5E.00.5D",
                 TierId = "extra_gpu_power",
-                PowerMilliwatts = 220_000,
-                NvVddMilliAmps = 120_000,
-                MsVddMilliAmps = 50_000,
-                BoardInputMilliAmps = 13_500,
-                EnforcedLimitMilliwatts = 220_000,
+                PowerMilliwatts = 250_000,
+                NvVddMilliAmps = 294_000,
+                MsVddMilliAmps = 84_000,
+                BoardInputMilliAmps = 14_026,
+                CeilingLimitMilliwatts = 250_000,
+                CurrentLimitMilliwatts = 150_000,
+                RequestedLimitMilliwatts = 225_000,
                 EnforcedLimitMoved = true,
                 Restarted = true,
             },
@@ -140,8 +142,11 @@ public sealed class GpuVerbsTests
         GpuRomOverrideStateDto state = await host.Gpu.GetRomOverrideStateAsync();
 
         Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
-        Assert.Equal(220_000, state.PowerMilliwatts);
-        Assert.Equal(13_500, state.BoardInputMilliAmps);
+        Assert.Equal(250_000, state.PowerMilliwatts);
+        Assert.Equal(14_026, state.BoardInputMilliAmps);
+        Assert.Equal(250_000, state.CeilingLimitMilliwatts);
+        Assert.Equal(150_000, state.CurrentLimitMilliwatts);
+        Assert.Equal(225_000, state.RequestedLimitMilliwatts);
         Assert.True(state.EnforcedLimitMoved);
         Assert.True(state.Restarted);
         Assert.Null(overrides.LastEnabled);

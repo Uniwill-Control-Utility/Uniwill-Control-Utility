@@ -108,7 +108,9 @@ namespace UCU.Engine
                         new UCU.Hardware.Gpu.DisplayDriverRomRegistry(
                             sp.GetRequiredService<UCU.Hardware.Devices.IPnpDeviceService>()),
                         new UCU.Hardware.Gpu.PnputilGpuRestarter(),
-                        new UCU.Hardware.Gpu.NvmlPowerCeilingProbe()));
+                        new UCU.Hardware.Gpu.NvmlPowerCeilingProbe(),
+                        new GatedEcGpuPower(sp.GetRequiredService<EcEngineGate>()),
+                        new UCU.Hardware.Gpu.NvApiPowerRequest()));
 
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
@@ -166,6 +168,25 @@ namespace UCU.Engine
             }
 
             return options;
+        }
+
+        /// <summary>
+        /// The EC side of the GPU ROM override, resolved through the gate at call time: the
+        /// gate is what opens the EC driver lazily and runs the activation handshake, so the
+        /// store must not hold an engine instance of its own.
+        /// </summary>
+        private sealed class GatedEcGpuPower : IEcGpuPowerControl
+        {
+            private readonly EcEngineGate _gate;
+
+            public GatedEcGpuPower(EcEngineGate gate) => _gate = gate;
+
+            public UCU.Contracts.GpuPowerInfoDto GetGpuPowerInfo() => _gate.Acquire().GetGpuPowerInfo();
+
+            public void ActivateGpuPowerControl(int ctgpOffset, int dbOffset) =>
+                _gate.Acquire().ActivateGpuPowerControl(ctgpOffset, dbOffset);
+
+            public void DeactivateGpuPowerControl() => _gate.Acquire().DeactivateGpuPowerControl();
         }
     }
 }

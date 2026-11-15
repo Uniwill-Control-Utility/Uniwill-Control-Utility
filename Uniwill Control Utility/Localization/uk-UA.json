@@ -1148,8 +1148,11 @@
   "Its board-input limit of 13.5 A permits roughly 267 W, which together with the CPU's 130 W stays inside the 420 W adapter.": "Межа вхідного струму плати 13,5 А допускає близько 267 Вт, що разом зі 130 Вт CPU залишається в межах 420-Вт адаптера.",
   "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Застосовано: межа {0} Вт · {1} А GPU, {2} А пам'ять, {3} А вхід плати",
   "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input": "Буде встановлено: межа {0} Вт · {1} А GPU, {2} А пам'ять, {3} А вхід плати",
-  "Live enforced limit: {0} W": "Застосований зараз ліміт: {0} Вт",
-  "Live enforced limit: not read": "Застосований зараз ліміт: не прочитано",
+  "Live ceiling: {0} W": "Поточна верхня межа: {0} Вт",
+  "Live ceiling: not read": "Поточна верхня межа: не прочитано",
+  "Live power limit: {0} W": "Поточний ліміт потужності: {0} Вт",
+  "Live power limit: not read": "Поточний ліміт потужності: не прочитано",
+  "The ceiling is what this card raises. The power limit is set by the EC's GPU power control, which this card does not change.": "Верхню межу піднімає ця картка. Ліміт потужності задає керування живленням GPU в EC — окреме керування, яке ця картка не змінює.",
   "GPU power control is not available on this machine.": "Керування живленням GPU недоступне на цьому комп'ютері.",
   "Board base TGP: {0} W": "Базовий TGP плати: {0} Вт",
   "The preset's GPU wattage is measured against this base.": "Потужність GPU у профілі вимірюється відносно цієї бази."
