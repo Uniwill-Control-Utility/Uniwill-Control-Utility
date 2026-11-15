@@ -176,6 +176,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 UpdateAdaptiveOverlay();
 
                 OpenRequestedTuningSection();
+
+                // The GPU power-ceiling card reads the driver key through the engine,
+                // so its state is re-read on every navigation (the Settings page owns
+                // the Power boost mode toggle this card gates on). Not awaited: the
+                // page must not wait on the engine to finish painting.
+                _ = RefreshRomOverrideAsync();
             }
             catch (Exception ex)
             {
@@ -567,6 +573,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 hasNvidia = !string.IsNullOrEmpty(NvTuning.GetGpuName());
             }
             sdNvidia.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
+
+            // The power-ceiling override is an NVIDIA driver key: no card without one.
+            cardRomOverride.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
 
             // Hide GPU clock controls when EnableGpuClockControl is OFF
             bool gpuClockEnabled = Settings.Default.EnableGpuClockControl;
@@ -2072,6 +2081,214 @@ namespace Uniwill_Control_Utility.Views.Pages
                 gpuPresetDuties: null);
 
             DebugLog($"ApplyFanCurveFromPreset: {fanPresetName} applied to EC");
+        }
+
+        #endregion
+
+        #region GPU power ceiling override (Extra GPU power)
+
+        // The state comes from the engine: the display-driver key is HKLM and the
+        // adapter restart is a LocalSystem act. Nothing here writes hardware directly.
+        private UCU.Contracts.Capabilities.IGpuTuningCapability? _gpuTuning;
+        private UCU.Contracts.GpuRomOverrideStateDto? _romOverride;
+        private bool _romOverrideBusy;
+        private string? _romOverrideError;
+
+        private async Task RefreshRomOverrideAsync()
+        {
+            _gpuTuning ??= App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
+            _romOverrideError = null;
+
+            if (_gpuTuning == null)
+            {
+                _romOverride = null;
+                RenderRomOverride();
+                return;
+            }
+
+            try
+            {
+                _romOverride = await _gpuTuning.GetRomOverrideStateAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                // A stopped engine or a refused verb is a state the card must show,
+                // not a page failure.
+                DebugLog($"GPU ROM override state unavailable: {ex.Message}");
+                _romOverride = null;
+            }
+
+            RenderRomOverride();
+        }
+
+        private void RenderRomOverride()
+        {
+            UCU.Contracts.GpuRomOverrideStateDto? state = _romOverride;
+            bool busy = _romOverrideBusy;
+            bool unlocked = state?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked;
+            bool uncertain = state?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain;
+            bool blocked = state?.State == UCU.Contracts.GpuRomOverrideStates.Unsupported;
+            bool canUnlock = state != null && !unlocked && !blocked;
+
+            // Nothing renders before the first read, so the card never shows an empty
+            // status bar while the engine is being asked.
+            RomOverrideStatus.Visibility = Visibility.Visible;
+
+            // The read-back is what the engine read from the driver, never what was asked for.
+            if (state == null)
+            {
+                spRomReadback.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                object enforced = state.EnforcedLimitMilliwatts is int limit
+                    ? limit / 1000.0
+                    : LocalizationService.Get("not read");
+
+                spRomReadback.Visibility = Visibility.Visible;
+                tbRomCeiling.Text = LocalizationService.Format(
+                    "Ceiling {0} W · enforced limit {1} W",
+                    state.PowerMilliwatts / 1000.0,
+                    enforced);
+                tbRomRails.Text = LocalizationService.Format(
+                    "Rails: {0} A GPU, {1} A memory, {2} A board input",
+                    state.NvVddMilliAmps / 1000.0,
+                    state.MsVddMilliAmps / 1000.0,
+                    state.BoardInputMilliAmps / 1000.0);
+            }
+
+            if (state == null)
+            {
+                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Informational;
+                RomOverrideStatus.Title = LocalizationService.Get(
+                    "The engine service is not available, so the current state could not be read.");
+                RomOverrideStatus.Message = string.Empty;
+            }
+            else if (blocked)
+            {
+                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Warning;
+                RomOverrideStatus.Title = LocalizationService.Get("The override cannot be used on this machine.");
+                RomOverrideStatus.Message = RomReasonLine(state.Reason) + "\n\n" + LocalizationService.Get(
+                    "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.");
+            }
+            else if (uncertain)
+            {
+                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Warning;
+                RomOverrideStatus.Title = LocalizationService.Get("Partly applied: the change could not be verified.");
+                RomOverrideStatus.Message = RomReasonLine(state.Reason);
+            }
+            else if (unlocked)
+            {
+                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Success;
+                RomOverrideStatus.Title = LocalizationService.Get("Unlocked: the driver is enforcing the raised ceiling.");
+                RomOverrideStatus.Message = RomReasonLine(state.Reason);
+            }
+            else
+            {
+                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Informational;
+                RomOverrideStatus.Title = LocalizationService.Get("Stock power limit: the GPU runs on the firmware's own ceiling.");
+                RomOverrideStatus.Message = RomReasonLine(state.Reason);
+            }
+
+            if (_romOverrideError != null)
+            {
+                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Warning;
+                RomOverrideStatus.Title = LocalizationService.Get("The state could not be read back");
+                RomOverrideStatus.Message = RomReasonLine(_romOverrideError);
+            }
+
+            btnRomOverride.Visibility = state == null || blocked ? Visibility.Collapsed : Visibility.Visible;
+            btnRomOverride.Content = unlocked
+                ? LocalizationService.Get("Restore stock")
+                : LocalizationService.Get("Unlock extra GPU power");
+
+            bool consent = chkRomConsent.IsChecked == true;
+            bool powerBoost = Settings.Default.EnablePowerBoostMode;
+            bool enabled = !busy && (unlocked || (canUnlock && powerBoost && consent));
+
+            btnRomOverride.IsEnabled = enabled;
+            btnRomOverride.Opacity = enabled ? 1.0 : 0.5;
+
+            chkRomConsent.Visibility = canUnlock ? Visibility.Visible : Visibility.Collapsed;
+            chkRomConsent.IsEnabled = !busy;
+
+            spRomBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+
+            // Never a control that looks live but ignores the click: the reason sits
+            // right under the button.
+            tbRomOverrideNote.Text = busy
+                ? LocalizationService.Get("Restarting the GPU. The screen may go blank for up to 60 seconds.")
+                : state == null || blocked || unlocked
+                    ? string.Empty
+                    : !powerBoost
+                        ? LocalizationService.Get("Turn on Power boost mode in Settings first.")
+                        : !consent
+                            ? LocalizationService.Get("Tick the statement above first.")
+                            : string.Empty;
+        }
+
+        private static string RomReasonLine(string? reason) =>
+            string.IsNullOrWhiteSpace(reason) ? string.Empty : LocalizationService.Format("Reason: {0}", reason);
+
+        private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
+
+        private async void btnRomOverride_Click(object sender, RoutedEventArgs e)
+        {
+            if (_romOverrideBusy || _gpuTuning == null || _romOverride == null)
+                return;
+
+            bool restore = _romOverride.State == UCU.Contracts.GpuRomOverrideStates.Unlocked;
+
+            // Consent gates the unlock (a CheckBox), then a dialog names the two effects
+            // the act has on the machine.
+            if (!restore && !(Settings.Default.EnablePowerBoostMode && chkRomConsent.IsChecked == true))
+                return;
+
+            string question = restore
+                ? LocalizationService.Get("Restore the stock GPU power limit?")
+                : LocalizationService.Get("Apply the extra GPU power override?");
+            string body = restore
+                ? LocalizationService.Get("This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.")
+                : LocalizationService.Get("This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.");
+
+            Window? owner = Window.GetWindow(this);
+            MessageBoxResult answer = owner != null
+                ? MessageBox.Show(owner, body, question, MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                : MessageBox.Show(body, question, MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+            if (answer != MessageBoxResult.Yes)
+                return;
+
+            _romOverrideBusy = true;
+            _romOverrideError = null;
+            RenderRomOverride();
+
+            try
+            {
+                _romOverride = await _gpuTuning.SetRomOverrideAsync(!restore).ConfigureAwait(true);
+                DebugLog($"GPU ROM override: asked {(!restore ? "unlock" : "restore")}, engine answered {_romOverride.State}");
+            }
+            catch (Exception ex)
+            {
+                // The adapter restart alone may take 60 s, so a transport timeout is
+                // not a verdict: report it, then read the real state back.
+                DebugLog($"GPU ROM override failed: {ex.Message}");
+                _romOverrideError = ex.Message;
+
+                try
+                {
+                    _romOverride = await _gpuTuning.GetRomOverrideStateAsync().ConfigureAwait(true);
+                }
+                catch (Exception reread)
+                {
+                    DebugLog($"GPU ROM override re-read failed: {reread.Message}");
+                }
+            }
+            finally
+            {
+                _romOverrideBusy = false;
+                RenderRomOverride();
+            }
         }
 
         #endregion

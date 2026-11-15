@@ -189,6 +189,82 @@
                         </Grid>
                     </ui:Card>
 
+                    <!-- GPU power ceiling override. Sits above the tuning editors so it is
+                         reachable from every preset: it is a machine-wide driver-level
+                         setting, not a per-preset value. The sliders below stay the
+                         advanced path. -->
+                    <ui:Card x:Name="cardRomOverride"
+                             Margin="0,0,0,8"
+                             Padding="15"
+                             Visibility="Collapsed">
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="BodyStrong" Text="Extra GPU power" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Raises the GPU's power ceiling at driver level" />
+                            <TextBlock Margin="0,10,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Measured on this machine: about 267 W from the GPU and 130 W from the CPU, close to 397 W of the 420 W adapter. The GPU hotspot stayed at 62 °C in testing." />
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it." />
+
+                            <ui:InfoBar x:Name="RomOverrideStatus"
+                                        Margin="0,12,0,0"
+                                        IsClosable="False"
+                                        IsOpen="True"
+                                        Visibility="Collapsed"
+                                        Severity="Informational" />
+
+                            <StackPanel x:Name="spRomReadback"
+                                        Margin="0,8,0,0"
+                                        Visibility="Collapsed">
+                                <TextBlock x:Name="tbRomCeiling" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRomRails" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <CheckBox x:Name="chkRomConsent"
+                                      Margin="0,14,0,0"
+                                      FontSize="12"
+                                      Visibility="Collapsed"
+                                      Checked="chkRomConsent_Changed"
+                                      Unchecked="chkRomConsent_Changed"
+                                      Content="I understand this changes driver-level settings and restarts the GPU" />
+
+                            <ui:Button x:Name="btnRomOverride"
+                                       Margin="0,14,0,0"
+                                       HorizontalAlignment="Left"
+                                       Padding="16,6"
+                                       Appearance="Primary"
+                                       Visibility="Collapsed"
+                                       Click="btnRomOverride_Click"
+                                       Content="Unlock extra GPU power" />
+
+                            <TextBlock x:Name="tbRomOverrideNote"
+                                       Margin="0,6,0,0"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+
+                            <StackPanel x:Name="spRomBusy"
+                                        Margin="0,12,0,0"
+                                        Visibility="Collapsed">
+                                <ProgressBar Height="4" IsIndeterminate="True" />
+                                <TextBlock Margin="0,6,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Restarting the GPU. The screen may go blank for up to 60 seconds." />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+
                     <!-- ===== CUSTOM PANEL (hidden by default) ===== -->
                     <StackPanel x:Name="customScroll" Visibility="Collapsed">
 
