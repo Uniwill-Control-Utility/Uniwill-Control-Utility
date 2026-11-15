@@ -207,6 +207,8 @@
 
   "driver": [
     { "name": "IOCTL_ECREAD", "value": "0x9C40A488", "type": "uint", "evidence": "MechControl's decompiled EcDevice.cs (EcEngine.cs header, EcDriverTransport.cs:22)" },
-    { "name": "IOCTL_ECWRITE", "value": "0x9C40A48C", "type": "uint", "evidence": "MechControl's decompiled EcDevice.cs (EcEngine.cs header, EcDriverTransport.cs:23)" }
+    { "name": "IOCTL_ECWRITE", "value": "0x9C40A48C", "type": "uint", "evidence": "MechControl's decompiled EcDevice.cs (EcEngine.cs header, EcDriverTransport.cs:23)" },
+    { "name": "IOCTL_ECSPEC", "value": "0x9C40A500", "type": "uint", "domain": "gpu-power", "evidence": "MechControl src/ec.h ecSpecIoctl and src/ec.cpp EcTransport::spec; reads the per-model SMAPCTABLE (re/notes/ECSpec.md)" },
+    { "name": "ECSPEC_READ_COMMAND", "value": "0xBB", "type": "uint", "domain": "gpu-power", "evidence": "MechControl src/ec.cpp EcTransport::spec input word 0xBB | index << 8; the EC echoes this byte at index 9+, which is the real/out-of-range discriminator (ECSpec.md 'Out-of-Range Detection')" }
   ]
 }

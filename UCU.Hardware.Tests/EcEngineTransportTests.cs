@@ -109,6 +109,8 @@ public sealed class EcEngineTransportTests
         {
         }
 
+        public uint ReadEcSpec(int index) => throw new System.InvalidOperationException();
+
         public void Dispose()
         {
         }

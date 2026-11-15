@@ -133,6 +133,9 @@ namespace UCU.Client
         public Task ActivateGpuPowerControlAsync(int ctgpOffset, int dbOffset, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Power.ActivateGpuPowerControl, new GpuPowerControlDto { CtgpOffset = ctgpOffset, DbOffset = dbOffset }, cancellationToken);
 
+        public Task<GpuPowerInfoDto> GetGpuPowerInfoAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<GpuPowerInfoDto>(EngineVerbs.Power.GetGpuPowerInfo, cancellationToken);
+
         public Task DeactivateGpuPowerControlAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Power.DeactivateGpuPowerControl, cancellationToken);
 

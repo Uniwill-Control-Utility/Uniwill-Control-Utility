@@ -31,6 +31,14 @@ namespace UCU.Hardware.Ec
         /// <summary>Reads one register. Throws when the transfer fails.</summary>
         byte Read(ushort address);
 
+        /// <summary>
+        /// Reads one dword of the EC's per-model power table (the driver's ECSpec IOCTL,
+        /// request <c>0xBB | index &lt;&lt; 8</c>). Throws when the transfer fails; an index
+        /// past the table does not throw, the EC echoes the request instead (that echo is
+        /// how <see cref="UCU.Core.Ec.EcSpecCodec.IsValid"/> tells a real table from a refusal).
+        /// </summary>
+        uint ReadEcSpec(int index);
+
         /// <summary>Writes one register. Throws when the transfer fails.</summary>
         void Write(ushort address, byte value);
     }

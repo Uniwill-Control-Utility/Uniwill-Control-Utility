@@ -99,4 +99,38 @@ public sealed class EcEngineGpuPowerTruthTests
         var state = engine.GetGpuPowerControlState();
         Assert.Equal(0x00, state.Enable);   // feature off: the guardian's drift signal
     }
+
+    [Fact]
+    public void Deactivate_RestoresTheOffsetFoundBeforeActivation()
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(EcEngine.REG_CTGP_DB_CTGP_OFFSET, 0x50); // the board's own byte (80 → 175 W)
+
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+
+        engine.ActivateGpuPowerControl(ctgpOffset: 120, dbOffset: 0);
+        engine.DeactivateGpuPowerControl();
+
+        // 0x0744 holds TGP - DefaultTGP, so the captured byte is the only honest stock
+        // witness: a constant would leave the board at 150 W (55) or 95 W (0).
+        Assert.Equal(0x50, engine.GetGpuPowerControlState().Ctgp);
+    }
+
+    [Fact]
+    public void Deactivate_WithoutActivation_LeavesTheOffsetUntouched()
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(EcEngine.REG_CTGP_DB_CTGP_OFFSET, 0x50);
+
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+        transport.ClearLog();
+
+        engine.DeactivateGpuPowerControl();
+
+        // Nothing was captured, so the register is left as the EC had it rather than
+        // overwritten with a guessed base.
+        Assert.DoesNotContain(transport.Writes, w => w.Address == EcEngine.REG_CTGP_DB_CTGP_OFFSET);
+    }
 }

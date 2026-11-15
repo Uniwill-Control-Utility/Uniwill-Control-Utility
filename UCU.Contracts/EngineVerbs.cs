@@ -49,6 +49,13 @@ namespace UCU.Contracts
             public const string IsCustomProfileActive = "power.is_custom_profile_active";
 
             /// <summary>
+            /// The GPU power-control gate and the base TGP it is measured against: the EC's
+            /// per-model power table (ECSpec, IOCTL 0x9C40A500) decoded to DefaultTGP, plus
+            /// whether that table is usable on this machine (with the reason when it is not).
+            /// </summary>
+            public const string GetGpuPowerInfo = "power.get_gpu_power_info";
+
+            /// <summary>
             /// The power-contract truth (U-107): the GPU cTGP/DB register bytes
             /// (0x0743-0x0746, 0x0727 bit6) and the CPU PL1/PL2 wattage in one
             /// serialized read. Laptop NVML answers NOT_SUPPORTED for power

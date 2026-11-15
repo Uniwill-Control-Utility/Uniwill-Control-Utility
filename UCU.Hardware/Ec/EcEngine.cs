@@ -247,6 +247,10 @@ namespace UCU.Hardware.Ec
         private byte _savedApOem6;
         private byte _savedUfCtrl;
 
+        // 0x0744 as found before our first cTGP write, so Deactivate can undo rather
+        // than write a guessed wattage base.
+        private int? _ctgpOffsetBeforeActivation;
+
         // 6ms delay between EC operations (from uniwill-laptop-driver UNIWILL_EC_DELAY_US)
         private const int EcDelayMs = 6;
 
@@ -427,6 +431,11 @@ namespace UCU.Hardware.Ec
 
                 _ecHandshakeDone = true;
                 DebugLog("[DIAG] EcEngine: EC activation handshake complete — fan curves should now apply");
+
+                // Warm the per-model power table here, once: it is firmware data for the
+                // boot, and reading it now keeps the diagnostics dump and the GPU power path
+                // cache hits instead of paying twelve paced reads on a user-visible verb.
+                GetEcSpec();
             }
         }
 
@@ -610,14 +619,7 @@ namespace UCU.Hardware.Ec
         /// WARNING: Registers 0x0743-0x0746 overlap with "manual-mode fan-curve" block.
         /// Call this AFTER fan initialization to avoid clobbering fan curve data.
         /// </summary>
-        /// <param name="dbOffset">Dynamic Boost range in watts (0-25). Default 25 gives +25W GPU borrow from CPU.</param>
-        public void ActivateGpuPowerControl(int dbOffset = 25)
-            => ActivateGpuPowerControl(55, dbOffset); // Legacy: hardcoded cTGP=55 for backward compat.
-
-        /// <summary>
-        /// Activates GPU power control on the EC with explicit cTGP and Dynamic Boost offsets.
-        /// </summary>
-        /// <param name="ctgpOffset">cTGP offset written to EC register 0x0744. Computed as (targetWatts - defaultWatts) per UCC/tuxedo-drivers.</param>
+        /// <param name="ctgpOffset">cTGP offset written to EC register 0x0744. Computed as (targetWatts - DefaultTGP) per UCC/tuxedo-drivers; use <see cref="CtgpOffsetForTgpWatts"/> so the board's own base is used.</param>
         /// <param name="dbOffset">Dynamic Boost range in watts (0-25). Default 25 gives +25W GPU borrow from CPU.</param>
         public void ActivateGpuPowerControl(int ctgpOffset, int dbOffset)
         {
@@ -661,6 +663,10 @@ namespace UCU.Hardware.Ec
                 Thread.Sleep(EcDelayMs);
 
                 // Step 1: cTGP offset (targetWatts - defaultWatts, per UCC/tuxedo-drivers).
+                // Capture the board's own byte once, before our first write: it is the only
+                // honest stock witness (0x0744 holds TGP - DefaultTGP, so no constant is
+                // right on every board).
+                _ctgpOffsetBeforeActivation ??= ReadECInternal(REG_CTGP_DB_CTGP_OFFSET);
                 WriteECInternal(REG_CTGP_DB_CTGP_OFFSET, (byte)ctgpOffset);
                 Thread.Sleep(EcDelayMs);
 
@@ -686,7 +692,12 @@ namespace UCU.Hardware.Ec
         }
 
         /// <summary>
-        /// Disables the EC GPU power control feature set. Restores NVIDIA default 150W ceiling.
+        /// Disables the EC GPU power control feature set: clears the 0x0743 enable bits and
+        /// the neutral pool/DB bytes, then puts 0x0744 back to the byte found before our
+        /// first activation. 0x0744 holds (TGP - DefaultTGP), so no constant restores stock:
+        /// 55 wrote 150 W and 0 writes only the board's base (95 W here) on a 175 W board.
+        /// With nothing captured this process the register is left alone - the EC's own
+        /// value already stands and the feature is off.
         /// </summary>
         public void DeactivateGpuPowerControl()
         {
@@ -697,9 +708,11 @@ namespace UCU.Hardware.Ec
                 WriteECInternal(REG_CTGP_DB_ENABLE, 0x00);
                 Thread.Sleep(EcDelayMs);
 
-                // Reset offsets to defaults
-                WriteECInternal(REG_CTGP_DB_CTGP_OFFSET, 55);
-                Thread.Sleep(EcDelayMs);
+                if (_ctgpOffsetBeforeActivation is int beforeCtgp)
+                {
+                    WriteECInternal(REG_CTGP_DB_CTGP_OFFSET, (byte)beforeCtgp);
+                    Thread.Sleep(EcDelayMs);
+                }
                 WriteECInternal(REG_CTGP_DB_TPP_OFFSET, 0);
                 Thread.Sleep(EcDelayMs);
                 WriteECInternal(REG_CTGP_DB_DB_OFFSET, 0);
@@ -769,6 +782,137 @@ namespace UCU.Hardware.Ec
         /// <summary>The GPU power-control registers as the EC reports them.
         /// See <see cref="GetGpuPowerControlState"/>.</summary>
         public sealed record GpuPowerControlStateBytes(byte Enable, byte Ctgp, byte Tpp, byte Db, bool CustomProfileActive);
+
+        // ECSpec: the EC's own per-model power table. This is where the board's base TGP
+        // comes from - the number 0x0744's offset is measured against - so the GPU power
+        // path never has to assume one. Firmware data for the whole boot, so the read
+        // happens once (the activation handshake warms it) and the answer, including "this
+        // EC publishes no table", is kept: only a transport failure is retried.
+        private EcSpec? _ecSpec;
+        private bool _ecSpecAnswered;
+
+        /// <summary>
+        /// The EC's per-model power table (the driver's SMAPCTABLE buffer), or null when the
+        /// EC refuses the read or answers garbage. Bounded by design: a transport failure is
+        /// logged and answered as "unavailable", never thrown at a verb.
+        ///
+        /// Reference: MechControl <c>EcTransport::spec</c> (IOCTL 0x9C40A500, request
+        /// <c>0xBB | index &lt;&lt; 8</c>, no reconnect on this path) and re/notes/ECSpec.md.
+        /// Twelve dwords are read: the nine table entries plus the three past-the-end echoes
+        /// that prove the table exists (<see cref="EcSpecCodec.IsValid"/>).
+        /// </summary>
+        public EcSpec? GetEcSpec()
+        {
+            if (!_initialized)
+                return null;
+
+            if (_ecSpecAnswered)
+                return _ecSpec;
+
+            // Read outside the engine lock: the table is not part of the register state
+            // machine that lock protects. No per-dword delay either: this is the one EC path
+            // the reference issues back-to-back (MechControl EcTransport::spec calls the
+            // IOCTL with no wait), and the 6 ms discipline is for register sequences the
+            // firmware processes in order. Each read is index-addressed and the transport
+            // keeps no per-call state, so interleaving with a register sequence is safe.
+            var dwords = new uint[EcSpecCodec.DwordCount];
+            try
+            {
+                for (int i = 0; i < dwords.Length; i++)
+                    dwords[i] = _transport.ReadEcSpec(i);
+            }
+            catch (Exception ex)
+            {
+                // Not cached: the driver may be mid-reset, and the next caller retries.
+                DebugLog($"[DIAG] EcEngine: ECSpec unavailable - the EC read failed: {ex.Message}");
+                return null;
+            }
+
+            EcSpec? spec = EcSpecCodec.Decode(dwords);
+            if (spec is null)
+            {
+                DebugLog($"[DIAG] EcEngine: ECSpec unavailable - index {EcSpecCodec.EchoIndex} answered " +
+                         $"0x{dwords[EcSpecCodec.EchoIndex] & 0xFF:X2}, not the 0x{EcSpecCodec.OutOfRangeEcho:X2} echo, " +
+                         "so this EC publishes no power table");
+            }
+            else
+            {
+                DebugLog($"[DIAG] EcEngine: ECSpec - PL1 max {spec.Pl1MaxWatts} W, PL2 max {spec.Pl2MaxWatts} W, " +
+                         $"PL4 max {spec.Pl4MaxWatts} W, TCC offset max {spec.TccOffsetMax} " +
+                         $"({EcSpecCodec.CpuTemperatureLimitC(spec.TccOffsetMax)} C), TGP offset max {spec.TgpOffsetMaxWatts} W, " +
+                         $"DB max {spec.DynamicBoostMaxWatts} W, GPU target {spec.GpuTargetTemperatureC} C, " +
+                         $"DefaultTGP {spec.DefaultTgpWatts} W, DB CPU TDP " +
+                         $"{(spec.DynamicBoostCpuTdpWatts is int tdp ? tdp + " W" : "n/a")}");
+            }
+
+            lock (_lock)
+            {
+                _ecSpec = spec;
+                _ecSpecAnswered = true;
+                return _ecSpec;
+            }
+        }
+
+        /// <summary>
+        /// Whether this machine can take a GPU power-control write, and the base TGP the
+        /// cTGP offset is measured against. Supported = the EC published a readable table AND
+        /// its DefaultTGP is a plausible board base; otherwise <c>Reason</c> says why and
+        /// <c>DefaultTgpWatts</c> is the 55 W fallback, which callers must log as a guess.
+        /// </summary>
+        public UCU.Contracts.GpuPowerInfoDto GetGpuPowerInfo()
+        {
+            EcSpec? spec = GetEcSpec();
+
+            if (spec is null)
+            {
+                return new UCU.Contracts.GpuPowerInfoDto
+                {
+                    Supported = false,
+                    DefaultTgpWatts = EcSpecCodec.FallbackDefaultTgpWatts,
+                    Reason = "ECSpec unavailable: the EC published no power table (IOCTL 0x9C40A500)",
+                };
+            }
+
+            if (!EcSpecCodec.IsPlausibleDefaultTgp(spec.DefaultTgpWatts))
+            {
+                return new UCU.Contracts.GpuPowerInfoDto
+                {
+                    Supported = false,
+                    DefaultTgpWatts = EcSpecCodec.FallbackDefaultTgpWatts,
+                    Reason = $"ECSpec DefaultTGP {spec.DefaultTgpWatts} W is outside the plausible " +
+                             $"{EcSpecCodec.MinDefaultTgpWatts}-{EcSpecCodec.MaxDefaultTgpWatts} W board range",
+                };
+            }
+
+            return new UCU.Contracts.GpuPowerInfoDto
+            {
+                Supported = true,
+                DefaultTgpWatts = spec.DefaultTgpWatts,
+            };
+        }
+
+        /// <summary>
+        /// The cTGP offset (register 0x0744) that produces a requested total TGP: the request
+        /// minus this board's DefaultTGP. The EC stores an offset from its own base, so the
+        /// same 175 W request is offset 80 on a 95 W-base board and 95 on an 80 W-base one.
+        ///
+        /// When the EC publishes no usable DefaultTGP the offset is computed against
+        /// <see cref="EcSpecCodec.FallbackDefaultTgpWatts"/> and the fallback is logged: on
+        /// such a machine the request cannot be made exact, and pretending it was is how the
+        /// request and the reported TGP drifted apart before ECSpec was read.
+        /// </summary>
+        public int CtgpOffsetForTgpWatts(int targetWatts)
+        {
+            UCU.Contracts.GpuPowerInfoDto info = GetGpuPowerInfo();
+            if (!info.Supported)
+            {
+                DebugLog($"[DIAG] EcEngine: cTGP offset for {targetWatts} W uses the " +
+                         $"{EcSpecCodec.FallbackDefaultTgpWatts} W fallback base (a guess, not this board's base) - {info.Reason}");
+            }
+
+            return EcSpecCodec.CtgpOffsetForTgp(targetWatts, info.DefaultTgpWatts);
+        }
+
 
         // 0x0786 is NOT a host TCC-offset control on these ECs. It is TCC only on
         // universal-fan-control systems; on the RamFan1 layout our models use, it is
@@ -1595,7 +1739,8 @@ namespace UCU.Hardware.Ec
         /// lock, so a fan plan can interleave. A slightly inconsistent snapshot is
         /// acceptable for support; the caller's timeout is what stops a dump from waiting
         /// behind a long plan, which is why the app treats a timeout as "busy, skipped".
-        /// Budget: ~20 single reads plus six 16-byte tables, ~0.7 s of EC traffic.
+        /// Budget: ~20 single reads plus six 16-byte tables, ~0.7 s of EC traffic
+        /// (~0.8 s once the ECSpec table has to be read for the first time).
         /// </summary>
         public UCU.Contracts.EcHardwareDumpDto DumpHardwareState()
         {
@@ -1604,6 +1749,7 @@ namespace UCU.Hardware.Ec
             GpuPowerControlStateBytes gpu = GetGpuPowerControlState();
             EcFanDutySnapshot duty = ReadFanDutyTelemetry();
             int tableLength = EcVault.EC_TABLE_LENGTH;
+            EcSpec? spec = GetEcSpec();
 
             return new UCU.Contracts.EcHardwareDumpDto
             {
@@ -1630,6 +1776,16 @@ namespace UCU.Hardware.Ec
                 PerformanceMode = GetPerformanceMode(),
                 CustomProfileActive = gpu.CustomProfileActive,
                 FanControlSupported = IsFanControlSupported(),
+                EcSpecValid = spec is not null,
+                SpecPl1Max = spec?.Pl1MaxWatts ?? 0,
+                SpecPl2Max = spec?.Pl2MaxWatts ?? 0,
+                SpecPl4Max = spec?.Pl4MaxWatts ?? 0,
+                SpecTccOffsetMax = spec?.TccOffsetMax ?? 0,
+                SpecTgpOffsetMax = spec?.TgpOffsetMaxWatts ?? 0,
+                SpecDynamicBoostMax = spec?.DynamicBoostMaxWatts ?? 0,
+                SpecGpuTargetTemp = spec?.GpuTargetTemperatureC ?? 0,
+                SpecDefaultTgp = spec?.DefaultTgpWatts ?? 0,
+                SpecDynamicBoostCpuTdp = spec?.DynamicBoostCpuTdpWatts ?? 0xFF,
                 CpuTempUp = ReadECRegisters(REG_CPU_TEMP_END_TABLE, tableLength),
                 CpuTempDown = ReadECRegisters(REG_CPU_TEMP_START_TABLE, tableLength),
                 CpuDuty = ReadECRegisters(REG_CPU_FAN_SPEED_TABLE, tableLength),

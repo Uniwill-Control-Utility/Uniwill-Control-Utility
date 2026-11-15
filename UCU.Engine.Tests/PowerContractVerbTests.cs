@@ -25,6 +25,9 @@ public sealed class PowerContractVerbTests
         transport.Preset(EcEngine.REG_CUSTOM_PROFILE, 0x40);
         transport.Preset(EcEngine.REG_PL1_SETTING, 75);
         transport.Preset(EcEngine.REG_PL2_SETTING, 85);
+        // Before the engine starts: the activation handshake warms the table once, so a
+        // table scripted later would land after the cached answer.
+        transport.PresetSpecTable(0xD2, 0xD2, 0xD2, 0x0A, 0x37, 0x19, 0x57, 0x5F, 0xFF);
 
         await using var host = await EngineHostFixture.StartAsync(transport: transport);
 
@@ -37,6 +40,15 @@ public sealed class PowerContractVerbTests
         Assert.True(truth.GpuCustomProfileActive);
         Assert.Equal(75, truth.Pl1);
         Assert.Equal(85, truth.Pl2);
+
+        // The GPU power gate rides the same power domain: with an ECSpec table the answer is
+        // the board's DefaultTGP, the base the cTGP offset is measured from (0x0744 stores a
+        // TGP offset, not a TGP). The refused-table path is pinned at the hardware layer,
+        // EcEngineEcSpecTests, so this test does not need a second host for it.
+        GpuPowerInfoDto info = await host.Power.GetGpuPowerInfoAsync();
+
+        Assert.True(info.Supported);
+        Assert.Equal(95, info.DefaultTgpWatts);
     }
 
     [Fact]

@@ -23,6 +23,11 @@ namespace UCU.Hardware.Ec
         private const uint IOCTL_ECREAD = EcVault.IOCTL_ECREAD;
         private const uint IOCTL_ECWRITE = EcVault.IOCTL_ECWRITE;
 
+        // The per-model power table (reference: MechControl EcTransport::spec).
+        private const uint IOCTL_ECSPEC = EcVault.IOCTL_ECSPEC;
+        private const int ECSPEC_READ_COMMAND = (int)EcVault.ECSPEC_READ_COMMAND;
+        private const int ECSPEC_INDEX_SHIFT = 8;
+
         // File access/share flags
         private const uint GENERIC_READ_WRITE = 0xC0000000; // GENERIC_READ | GENERIC_WRITE
         private const uint FILE_SHARE_RW = 3;               // FILE_SHARE_READ | FILE_SHARE_WRITE
@@ -116,6 +121,29 @@ namespace UCU.Hardware.Ec
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     $"EC write failed at 0x{address:X3} value 0x{value:X2}");
             }
+        }
+
+        public uint ReadEcSpec(int index)
+        {
+            ThrowIfDisposed();
+
+            // The whole 32-bit window comes back; the engine keeps the low byte
+            // (EcSpecCodec.ByteAt). The driver takes one int32 in, one uint32 out. The input
+            // is a local so two callers cannot race on a shared buffer: the engine reads the
+            // table outside its EC lock (a dozen reads are too long a hold for one verb).
+            if (index < 0 || index > 0xFF)
+                throw new ArgumentOutOfRangeException(nameof(index), index,
+                    "the ECSpec index is a byte offset into the table (0-255)");
+
+            int input = ECSPEC_READ_COMMAND | (index << ECSPEC_INDEX_SHIFT);
+            int lpOut = 0;
+            if (!DeviceIoControl(_handle, IOCTL_ECSPEC, ref input, 4, ref lpOut, 4, out _, nint.Zero))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    $"EC ECSpec read failed at index {index}");
+            }
+
+            return unchecked((uint)lpOut);
         }
 
         public void Dispose()

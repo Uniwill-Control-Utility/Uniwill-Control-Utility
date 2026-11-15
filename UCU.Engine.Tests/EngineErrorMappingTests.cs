@@ -166,6 +166,8 @@ public sealed class EngineErrorMappingTests
 
         public void Write(ushort address, byte value) => throw new InvalidOperationException();
 
+        public uint ReadEcSpec(int index) => throw new InvalidOperationException();
+
         public void Dispose()
         {
         }
@@ -194,6 +196,8 @@ public sealed class EngineErrorMappingTests
         public void Reconnect() => _inner.Reconnect();
 
         public byte Read(ushort address) => _inner.Read(address);
+
+        public uint ReadEcSpec(int index) => _inner.ReadEcSpec(index);
 
         public void Write(ushort address, byte value)
         {

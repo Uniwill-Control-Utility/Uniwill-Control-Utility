@@ -93,6 +93,15 @@ namespace UCU.Contracts.Capabilities
 
         Task ActivateGpuPowerControlAsync(int ctgpOffset, int dbOffset, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// The GPU power-control gate: whether the EC published a usable per-model power
+        /// table (ECSpec), the board's DefaultTGP the cTGP offset is measured against, and
+        /// the reason when the control is unsupported. Compute the offset as
+        /// (requested TGP - <see cref="GpuPowerInfoDto.DefaultTgpWatts"/>), never from a
+        /// constant: the base differs per model.
+        /// </summary>
+        Task<GpuPowerInfoDto> GetGpuPowerInfoAsync(CancellationToken cancellationToken = default);
+
         Task DeactivateGpuPowerControlAsync(CancellationToken cancellationToken = default);
 
         Task<bool> IsCustomProfileActiveAsync(CancellationToken cancellationToken = default);

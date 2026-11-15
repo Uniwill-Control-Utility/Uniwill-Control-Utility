@@ -50,6 +50,23 @@ public sealed class FakeEcTransport : IEcTransport
 
     public byte Read(ushort address) => _registers.TryGetValue(address, out byte value) ? value : (byte)0;
 
+    // --- ECSpec (the EC's per-model power table) ---
+    private uint[] _ecSpec = Array.Empty<uint>();
+
+    /// <summary>Scripts a table from its nine bytes, appending the three out-of-range echoes.</summary>
+    public void PresetSpecTable(params byte[] bytes)
+    {
+        var dwords = new uint[12];
+        for (int i = 0; i < bytes.Length && i < 9; i++)
+            dwords[i] = bytes[i];
+        for (int i = 9; i < dwords.Length; i++)
+            dwords[i] = 0xBB | ((uint)i << 8);
+        _ecSpec = dwords;
+    }
+
+    public uint ReadEcSpec(int index) =>
+        index >= 0 && index < _ecSpec.Length ? _ecSpec[index] : 0xFFFFFFFF;
+
     public void Write(ushort address, byte value)
     {
         if (_writesRemainingToFail > 0)

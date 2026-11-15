@@ -70,7 +70,6 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         private const int MinPowerLimitWatts = 5;
         private const int MaxPowerLimitWattsDefault = 175;
         private const int MaxPowerLimitWattsBoost = 250;
-        private const int DefaultPowerLimitFallbackWatts = 80;
 
         /// <summary>
         /// Returns the effective maximum power limit based on the user's power boost setting.
@@ -261,20 +260,33 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 }
 
                 // Compute cTGP offset from target wattage.
-                // Per UCC/tuxedo-drivers: cTGP offset = targetWatts - defaultWatts.
-                // The kernel driver writes this value directly to EC register 0x0744.
-                int ctgpOffset = 0;
-                if (TryGetPowerLimitInfo(out PowerLimitInfo info))
+                // Per UCC/tuxedo-drivers: cTGP offset = targetWatts - DefaultTGP.
+                // DefaultTGP is the EC's own per-model base (ECSpec index 7), not NVML's
+                // default limit: NVML reports a stocking ceiling, so a 175 W request on a
+                // 95 W-base board is offset 80 and on an 80 W-base board offset 95.
+                UCU.Contracts.GpuPowerInfoDto info;
+                try
                 {
-                    ctgpOffset = Math.Clamp(totalWatts - info.DefaultWatts, 0, 255);
-                    DiagnosticLogger.LogInfo($"SetPowerLimit: default={info.DefaultWatts}W, target={totalWatts}W ? cTGP offset={ctgpOffset}");
+                    info = ec.GetGpuPowerInfoAsync().GetAwaiter().GetResult();
                 }
-                else
+                catch (Exception ex)
                 {
-                    // Fallback: assume DefaultPowerLimitFallbackWatts default (matches UCC fallback).
-                    ctgpOffset = Math.Clamp(totalWatts - DefaultPowerLimitFallbackWatts, 0, 255);
-                    DiagnosticLogger.LogInfo($"SetPowerLimit: NVML default unavailable, assuming 80W ? cTGP offset={ctgpOffset}");
+                    DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): GPU power info unavailable: {ex.Message}");
+                    return 0;
                 }
+
+                // An EC with no usable table is the one case where the base is still a guess:
+                // the engine answers the 55 W fallback, and that guess is logged here so a
+                // bug report shows which base the offset was computed against.
+                if (!info.Supported)
+                {
+                    DiagnosticLogger.LogWarning(
+                        $"SetPowerLimit({totalWatts}W, db={dbOffset}W): {info.Reason}; " +
+                        $"using the {info.DefaultTgpWatts}W fallback base (a guess, not this board's DefaultTGP)");
+                }
+
+                int ctgpOffset = UCU.Core.Ec.EcSpecCodec.CtgpOffsetForTgp(totalWatts, info.DefaultTgpWatts);
+                DiagnosticLogger.LogInfo($"SetPowerLimit: DefaultTGP={info.DefaultTgpWatts}W (ECSpec), target={totalWatts}W -> cTGP offset={ctgpOffset}");
 
                 // GPU power control on these laptops works through EC registers only.
                 // NVML returns NOT_SUPPORTED on laptops, and NvAPI has no GPU power

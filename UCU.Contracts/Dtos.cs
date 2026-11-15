@@ -442,6 +442,39 @@ namespace UCU.Contracts
         /// <summary>0x0787: bit 7 = ramp enabled, bits 0-6 = time in 100 ms steps.</summary>
         public int FanSwitchSpeed { get; init; }
 
+        /// <summary>
+        /// ECSpec (IOCTL 0x9C40A500) available: the EC published its per-model power table.
+        /// False means the fields below carry no meaning.
+        /// </summary>
+        public bool EcSpecValid { get; init; }
+
+        /// <summary>ECSpec index 0: PL1 ceiling, watts.</summary>
+        public int SpecPl1Max { get; init; }
+
+        /// <summary>ECSpec index 1: PL2 ceiling, watts.</summary>
+        public int SpecPl2Max { get; init; }
+
+        /// <summary>ECSpec index 2: PL4 ceiling in watts (raw x 2).</summary>
+        public int SpecPl4Max { get; init; }
+
+        /// <summary>ECSpec index 3: TCC offset ceiling; the temperature is 105 C minus this.</summary>
+        public int SpecTccOffsetMax { get; init; }
+
+        /// <summary>ECSpec index 4: configurable-TGP offset ceiling, watts (TGP max = this + DefaultTGP).</summary>
+        public int SpecTgpOffsetMax { get; init; }
+
+        /// <summary>ECSpec index 5: Dynamic Boost ceiling, watts.</summary>
+        public int SpecDynamicBoostMax { get; init; }
+
+        /// <summary>ECSpec index 6: GPU thermal target, degrees C.</summary>
+        public int SpecGpuTargetTemp { get; init; }
+
+        /// <summary>ECSpec index 7: DefaultTGP, the board's base GPU power in watts.</summary>
+        public int SpecDefaultTgp { get; init; }
+
+        /// <summary>ECSpec index 8: Dynamic Boost CPU TDP, watts; 0xFF means not applicable.</summary>
+        public int SpecDynamicBoostCpuTdp { get; init; }
+
         public int PerformanceMode { get; init; }
 
         public bool CustomProfileActive { get; init; }
@@ -500,6 +533,33 @@ namespace UCU.Contracts
 
         /// <summary>CPU PL2 in watts (EC 0x0784 readback).</summary>
         public int Pl2 { get; init; }
+    }
+
+    /// <summary>
+    /// The EC's per-model power table (ECSpec, IOCTL 0x9C40A500) as the GPU power path needs
+    /// it. Laptop NVML reports a stocking ceiling (NOT_SUPPORTED on these boards), not the
+    /// board TGP, so the cTGP offset (0x0744) is measured from the firmware's own
+    /// <see cref="DefaultTgpWatts"/>:
+    /// a 175 W request is offset 80 on a 95 W-base board and offset 95 on an 80 W-base one.
+    ///
+    /// <see cref="Supported"/> is the GPU power-control gate: the table is readable AND the
+    /// DefaultTGP is a plausible board base. <see cref="Reason"/> carries the refusal, so a
+    /// caller can refuse the control with a cause instead of writing the EC blind - and it
+    /// is the answer the app hides its GPU power controls by.
+    /// </summary>
+    public sealed record GpuPowerInfoDto
+    {
+        /// <summary>GPU power control is supported on this machine.</summary>
+        public bool Supported { get; init; }
+
+        /// <summary>
+        /// The board's base TGP in watts (ECSpec index 7). Valid when <see cref="Supported"/>;
+        /// otherwise the 55 W fallback, which a caller must treat as a guess.
+        /// </summary>
+        public int DefaultTgpWatts { get; init; }
+
+        /// <summary>Why GPU power control is unsupported; empty when it is.</summary>
+        public string Reason { get; init; } = string.Empty;
     }
 
     /// <summary>

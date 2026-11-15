@@ -192,6 +192,8 @@ public sealed class EcVaultRegistryTests
             ["REG_EC_VERSION_MAJOR"] = 0x0454,   // probe 2026-11-10 (116 on X6FR5xxY, 90 on X6AR558Y)
             ["REG_EC_VERSION_MINOR"] = 0x047D,   // probe 2026-11-10
             ["AP_OEM_ACTIVATION_BIT"] = 0x01,   // 0x0741 bit 0 (DSDT APPE)
+            ["IOCTL_ECSPEC"] = 0x9C40A500,      // MechControl src/ec.h ecSpecIoctl
+            ["ECSPEC_READ_COMMAND"] = 0xBB,     // MechControl src/ec.cpp EcTransport::spec input byte
     };
 
     [Fact]

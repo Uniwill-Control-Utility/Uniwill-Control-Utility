@@ -657,6 +657,7 @@ public sealed class WatcherHubServiceTests
         public Task SetOverboostProfileAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task EnsurePowerManagementActiveAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task ActivateGpuPowerControlAsync(int ctgpOffset, int dbOffset, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<GpuPowerInfoDto> GetGpuPowerInfoAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task DeactivateGpuPowerControlAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> IsCustomProfileActiveAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task<PowerContractTruthDto> GetContractTruthAsync(CancellationToken ct = default) => throw new NotSupportedException();

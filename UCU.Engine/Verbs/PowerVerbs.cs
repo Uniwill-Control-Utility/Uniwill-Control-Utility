@@ -98,6 +98,9 @@ namespace UCU.Engine
                 return Task.FromResult<object?>(null);
             });
 
+            add(EngineVerbs.Power.GetGpuPowerInfo, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().GetGpuPowerInfo()));
+
             add(EngineVerbs.Power.DeactivateGpuPowerControl, (p, ct) =>
             {
                 gate.Acquire().DeactivateGpuPowerControl();

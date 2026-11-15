@@ -229,6 +229,7 @@ namespace Uniwill_Control_Utility.Services
             text.AppendLine("Mode: " + dump.PerformanceMode +
                             ", custom profile " + dump.CustomProfileActive +
                             ", fan control supported " + dump.FanControlSupported);
+            text.AppendLine(EcSpecLine(dump));
             text.AppendLine();
             text.AppendLine("Fan tables (16 bytes each; duty 0-200, temp 255 = inactive):");
             text.AppendLine("  CPU tempUp   " + HexBytes(dump.CpuTempUp));
@@ -238,6 +239,24 @@ namespace Uniwill_Control_Utility.Services
             text.AppendLine("  GPU tempDown " + HexBytes(dump.GpuTempDown));
             text.AppendLine("  GPU duty     " + HexBytes(dump.GpuDuty));
             return text.ToString();
+        }
+
+        /// <summary>
+        /// The EC's per-model power table (ECSpec, IOCTL 0x9C40A500) as one line: the numbers a
+        /// GPU-power bug report cannot be reconstructed without - above all DefaultTGP, the base
+        /// the cTGP offset is measured from. A table the EC did not publish says so.
+        /// </summary>
+        private static string EcSpecLine(EcHardwareDumpDto dump)
+        {
+            if (!dump.EcSpecValid)
+                return "ECSpec 0x9C40A500: unavailable (the EC refused the table or echoed garbage)";
+
+            return "ECSpec 0x9C40A500: PL1 max " + dump.SpecPl1Max + " W, PL2 max " + dump.SpecPl2Max +
+                   " W, PL4 max " + dump.SpecPl4Max + " W, TCC offset max " + dump.SpecTccOffsetMax +
+                   " (" + UCU.Core.Ec.EcSpecCodec.CpuTemperatureLimitC(dump.SpecTccOffsetMax) + " C), TGP offset max " + dump.SpecTgpOffsetMax +
+                   " W, DefaultTGP " + dump.SpecDefaultTgp + " W, DB max " + dump.SpecDynamicBoostMax +
+                   " W, GPU target " + dump.SpecGpuTargetTemp + " C, DB CPU TDP " +
+                   (dump.SpecDynamicBoostCpuTdp == 0xFF ? "n/a" : dump.SpecDynamicBoostCpuTdp + " W");
         }
 
         private static string HexBytes(IReadOnlyList<byte> values)

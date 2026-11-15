@@ -123,6 +123,16 @@ public sealed class DiagnosticsExportTests
         PerformanceMode = 2,
         CustomProfileActive = true,
         FanControlSupported = true,
+        EcSpecValid = true,
+        SpecPl1Max = 210,
+        SpecPl2Max = 210,
+        SpecPl4Max = 420,
+        SpecTccOffsetMax = 10,
+        SpecTgpOffsetMax = 55,
+        SpecDynamicBoostMax = 25,
+        SpecGpuTargetTemp = 87,
+        SpecDefaultTgp = 95,
+        SpecDynamicBoostCpuTdp = 0xFF,
         CpuDuty = new byte[] { 0, 60, 64, 72 },
         GpuDuty = new byte[] { 0, 60, 64, 72 },
     };
@@ -141,8 +151,30 @@ public sealed class DiagnosticsExportTests
     }
 
     [Fact]
-    public void HardwareComposer_ExplainsAMissingDumpInsteadOfThrowing()
+    public void HardwareComposer_RendersTheEcSpecTable()
     {
+        string text = DiagnosticsExportService.ComposeHardware(Dump(), "collected");
+
+        Assert.Contains("ECSpec 0x9C40A500", text);
+        Assert.Contains("DefaultTGP 95 W", text);
+        Assert.Contains("PL4 max 420 W", text);
+        Assert.Contains("TCC offset max 10 (95 C)", text); // the ceiling the offset stands for
+        Assert.Contains("DB CPU TDP n/a", text);           // 0xFF is "not applicable", not a wattage
+    }
+
+    [Fact]
+    public void HardwareComposer_SaysWhenTheEcPublishesNoSpec()
+    {
+        EcHardwareDumpDto dump = Dump() with { EcSpecValid = false };
+
+        string text = DiagnosticsExportService.ComposeHardware(dump, "collected");
+
+        Assert.Contains("ECSpec 0x9C40A500: unavailable", text);
+        Assert.DoesNotContain("DefaultTGP", text);
+    }
+
+    [Fact]
+    public void HardwareComposer_ExplainsAMissingDumpInsteadOfThrowing()    {
         string text = DiagnosticsExportService.ComposeHardware(null, "skipped: engine busy (dump timed out)");
 
         Assert.Contains("skipped: engine busy", text);

@@ -120,6 +120,8 @@ public sealed class EcEngineInitializationTests
 
         public void Write(ushort address, byte value) => throw new InvalidOperationException();
 
+        public uint ReadEcSpec(int index) => throw new InvalidOperationException();
+
         public void Dispose()
         {
         }

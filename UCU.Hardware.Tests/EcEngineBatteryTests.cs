@@ -201,6 +201,8 @@ public sealed class EcEngineBatteryTests
         {
         }
 
+        public uint ReadEcSpec(int index) => throw new System.ComponentModel.Win32Exception(5, "EC unresponsive");
+
         public void Dispose()
         {
         }
