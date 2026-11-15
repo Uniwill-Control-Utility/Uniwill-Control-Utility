@@ -42,8 +42,10 @@ namespace UCU.Core.Ec
         public int Pl4MaxWatts { get; init; }
 
         /// <summary>
-        /// Index 3: the EC's TCC offset ceiling. The temperature it stands for is
-        /// <see cref="EcSpecCodec.CpuTemperatureLimitC"/> = TjMax (105 C) minus this offset.
+        /// Index 3: the EC's TCC field, raw. The reference reads it as an offset whose
+        /// temperature is <see cref="EcSpecCodec.CpuTemperatureLimitC"/> (TjMax minus this),
+        /// but this machine publishes 95 there - 10 C by that inversion - so it is kept raw
+        /// and no temperature is derived from it.
         /// </summary>
         public int TccOffsetMax { get; init; }
 
@@ -151,7 +153,12 @@ namespace UCU.Core.Ec
         /// <summary>PL4 is stored at half its wattage: the EC's entry is the watts divided by two.</summary>
         public static int Pl4Watts(byte raw) => raw * 2;
 
-        /// <summary>The CPU temperature ceiling a TCC offset stands for (TjMax minus the offset).</summary>
+        /// <summary>
+        /// The CPU temperature ceiling a TCC offset stands for (TjMax minus the offset), per the
+        /// reference's reading of index 3. Do not present it as fact: this machine publishes 95
+        /// there, which as an offset would mean a 10 C ceiling, so the field's meaning is
+        /// machine-dependent and the dump prints the raw byte instead.
+        /// </summary>
         public static int CpuTemperatureLimitC(int tccOffset) => TjMaxC - tccOffset;
 
         /// <summary>

@@ -457,7 +457,7 @@ namespace UCU.Contracts
         /// <summary>ECSpec index 2: PL4 ceiling in watts (raw x 2).</summary>
         public int SpecPl4Max { get; init; }
 
-        /// <summary>ECSpec index 3: TCC offset ceiling; the temperature is 105 C minus this.</summary>
+        /// <summary>ECSpec index 3: the TCC field, raw. Its meaning is machine-dependent (see <c>EcSpecCodec</c>).</summary>
         public int SpecTccOffsetMax { get; init; }
 
         /// <summary>ECSpec index 4: configurable-TGP offset ceiling, watts (TGP max = this + DefaultTGP).</summary>

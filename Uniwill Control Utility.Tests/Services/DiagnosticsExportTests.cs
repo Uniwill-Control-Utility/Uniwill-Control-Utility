@@ -158,7 +158,8 @@ public sealed class DiagnosticsExportTests
         Assert.Contains("ECSpec 0x9C40A500", text);
         Assert.Contains("DefaultTGP 95 W", text);
         Assert.Contains("PL4 max 420 W", text);
-        Assert.Contains("TCC offset max 10 (95 C)", text); // the ceiling the offset stands for
+        Assert.Contains("TCC raw 10", text);               // the raw byte: its meaning is machine-dependent
+        Assert.DoesNotContain("95 C)", text);               // never a derived ceiling - 95 would read as 10 C
         Assert.Contains("DB CPU TDP n/a", text);           // 0xFF is "not applicable", not a wattage
     }
 

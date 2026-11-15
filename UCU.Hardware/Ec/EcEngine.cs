@@ -838,8 +838,8 @@ namespace UCU.Hardware.Ec
             else
             {
                 DebugLog($"[DIAG] EcEngine: ECSpec - PL1 max {spec.Pl1MaxWatts} W, PL2 max {spec.Pl2MaxWatts} W, " +
-                         $"PL4 max {spec.Pl4MaxWatts} W, TCC offset max {spec.TccOffsetMax} " +
-                         $"({EcSpecCodec.CpuTemperatureLimitC(spec.TccOffsetMax)} C), TGP offset max {spec.TgpOffsetMaxWatts} W, " +
+                         $"PL4 max {spec.Pl4MaxWatts} W, TCC raw {spec.TccOffsetMax}, " +
+                         $"TGP offset max {spec.TgpOffsetMaxWatts} W, " +
                          $"DB max {spec.DynamicBoostMaxWatts} W, GPU target {spec.GpuTargetTemperatureC} C, " +
                          $"DefaultTGP {spec.DefaultTgpWatts} W, DB CPU TDP " +
                          $"{(spec.DynamicBoostCpuTdpWatts is int tdp ? tdp + " W" : "n/a")}");

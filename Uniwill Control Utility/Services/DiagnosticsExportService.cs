@@ -252,8 +252,8 @@ namespace Uniwill_Control_Utility.Services
                 return "ECSpec 0x9C40A500: unavailable (the EC refused the table or echoed garbage)";
 
             return "ECSpec 0x9C40A500: PL1 max " + dump.SpecPl1Max + " W, PL2 max " + dump.SpecPl2Max +
-                   " W, PL4 max " + dump.SpecPl4Max + " W, TCC offset max " + dump.SpecTccOffsetMax +
-                   " (" + UCU.Core.Ec.EcSpecCodec.CpuTemperatureLimitC(dump.SpecTccOffsetMax) + " C), TGP offset max " + dump.SpecTgpOffsetMax +
+                   " W, PL4 max " + dump.SpecPl4Max + " W, TCC raw " + dump.SpecTccOffsetMax +
+                   ", TGP offset max " + dump.SpecTgpOffsetMax +
                    " W, DefaultTGP " + dump.SpecDefaultTgp + " W, DB max " + dump.SpecDynamicBoostMax +
                    " W, GPU target " + dump.SpecGpuTargetTemp + " C, DB CPU TDP " +
                    (dump.SpecDynamicBoostCpuTdp == 0xFF ? "n/a" : dump.SpecDynamicBoostCpuTdp + " W");
