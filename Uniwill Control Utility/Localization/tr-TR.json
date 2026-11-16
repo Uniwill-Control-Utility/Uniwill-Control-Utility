@@ -1168,8 +1168,5 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "EC 95 W temel TGP bildirir, bu yüzden cTGP farkı 130 olur ve Dynamic Boost kapalıdır.",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "+233 MHz çekirdek farkıyla 0,975-0,985 V'ta 214 W kart gücü ölçtük, PerfCap VRel — güç artık bağlayıcı sınır değildi. Fark karta özeldir ve bu sayfada ayarlanır; başka bir birim daha fazlasını kaldırabilir ya da çok daha altında çökebilir ve fark olmadan hiçbir watt değeri ölçmedik. Sıcak nokta sıvı soğutma bağlıyken 215 W'ta 58-63 °C, bağlı değilken 81,7 °C.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Yalnızca sürücünün güç ilkesini geçersiz kılar: GPU ürün yazılımı değişmez ve “Özgün ayara dön” bunu geri alır.",
-  "Show advanced": "Gelişmişi göster",
-  "Hide advanced": "Gelişmişi gizle",
-  "Range {0}-{1} A": "Aralık {0}-{1} A",
-  "Power limits and measurements": "Güç sınırları ve ölçümler"
+  "Range {0}-{1} A": "Aralık {0}-{1} A"
 }

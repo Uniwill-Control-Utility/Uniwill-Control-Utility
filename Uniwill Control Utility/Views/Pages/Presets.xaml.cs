@@ -131,6 +131,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await applyPlatformVisibilityAsync().ConfigureAwait(true);
                 applyPowerLimits();
                 setProfileTooltips();
+                setRomInfoTooltip();
                 loadSavedProfile();
 
                 // For Custom profile, restore slider values.
@@ -246,10 +247,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            // The measurement tooltip is not in the visual tree until it opens, so its strings
-            // are applied explicitly instead of waiting for their own Loaded events.
-            LocalizationService.RefreshElement(spRomInfo);
-
             // Detect if a V-F curve preset has non-zero offsets on disk and activate it.
             // _vfActivePreset starts at -1; it gets set to 0 when the user opens the
             // curve editor. On app restart we need to re-detect so the "Curve" label
@@ -2351,15 +2348,28 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
 
-        // Hover opens the same tooltip; this is the keyboard's way in without a mouse.
-        private void btnRomInfo_Click(object sender, RoutedEventArgs e) => ttRomInfo.IsOpen = true;
-
-        private void btnRomAdvanced_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// The measurement tooltip's text, built here instead of walked by the page's translation
+        /// pass: a tooltip's content is not in the visual tree until it opens, so nothing else
+        /// would translate it. Rebuilt on every navigation, as the profile tooltips are.
+        /// </summary>
+        private void setRomInfoTooltip()
         {
-            bool show = spRomAdvanced.Visibility != Visibility.Visible;
-            spRomAdvanced.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            tbRomAdvanced.Text = LocalizationService.Get(show ? "Hide advanced" : "Show advanced");
-            icRomAdvanced.Glyph = show ? "\uE70E" : "\uE70D";
+            static string Row(string label, string value) =>
+                LocalizationService.Format("{0}: {1}", LocalizationService.Get(label), value);
+
+            tbRomInfo.Text = string.Join("\n",
+                Row("Ceiling", "250 W"),
+                Row("Target", "225 W"),
+                Row("Rails", "250 A · 70 A · 14.026 A"),
+                Row("Stock rails", "210 A · 60 A · 11.053 A"),
+                Row("Driver max", "294 A · 84 A · 17.021 A"),
+                string.Empty,
+                LocalizationService.Get("The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off."),
+                string.Empty,
+                LocalizationService.Get("With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it."),
+                string.Empty,
+                LocalizationService.Get("Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it."));
         }
 
         private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>

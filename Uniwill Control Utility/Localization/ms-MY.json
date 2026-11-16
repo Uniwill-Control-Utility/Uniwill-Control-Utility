@@ -1168,8 +1168,5 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "EC menyatakan TGP asas 95 W, jadi offset cTGP ialah 130 dan Dynamic Boost dimatikan.",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Dengan offset teras +233 MHz kami mengukur 214 W kuasa papan pada 0.975-0.985 V, dengan PerfCap VRel — kuasa bukan lagi hadnya. Offset adalah bagi setiap kad dan ditetapkan pada halaman ini; unit lain mungkin menampung lebih atau ranap jauh di bawahnya, dan kami belum mengukur sebarang watt tanpa offset. Titik panas 58-63 °C pada 215 W dengan penyejuk cecair disambungkan, 81.7 °C tanpanya.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Hanya mengatasi dasar kuasa pemacu: firmware GPU tidak berubah, dan “Pulihkan asal” membatalkannya.",
-  "Show advanced": "Tunjukkan lanjutan",
-  "Hide advanced": "Sembunyikan lanjutan",
-  "Range {0}-{1} A": "Julat {0}-{1} A",
-  "Power limits and measurements": "Had kuasa dan ukuran"
+  "Range {0}-{1} A": "Julat {0}-{1} A"
 }

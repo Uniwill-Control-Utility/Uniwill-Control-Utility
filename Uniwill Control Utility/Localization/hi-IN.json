@@ -1168,8 +1168,5 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "EC 95 W का आधार TGP बताता है, इसलिए cTGP ऑफ़सेट 130 है और Dynamic Boost बंद है।",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "+233 MHz कोर ऑफ़सेट के साथ हमने 0.975-0.985 V पर 214 W बोर्ड पावर मापी, PerfCap VRel — पावर अब बाधा नहीं थी। ऑफ़सेट हर कार्ड का अपना होता है और इस पेज पर सेट होता है; कोई दूसरी यूनिट अधिक सह सकती है या इससे बहुत कम पर क्रैश कर सकती है, और बिना ऑफ़सेट हमने कोई वाट क्षमता नहीं मापी है। तरल कूलर जुड़ा होने पर 215 W पर हॉटस्पॉट 58-63 °C, बिना कूलर 81.7 °C।",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "केवल ड्राइवर की पावर नीति को ओवरराइड करता है: GPU का फ़र्मवेयर नहीं बदलता, और \"मूल स्थिति में लौटाएँ\" इसे वापस ले लेता है।",
-  "Show advanced": "उन्नत दिखाएँ",
-  "Hide advanced": "उन्नत छिपाएँ",
-  "Range {0}-{1} A": "सीमा {0}-{1} A",
-  "Power limits and measurements": "पावर सीमाएँ और माप"
+  "Range {0}-{1} A": "सीमा {0}-{1} A"
 }

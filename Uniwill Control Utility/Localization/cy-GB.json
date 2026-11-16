@@ -1168,8 +1168,5 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "Mae'r EC yn cyhoeddi TGP sylfaen o 95 W, felly mae'r gwrthbwyso cTGP yn 130 ac mae Dynamic Boost i ffwrdd.",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Gyda gwrthbwyso craidd o +233 MHz fe fesurwyd 214 W o bŵer bwrdd ar 0.975-0.985 V, gyda PerfCap VRel — nid pŵer oedd y terfyn bellach. Mae'r gwrthbwyso'n unigol i bob cerdyn ac yn cael ei osod ar y dudalen hon; gall uned arall oddef mwy neu chwalu ymhell islaw, ac nid ydym wedi mesur unrhyw watedd heb wrthbwyso. Poenyn poeth 58-63 °C ar 215 W gyda'r oerydd hylif wedi'i gysylltu, 81.7 °C hebddi.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Mae hyn yn diystyru polisi pŵer y gyrrwr yn unig: nid yw firmware'r GPU yn newid, ac mae «Adfer y gwreiddiol» yn ei ddadwneud.",
-  "Show advanced": "Dangos uwch",
-  "Hide advanced": "Cuddio uwch",
-  "Range {0}-{1} A": "Amrediad {0}-{1} A",
-  "Power limits and measurements": "Terfynau pŵer a mesuriadau"
+  "Range {0}-{1} A": "Amrediad {0}-{1} A"
 }

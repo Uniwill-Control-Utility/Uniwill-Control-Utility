@@ -1168,8 +1168,5 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "L'EC annonce un TGP de base de 95 W : le décalage cTGP est donc de 130 et Dynamic Boost est désactivé.",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Avec un décalage de +233 MHz sur le cœur, nous avons mesuré 214 W de puissance carte à 0,975-0,985 V, avec PerfCap VRel — la puissance n'était plus la limite. Le décalage dépend de la carte et se règle sur cette page ; un autre exemplaire peut en accepter davantage ou planter bien en dessous, et nous n'avons pas mesuré de puissance sans décalage. Point chaud 58-63 °C à 215 W avec le refroidissement liquide branché, 81,7 °C sans.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Remplace uniquement la politique d'alimentation du pilote : le firmware du GPU n'est pas modifié et « Restaurer l'origine » l'annule.",
-  "Show advanced": "Afficher les options avancées",
-  "Hide advanced": "Masquer les options avancées",
-  "Range {0}-{1} A": "Plage {0}-{1} A",
-  "Power limits and measurements": "Limites de puissance et mesures"
+  "Range {0}-{1} A": "Plage {0}-{1} A"
 }

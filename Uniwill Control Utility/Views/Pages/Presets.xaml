@@ -855,88 +855,32 @@
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
-                                <!-- The measurements behind the card sit behind one icon: hover
-                                     opens them, and the icon is a button so the keyboard reaches
-                                     the same tooltip without a mouse. -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                <!-- The measurements behind the card sit behind one icon: the same
+                                     native tooltip the tuning rows use. Its text is built once in
+                                     code, because a tooltip's content is not in the visual tree
+                                     until it opens and nothing else would translate it. -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <ui:TextBlock VerticalAlignment="Center"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="Measured on our test unit" />
-                                    <ui:Button x:Name="btnRomInfo"
-                                               Grid.Column="1"
-                                               Margin="6,0,0,0"
-                                               Padding="2"
-                                               Appearance="Transparent"
-                                               ToolTipService.ShowDuration="60000"
-                                               AutomationProperties.Name="Power limits and measurements"
-                                               Click="btnRomInfo_Click">
-                                        <ui:Button.ToolTip>
-                                            <ToolTip x:Name="ttRomInfo">
-                                                <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
-                                                        BorderBrush="{DynamicResource ControlElevationBorderBrush}"
-                                                        BorderThickness="1"
-                                                        Padding="12,10"
-                                                        MaxWidth="420">
-                                                    <StackPanel x:Name="spRomInfo">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="Auto" MinWidth="86" />
-                                                                <ColumnDefinition Width="*" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="Auto" />
-                                                            </Grid.RowDefinitions>
-
-                                                            <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Ceiling" />
-                                                            <TextBlock Grid.Row="0" Grid.Column="1" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="250 W" />
-
-                                                            <TextBlock Grid.Row="1" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Target" Margin="0,2,0,0" />
-                                                            <TextBlock Grid.Row="1" Grid.Column="1" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="225 W" Margin="0,2,0,0" />
-
-                                                            <TextBlock Grid.Row="2" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Rails" Margin="0,2,0,0" />
-                                                            <TextBlock Grid.Row="2" Grid.Column="1" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" Text="250 A · 70 A · 14.026 A" Margin="0,2,0,0" />
-
-                                                            <TextBlock Grid.Row="3" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Stock rails" Margin="0,2,0,0" />
-                                                            <TextBlock Grid.Row="3" Grid.Column="1" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" Text="210 A · 60 A · 11.053 A" Margin="0,2,0,0" />
-
-                                                            <TextBlock Grid.Row="4" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Driver max" Margin="0,2,0,0" />
-                                                            <TextBlock Grid.Row="4" Grid.Column="1" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" Text="294 A · 84 A · 17.021 A" Margin="0,2,0,0" />
-                                                        </Grid>
-
-                                                        <Border Height="1"
-                                                                Margin="0,10,0,10"
-                                                                Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                                                        <TextBlock FontSize="12"
-                                                                   TextWrapping="Wrap"
-                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                                                   Text="The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off." />
-                                                        <TextBlock Margin="0,8,0,0"
-                                                                   FontSize="12"
-                                                                   TextWrapping="Wrap"
-                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                                                   Text="With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it." />
-                                                        <TextBlock Margin="0,8,0,0"
-                                                                   FontSize="12"
-                                                                   TextWrapping="Wrap"
-                                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                                   Text="Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it." />
-                                                    </StackPanel>
-                                                </Border>
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                 Glyph="&#xE946;"
+                                                 FontSize="14"
+                                                 Margin="6,2,0,0"
+                                                 VerticalAlignment="Center"
+                                                 ToolTipService.ShowDuration="60000">
+                                        <ui:FontIcon.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock x:Name="tbRomInfo"
+                                                           MaxWidth="420"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                             </ToolTip>
-                                        </ui:Button.ToolTip>
-                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" />
-                                    </ui:Button>
-                                </Grid>
+                                        </ui:FontIcon.ToolTip>
+                                    </ui:FontIcon>
+                                </StackPanel>
 
                                 <!-- The statement is only asked for when there is something to
                                      unlock, so its divider lives in the row and goes with it. -->
@@ -993,31 +937,10 @@
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                                <!-- Advanced: the runtime rail currents. A separate, live NVAPI
-                                     write (no restart, no blank screen, no consent), so it stays
-                                     closed until asked for and follows the unlock's state. -->
-                                <ui:Button x:Name="btnRomAdvanced"
-                                           Padding="0,6"
-                                           HorizontalAlignment="Left"
-                                           Appearance="Transparent"
-                                           Click="btnRomAdvanced_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:FontIcon x:Name="icRomAdvanced"
-                                                     FontFamily="Segoe Fluent Icons"
-                                                     Glyph="&#xE70D;"
-                                                     FontSize="12"
-                                                     Margin="0,0,8,0"
-                                                     VerticalAlignment="Center" />
-                                        <TextBlock x:Name="tbRomAdvanced"
-                                                   VerticalAlignment="Center"
-                                                   FontSize="12"
-                                                   Text="Show advanced" />
-                                    </StackPanel>
-                                </ui:Button>
-
-                                <StackPanel x:Name="spRomAdvanced"
-                                            Margin="0,8,0,0"
-                                            Visibility="Collapsed">
+                                <!-- The runtime rail currents. A separate, live NVAPI write (no
+                                     restart, no blank screen, no consent), so it follows the
+                                     unlock's state: inert and explained until it is applied. -->
+                                <StackPanel>
                                     <ui:TextBlock FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    TextWrapping="Wrap"
@@ -1051,6 +974,11 @@
                                                 <Slider x:Name="sdRailNvvdd"
                                                         Width="140"
                                                         VerticalAlignment="Center"
+                                                        TickPlacement="Both"
+                                                        TickFrequency="5000"
+                                                        SmallChange="1000"
+                                                        LargeChange="5000"
+                                                        IsSnapToTickEnabled="False"
                                                         ValueChanged="RailSlider_ValueChanged" />
                                             </StackPanel>
                                         </Grid>
@@ -1085,6 +1013,11 @@
                                                 <Slider x:Name="sdRailMsvdd"
                                                         Width="140"
                                                         VerticalAlignment="Center"
+                                                        TickPlacement="Both"
+                                                        TickFrequency="1000"
+                                                        SmallChange="1000"
+                                                        LargeChange="5000"
+                                                        IsSnapToTickEnabled="False"
                                                         ValueChanged="RailSlider_ValueChanged" />
                                             </StackPanel>
                                         </Grid>
@@ -1119,6 +1052,11 @@
                                                 <Slider x:Name="sdRailBoardInput"
                                                         Width="140"
                                                         VerticalAlignment="Center"
+                                                        TickPlacement="Both"
+                                                        TickFrequency="250"
+                                                        SmallChange="100"
+                                                        LargeChange="1000"
+                                                        IsSnapToTickEnabled="False"
                                                         ValueChanged="RailSlider_ValueChanged" />
                                             </StackPanel>
                                         </Grid>

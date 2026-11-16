@@ -1168,8 +1168,5 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "EC повідомляє базовий TGP 95 Вт, тому зсув cTGP дорівнює 130, а Dynamic Boost вимкнено.",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Зі зсувом ядра +233 МГц ми виміряли 214 Вт потужності плати при 0,975-0,985 В, PerfCap VRel — потужність уже не була обмеженням. Зсув індивідуальний для карти і задається на цій сторінці; інший екземпляр може витримати більше або впасти значно нижче, і без зсуву ми не вимірювали жодної потужності у ватах. Гаряча точка 58-63 °C при 215 Вт із під'єднаним рідинним охолодженням, 81,7 °C без нього.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Перевизначає лише політику живлення драйвера: прошивка GPU не змінюється, а «Відновити вихідне» скасовує зміну.",
-  "Show advanced": "Показати додаткові",
-  "Hide advanced": "Сховати додаткові",
-  "Range {0}-{1} A": "Діапазон {0}-{1} A",
-  "Power limits and measurements": "Межі потужності та вимірювання"
+  "Range {0}-{1} A": "Діапазон {0}-{1} A"
 }
