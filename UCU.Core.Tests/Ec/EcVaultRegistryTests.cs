@@ -164,7 +164,9 @@ public sealed class EcVaultRegistryTests
                 ["HANDSHAKE_708_VALUE"] = 0x01, // HEAD EcEngine.cs:319
                 ["REG_FEATURE_ENABLE_748"] = 0x0748, // HEAD EcEngine.cs:333 WriteECRaw(0x0748, 0x81)
                 ["FEATURE_ENABLE_748_VALUE"] = 0x81, // HEAD EcEngine.cs:333
-                ["UNIVERSAL_FAN_CURVE_ENABLE_BITS"] = 0xE0, // HEAD EcEngine.cs:349 ReadECRaw(0x07C5) | 0xE0
+                ["WHISPER_MODE_REQUEST"] = 0x40, // 0x07C5 bit 6 (MechControl-RE 21ffc69, re/register_reference.md '0x7C5 bits 6:5')
+                ["WHISPER_MODE_SWITCH"] = 0x20,  // 0x07C5 bit 5, WHMS (same)
+                ["WHISPER_LEVEL_MASK"] = 0x03,   // 0x07C6 bits 1:0, WMS0 (same)
                 ["REG_FAN_CURVE_PARAM_7C7"] = 0x07C7, // HEAD EcEngine.cs:368 WriteECRaw(0x07C7, 0x0C)
                 ["FAN_CURVE_PARAM_7C7_VALUE"] = 0x0C, // HEAD EcEngine.cs:368
                 ["AP_OEM_6_FAN_CURVE_MODE"] = 0x04, // HEAD EcEngine.cs:373 WriteECRaw(0x07C6, 0x04)

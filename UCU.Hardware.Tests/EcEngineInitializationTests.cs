@@ -19,8 +19,59 @@ public sealed class EcEngineInitializationTests
         engine.InitializeEc();
 
         Assert.Equal(
-            "0x0709=0x05 0x0708=0x01 0x0748=0x81 0x0726=0x80 0x0727=0x40 0x07C5=0xE0 0x07C7=0x0C 0x07C6=0x04 0x0706=0x41",
+            "0x0709=0x05 0x0708=0x01 0x0748=0x81 0x0726=0x80 0x0727=0x40 0x07C5=0xC0 0x07C7=0x0C 0x07C6=0x04 0x0706=0x41",
             transport.SequenceOf(0x0709, 0x0708, 0x0748, 0x0726, 0x0727, 0x07C5, 0x07C7, 0x07C6, 0x0706));
+    }
+
+    [Fact]
+    public void InitializeEc_TurnsNvidiaWhisperModeOffInsteadOfArmingTheOemOnSequence()
+    {
+        // 0x7C5 reads 0xE0: per-fan tables plus the Whisper Mode switch and request, which
+        // is what the OEM service writes for "on". Init has to write the OEM "off": bit 7
+        // stays (per-fan tables), bit 5 (the switch) clears, bit 6 (the request) sets.
+        // 0x7C6 reads 0x05: a whisper level (bits 1:0) the driver left behind, cleared.
+        var transport = new FakeEcTransport();
+        transport.Preset(0x07C5, 0xE0);
+        transport.Preset(0x07C6, 0x05);
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+
+        engine.InitializeEc();
+
+        Assert.Equal((byte)0xC0, transport.FirstWriteAt(0x07C5));
+        // The clear runs in step 4, before the fan tables, not as a repeat of step 7's 0x04.
+        Assert.True(transport.FirstWriteIndex(0x07C6) < transport.FirstWriteIndex(EcEngine.REG_CPU_TEMP_END_TABLE));
+        Assert.Equal(new byte[] { 0x04, 0x04 }, transport.WritesAt(0x07C6));
+    }
+
+    [Theory]
+    [InlineData(0x00)] // no level at all
+    [InlineData(0x04)] // only the fan-curve latch bit
+    public void InitializeEc_Leaves0x7C6AloneUnlessAWhisperLevelIsSet(byte apOem6)
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(0x07C6, apOem6);
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+
+        engine.InitializeEc();
+
+        // The one 0x7C6 write is step 7's fan-curve mode, never a whisper clear.
+        Assert.Equal(new byte[] { 0x04 }, transport.WritesAt(0x07C6));
+    }
+
+    [Fact]
+    public void InitializeEc_KeepsPerFanTablesOnWhenTheRegisterReadsZero()
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(0x07C5, 0x00);
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+
+        engine.InitializeEc();
+
+        // Bit 7 armed, Whisper Mode off - the two things this step owns.
+        Assert.Equal((byte)0xC0, transport.FirstWriteAt(0x07C5));
     }
 
     [Fact]
@@ -59,7 +110,7 @@ public sealed class EcEngineInitializationTests
 
         Assert.Equal((byte)0x81, transport.LastWriteAt(0x0726)!.Value);
         Assert.Equal((byte)0x42, transport.LastWriteAt(0x0727)!.Value);
-        Assert.Equal((byte)0xE1, transport.LastWriteAt(0x07C5)!.Value);
+        Assert.Equal((byte)0xC1, transport.LastWriteAt(0x07C5)!.Value);
     }
 
     [Fact]

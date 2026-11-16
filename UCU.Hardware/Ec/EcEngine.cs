@@ -203,11 +203,13 @@ namespace UCU.Hardware.Ec
         private const ushort REG_HANDSHAKE_708 = EcVault.REG_HANDSHAKE_708;
         private const byte HANDSHAKE_708_VALUE = EcVault.HANDSHAKE_708_VALUE;
 
-        // Init step 3 feature enable / step 4 fan-curve arming / step 6 parameter /
+        // Init step 3 feature enable / step 4 Whisper Mode off / step 6 parameter /
         // step 7 mode / step 8 BIOS_CTRL.
         private const ushort REG_FEATURE_ENABLE_748 = EcVault.REG_FEATURE_ENABLE_748;
         private const byte FEATURE_ENABLE_748_VALUE = EcVault.FEATURE_ENABLE_748_VALUE;
-        private const byte UNIVERSAL_FAN_CURVE_ENABLE_BITS = EcVault.UNIVERSAL_FAN_CURVE_ENABLE_BITS;
+        private const byte WHISPER_MODE_REQUEST = EcVault.WHISPER_MODE_REQUEST; // 0x7C5 bit 6
+        private const byte WHISPER_MODE_SWITCH = EcVault.WHISPER_MODE_SWITCH;   // 0x7C5 bit 5
+        private const byte WHISPER_LEVEL_MASK = EcVault.WHISPER_LEVEL_MASK;     // 0x7C6 bits 1:0
         private const ushort REG_FAN_CURVE_PARAM_7C7 = EcVault.REG_FAN_CURVE_PARAM_7C7;
         private const byte FAN_CURVE_PARAM_7C7_VALUE = EcVault.FAN_CURVE_PARAM_7C7_VALUE;
         private const byte AP_OEM_6_FAN_CURVE_MODE = EcVault.AP_OEM_6_FAN_CURVE_MODE;
@@ -395,11 +397,19 @@ namespace UCU.Hardware.Ec
                 Thread.Sleep(50);
                 DebugLog($"[DIAG] EcEngine: Step 3b — Power management activation (0x726=0x{reg726:X2}, 0x727=0x{reg727:X2})");
 
-                // Step 4: Fan curve enable bits — set bits 7,6,5 of 0x7C5 (OR with 0xE0)
-                byte ufCtrl = (byte)(ReadECRaw(REG_UNIVERSAL_FAN_CTRL) | UNIVERSAL_FAN_CURVE_ENABLE_BITS);
+                // Step 4: 0x7C5 — per-fan tables on (bit 7), NVIDIA Whisper Mode off.
+                // Bits 6:5 are the Whisper Mode request and switch, not fan-curve enables:
+                // setting both is the OEM service's "on", which tells the EC to hand the
+                // driver its quiet-profile cap (a GM7ZG sat at ~800 MHz / 30 fps until the
+                // off sequence was written). "Off" is bit 6 set with bit 5 clear, and a
+                // whisper level the driver left behind is cleared too (MechControl-RE 21ffc69).
+                byte ufCtrl = (byte)(((ReadECRaw(REG_UNIVERSAL_FAN_CTRL) | SPLIT_TABLES) & ~WHISPER_MODE_SWITCH) | WHISPER_MODE_REQUEST);
                 WriteECRaw(REG_UNIVERSAL_FAN_CTRL, ufCtrl);
+                byte whisperLevel = ReadECRaw(REG_AP_OEM_6);
+                if ((whisperLevel & WHISPER_LEVEL_MASK) != 0)
+                    WriteECRaw(REG_AP_OEM_6, (byte)(whisperLevel & ~WHISPER_LEVEL_MASK));
                 Thread.Sleep(50);
-                DebugLog($"[DIAG] EcEngine: Step 4 — Fan curve enable bits set (0x{ufCtrl:X2})");
+                DebugLog($"[DIAG] EcEngine: Step 4 — 0x7C5=0x{ufCtrl:X2} (per-fan tables on, Whisper Mode off: bit 6 request set, bit 5 switch cleared), 0x7C6 read 0x{whisperLevel:X2}, whisper level 0x{whisperLevel & WHISPER_LEVEL_MASK:X2} cleared when non-zero");
 
                 // Step 5: Write default OEM fan tables.
                 // The EC expects this as part of the init sequence. Skipping it causes

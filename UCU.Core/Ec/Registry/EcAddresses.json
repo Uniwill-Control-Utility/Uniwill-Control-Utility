@@ -35,8 +35,8 @@
 
     { "name": "REG_MANUAL_FAN_CTRL", "value": "0x0751", "domain": "fan", "evidence": "uniwill-laptop-driver; carries FAN_MODE_* level bits (dual-purpose with the OVERBOOST profile, EcEngine.cs:2210)" },
     { "name": "REG_FAN_SWITCH_SPEED", "value": "0x0787", "domain": "fan", "evidence": "uniwill-laptop-driver; also the last write of every OEM stock-mode body (OEM_MODE_COMMIT, EcEngine.cs:1850)" },
-    { "name": "REG_UNIVERSAL_FAN_CTRL", "value": "0x07C5", "domain": "fan", "evidence": "uniwill-laptop-driver; bits 7/6/5 armed by the init sequence (EcEngine.cs:348)" },
-    { "name": "REG_AP_OEM_6", "value": "0x07C6", "domain": "fan", "evidence": "MechControl decompile; init step 7 writes the fan-curve mode here (EcEngine.cs:372)" },
+    { "name": "REG_UNIVERSAL_FAN_CTRL", "value": "0x07C5", "domain": "fan", "evidence": "uniwill-laptop-driver; bit 7 = OEM FanControlRespective (per-fan tables), bits 6:5 = NVIDIA Whisper Mode request and switch - the init writes the OEM 'off' (bit 6 set, bit 5 clear), never 0xE0 (MechControl-RE 21ffc69; re/register_reference.md '0x7C5 bits 6:5')" },
+    { "name": "REG_AP_OEM_6", "value": "0x07C6", "domain": "fan", "evidence": "MechControl decompile; init step 7 writes the fan-curve mode here (EcEngine.cs:372); bits 1:0 = WMS0, the Whisper Mode level the NVIDIA driver stored, cleared at init (MechControl-RE 21ffc69)" },
 
     { "name": "REG_SUPPORT_1", "value": "0x0765", "access": "ro", "domain": "capability", "evidence": "uniwill-laptop-driver; feature-support byte (FAN_V2_NEW, FAN_V3)" },
     { "name": "REG_SUPPORT_2", "value": "0x0766", "access": "ro", "domain": "capability", "evidence": "uniwill-laptop-driver; feature-support byte (RGB_KEYBOARD)" },
@@ -154,9 +154,11 @@
     { "name": "FAN_PROFILE_BEAST", "value": "0x10", "register": "REG_MANUAL_FAN_CTRL", "evidence": "OpenRevo's literal per stock mode: TURBO" },
     { "name": "OEM_MODE_COMMIT", "value": "0x83", "register": "REG_FAN_SWITCH_SPEED", "evidence": "declared in EcEngine.cs:155 - the last write of every OEM stock-mode body, absent in Custom (EcEngine.cs:1850)" },
     { "name": "SPLIT_TABLES", "value": "0x80", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:158 - bit 7: per-CPU/GPU fan tables" },
-    { "name": "UNIVERSAL_FAN_CURVE_ENABLE_BITS", "value": "0xE0", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "MechControl decompiled init sequence, step 4: 'fan curve enable bits - set bits 7,6,5 of 0x7C5 (OR with 0xE0)' (EcEngine.cs:348)" },
+    { "name": "WHISPER_MODE_REQUEST", "value": "0x40", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "MechControl-RE 21ffc69 (re/register_reference.md '0x7C5 bits 6:5'): bit 6 makes the EC pass the Whisper Mode switch to the NVIDIA driver. Init sets it with bit 5 clear - the OEM service's 'off'" },
+    { "name": "WHISPER_MODE_SWITCH", "value": "0x20", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "MechControl-RE 21ffc69 (re/register_reference.md '0x7C5 bits 6:5'): bit 5 is WHMS, the NVIDIA Whisper Mode switch. Setting bits 6:5 is the OEM 'on' that held a GM7ZG RTX 3080 at ~800 MHz and 30 fps; init clears it" },
     { "name": "ENABLE_UNIVERSAL_FAN_CTRL", "value": "0x04", "register": "REG_UNIVERSAL_FAN_CTRL", "evidence": "declared in EcEngine.cs:161 - bit 2" },
     { "name": "AP_OEM_6_FAN_CURVE_MODE", "value": "0x04", "register": "REG_AP_OEM_6", "evidence": "MechControl decompiled init sequence, step 7 'fan curve mode' (EcEngine.cs:372-373)" },
+    { "name": "WHISPER_LEVEL_MASK", "value": "0x03", "register": "REG_AP_OEM_6", "evidence": "MechControl-RE 21ffc69: bits 1:0 are WMS0, the Whisper Mode level the NVIDIA driver reports through ACPI (3/2/1, 0 = none); init clears a level it finds" },
 
     { "name": "KBD_WHITE_ONLY", "value": "0x01", "register": "REG_KBD_STATUS", "evidence": "declared in EcEngine.cs:164 - bit 0 (EcKeyboardCodec.WhiteOnlyBit)" },
     { "name": "KBD_POWER_OFF", "value": "0x02", "register": "REG_KBD_STATUS", "evidence": "declared in EcEngine.cs:165 - bit 1 (EcKeyboardCodec.PowerOffBit)" },

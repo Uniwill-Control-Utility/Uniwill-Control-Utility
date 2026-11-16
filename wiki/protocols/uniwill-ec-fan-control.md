@@ -130,11 +130,14 @@ If none exist, EC access is unavailable.
 | Bit | Name | Description |
 |-----|------|-------------|
 | 7 | SPLIT_TABLES | When set, CPU and GPU use separate curve tables |
+| 5 | WHISPER_MODE_SWITCH | `WHMS`, the NVIDIA Whisper Mode switch. Init clears it: set, the EC hands the driver its quiet-profile frame cap |
+| 6 | WHISPER_MODE_REQUEST | Set with bit 5 clear = the OEM service's Whisper Mode "off". Setting bits 6 and 5 together is its "on" |
 
 #### AP_OEM_6 bits
 
 | Bit | Name | Description |
 |-----|------|-------------|
+| 0–1 | WHISPER_LEVEL_MASK | `WMS0`, the Whisper Mode level the NVIDIA driver reports (0 = none). Init clears a level it finds |
 | 2 | ENABLE_UNIVERSAL_FAN_CTRL | Enable custom fan table mode |
 
 ### Fan Curve Tables
@@ -216,7 +219,7 @@ The handshake was reverse-engineered from the MechControl (XMG Control Center) i
 | 1b | Handshake | `0x0708` | `0x01` |
 | 2 | Activation | `0x0741` (AP_OEM) | `0x05` |
 | 3 | Feature enable | `0x0748` | `0x81` |
-| 4 | Fan curve enable | `0x07C5` | OR with `0xE0` (bits 7,6,5) |
+| 4 | Per-fan tables on, Whisper Mode off | `0x07C5` | `(read \| 0x80) & ~0x20 \| 0x40` — bit 7 set, bit 5 (Whisper switch) clear, bit 6 (request) set; then clear `0x07C6` bits 1:0 if a whisper level is set |
 | 5 | Write default OEM tables | All curve registers | See default values above |
 | 6 | Fan curve parameter | `0x07C7` | `0x0C` |
 | 7 | Fan curve mode | `0x07C6` | `0x04` |
