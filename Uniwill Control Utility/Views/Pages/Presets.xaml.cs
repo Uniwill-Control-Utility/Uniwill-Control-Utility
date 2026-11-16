@@ -2160,7 +2160,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         // (GpuPowerTiers.ExtraGpuPower and RomOverrideLayout.Stock*MilliAmps in UCU.Hardware,
         // which this project does not reference). The status row judges a reading against these
         // without asking the engine what "tested" means, and the slider floor is the stock rail.
-        private const int TestedCeilingMilliwatts = 250_000;
         private const int TestedTargetMilliwatts = 225_000;
         private const int TestedNvvddMilliamps = 250_000;
         private const int TestedMsvddMilliamps = 70_000;
@@ -2269,19 +2268,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             string.IsNullOrWhiteSpace(reason) ? text : text + "\n" + RomReasonLine(reason);
 
         /// <summary>
-        /// The unlock's numbers as the status card's second row: the three power values and the
-        /// three rails, each the driver's own read-back rather than the tier's request. The row
-        /// exists only while the unlock is applied (Unlocked or Uncertain); with it off, the
-        /// card above already says what the GPU runs on.
+        /// The unlock's numbers as the status card's second row: TGP and the budget, plus the three
+        /// rails, each the driver's own read-back rather than the tier's request. The row exists
+        /// only while the unlock is applied (Unlocked or Uncertain); with it off, the card above
+        /// already says what the GPU runs on. It is named in the slider's own vocabulary - TGP -
+        /// while the driver's 250 W ceiling is permission, not a target, and is explained in the
+        /// section's tooltip instead.
         ///
         /// What the colours mean, stated once here — and every colour is rendered next to its
         /// own word, so no state depends on colour alone:
-        ///   Raised (success)   — the ceiling cell only. The driver's policy maximum is at or
-        ///                        above 250 W, so the records took. Permission, not a target:
-        ///                        nothing ever draws 250 W, the 225 W request below is the
-        ///                        number we measured.
-        ///   Low (caution)      — the ceiling cell only: read, but below 250 W, so the records
-        ///                        did not take and the driver clamps the request.
         ///   Tested (success)   — applied and inside the measured configuration: request at or
         ///                        above the 225 W target, budget at or above the request, and
         ///                        every rail at or below 250 / 70 / 14.026 A.
@@ -2305,16 +2300,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             // A partial apply is not a verdict: the numbers can read right and still be unverified.
             bool unverified = state!.State != UCU.Contracts.GpuRomOverrideStates.Unlocked;
 
-            int? ceiling = state.CeilingLimitMilliwatts;
             int? request = state.RequestedLimitMilliwatts;
             int? budget = state.BudgetMilliwatts;
             int? nvvdd = state.NvvddCurrentMilliamps;
             int? msvdd = state.MsvddCurrentMilliamps;
             int? board = state.BoardInputCurrentMilliamps;
 
-            SetRomValue(tbRomStatCeiling, tbRomStatCeilingWord, Watts(ceiling),
-                ceiling is not null, unverified, ceiling is int c && c >= TestedCeilingMilliwatts,
-                testedWord: "Raised", untestedWord: "Low");
             SetRomValue(tbRomStatRequest, tbRomStatRequestWord, Watts(request),
                 request is not null, unverified, request is int r && r >= TestedTargetMilliwatts);
 
@@ -2332,8 +2323,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private void SetRomValue(
-            TextBlock valueText, TextBlock wordText, string text, bool read, bool unverified, bool tested,
-            string testedWord = "Tested", string untestedWord = "Untested")
+            TextBlock valueText, TextBlock wordText, string text, bool read, bool unverified, bool tested)
         {
             valueText.Text = text;
 
@@ -2342,8 +2332,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 : unverified
                     ? ("Unverified", "SystemFillColorCriticalBrush")
                     : tested
-                        ? (testedWord, "SystemFillColorSuccessBrush")
-                        : (untestedWord, "SystemFillColorCautionBrush");
+                        ? ("Tested", "SystemFillColorSuccessBrush")
+                        : ("Untested", "SystemFillColorCautionBrush");
 
             wordText.Text = LocalizationService.Get(word);
             System.Windows.Media.Brush colour = (System.Windows.Media.Brush)FindResource(brush);
