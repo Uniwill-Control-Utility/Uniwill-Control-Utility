@@ -33,6 +33,53 @@ public sealed class GpuVerbsTests
     }
 
     [Fact]
+    public async Task ApplyVfCurve_CarriesTheMemoryOffset_AndDeliversIt()
+    {
+        // The curve write rebuilds the pstate table, which is where the memory delta lives,
+        // so the offset must ride the same payload: sent separately it is erased (field,
+        // 2026-11-16, GPU-Z 1812.6 -> 1750.1 MHz after a curve apply).
+        var gpu = new FakeGpuTuningService();
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuTuningOverride = gpu });
+
+        GpuTuningResultDto result = await host.Gpu.ApplyVfCurveAsync(
+            new Dictionary<int, int> { [72] = 150 }, memoryOffsetMhz: 500);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(500, gpu.LastMemoryOffsetMhz);
+        Assert.Equal(150, gpu.LastOffsets![72]);
+    }
+
+    [Fact]
+    public async Task ApplyVfCurve_AcceptedCurveWithARefusedMemoryOffset_ReachesTheClientAsData()
+    {
+        // The engine answers both facts: the curve landed (AppliedPoints > 0) and the memory
+        // offset did not. The app must be able to tell that apart from a refused curve.
+        var gpu = new FakeGpuTuningService
+        {
+            Answer = new GpuTuningResultDto
+            {
+                Succeeded = false,
+                Status = unchecked((int)0xFFFFFF77),
+                AppliedPoints = 1,
+                Detail = "the V-F curve applied (1 points) but the 500 MHz memory offset was refused",
+            },
+        };
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuTuningOverride = gpu });
+
+        GpuTuningResultDto result = await host.Gpu.ApplyVfCurveAsync(
+            new Dictionary<int, int> { [72] = 150 }, memoryOffsetMhz: 500);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(unchecked((int)0xFFFFFF77), result.Status);
+        Assert.Equal(1, result.AppliedPoints);
+        Assert.Contains("memory offset was refused", result.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SetDrsPreference_DeliversTheEnum_AndAnswersTheResult()
     {
         var gpu = new FakeGpuTuningService();

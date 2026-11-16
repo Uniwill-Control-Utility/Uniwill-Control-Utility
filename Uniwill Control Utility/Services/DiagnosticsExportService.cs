@@ -127,7 +127,8 @@ namespace Uniwill_Control_Utility.Services
                 }
 
                 await File.WriteAllTextAsync(
-                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote, ReadBudget(), ReadRailLimits()), cancellationToken);
+                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote, ReadBudget(), ReadRailLimits(),
+                        Scripts.GPUs.NVIDIA.NvTuning.LastMemoryOffset), cancellationToken);
 
                 string? directory = Path.GetDirectoryName(targetZip);
                 if (!string.IsNullOrEmpty(directory))
@@ -199,12 +200,24 @@ namespace Uniwill_Control_Utility.Services
         /// missing dump renders the reason instead of throwing.
         /// </summary>
         public static string ComposeHardware(
-            EcHardwareDumpDto? dump, string note, int? budgetMilliwatts = null, GpuRailLimitsDto? railLimits = null)
+            EcHardwareDumpDto? dump,
+            string note,
+            int? budgetMilliwatts = null,
+            GpuRailLimitsDto? railLimits = null,
+            UCU.Core.Gpu.MemoryOffsetVerdict? memoryOffset = null)
         {
             var text = new StringBuilder();
             text.AppendLine("Uniwill Control Utility - EC hardware state");
             text.AppendLine("Generated: " + DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"));
             text.AppendLine("Collection: " + (string.IsNullOrWhiteSpace(note) ? "unknown" : note));
+
+            // The driver accepts clock writes and then erases the memory offset with the next
+            // pstate write (field, 2026-11-16), so the only truthful account is the readback
+            // the last write took: the offset and whether it is in force.
+            text.AppendLine("GPU memory offset: " +
+                            (memoryOffset is UCU.Core.Gpu.MemoryOffsetVerdict verdict
+                                ? verdict.Summary
+                                : "unknown (no clock or curve write this session)"));
 
             // The laptop's own power budget (the driver's F7 value): the driver enforces
             // min(request, budget), so without this number a report cannot say why a

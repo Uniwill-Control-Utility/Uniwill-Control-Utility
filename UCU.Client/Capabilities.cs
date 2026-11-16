@@ -420,10 +420,10 @@ namespace UCU.Client
 
         public GpuTuningCapability(EngineClient client) => _client = client;
 
-        public Task<GpuTuningResultDto> ApplyVfCurveAsync(Dictionary<int, int> offsetsMhz, CancellationToken cancellationToken = default) =>
+        public Task<GpuTuningResultDto> ApplyVfCurveAsync(Dictionary<int, int> offsetsMhz, int memoryOffsetMhz = 0, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<GpuTuningResultDto>(
                 EngineVerbs.Gpu.ApplyVfCurve,
-                EngineSerializer.ToParams(new VfCurveOffsetsDto { OffsetsMhz = offsetsMhz }),
+                EngineSerializer.ToParams(new VfCurveOffsetsDto { OffsetsMhz = offsetsMhz, MemoryOffsetMhz = memoryOffsetMhz }),
                 cancellationToken);
 
         public Task<GpuTuningResultDto> SetDrsPreferenceAsync(DrsGpuPreference preference, CancellationToken cancellationToken = default) =>

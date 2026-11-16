@@ -16,12 +16,16 @@ public sealed class FakeGpuTuningService : IGpuTuningService
 
     public (int Core, int Memory)? LastClocks { get; private set; }
 
+    /// <summary>The memory offset that rode the curve payload.</summary>
+    public int LastMemoryOffsetMhz { get; private set; }
+
     /// <summary>The answer both writes report (the default is an accepted write).</summary>
     public GpuTuningResultDto Answer { get; set; } = new() { Succeeded = true, Status = 0, AppliedPoints = 0 };
 
-    public GpuTuningResultDto ApplyVfCurveOffsets(IReadOnlyDictionary<int, int> offsetsMhz)
+    public GpuTuningResultDto ApplyVfCurveOffsets(IReadOnlyDictionary<int, int> offsetsMhz, int memoryOffsetMhz)
     {
         LastOffsets = new Dictionary<int, int>(offsetsMhz);
+        LastMemoryOffsetMhz = memoryOffsetMhz;
         return Answer with { AppliedPoints = offsetsMhz.Count };
     }
 

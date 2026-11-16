@@ -253,6 +253,59 @@ public sealed class DeviceElevationRelocationTests
         Assert.Contains("the core/memory offsets are NOT applied", body, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void VfCurveApply_WritesTheClocksFirst_ThenTheCurve_ThenVerifies()
+    {
+        // Measured 2026-11-16: the engine log's "memory offset re-applied after the curve" was
+        // a pstate write that erased the curve (the next curve write would have blanked it the
+        // other way round); a curve write does NOT disturb an already-applied pstate memory
+        // offset. So the order is clocks -> curve -> verify, with no pstate write after a curve.
+        string engine = ReadEngine("Gpu", "NvApiGpuTuning.cs");
+        string curve = MethodBody(engine, "public GpuTuningResultDto ApplyVfCurveOffsets");
+
+        int memoryWrite = curve.IndexOf("ApplyMemoryOffset(memoryOffsetMhz)", StringComparison.Ordinal);
+        int readback = curve.IndexOf("TryReadClockBoostTable", StringComparison.Ordinal);
+        int curveWrite = curve.IndexOf("setControl(gpu, buffer)", StringComparison.Ordinal);
+        int verify = curve.IndexOf("VerifyCurveSurvived", StringComparison.Ordinal);
+
+        Assert.True(memoryWrite >= 0, "The memory offset is a pstate write inside the verb.");
+        Assert.True(readback > memoryWrite, "The table is read after the clocks are in force.");
+        Assert.True(curveWrite > readback, "The curve is written last.");
+        Assert.True(verify > curveWrite, "The curve is verified after the write.");
+
+        // no pstate write after the curve: that was the write erasing it
+        Assert.DoesNotContain("SetPerformanceStates20", curve[curveWrite..], StringComparison.Ordinal);
+        Assert.Contains("BuildMemoryClockState(memoryOffsetMhz)", engine, StringComparison.Ordinal);
+
+        // read-modify-write with the accepted mask shape, and a fallback that says so
+        Assert.Contains("PrepareClockBoostWriteTable", curve, StringComparison.Ordinal);
+        Assert.Contains("0x23F1B133", engine, StringComparison.Ordinal);
+        Assert.Contains("from-zero table", engine, StringComparison.Ordinal);
+        Assert.Contains("still read as written", engine, StringComparison.Ordinal);
+
+        // 0xB84/0xBE0 are inside the point delta array; no constant may target them again
+        Assert.DoesNotContain("= 0xB84", engine, StringComparison.Ordinal);
+        Assert.DoesNotContain("= 0xBE0", engine, StringComparison.Ordinal);
+
+        // the app-side fallback: its own points-only buffer, then the memory-only write
+        string app = Read("Scripts", "GPUs", "NVIDIA", "NvTuning.cs");
+        string appLocal = MethodBody(app, "private static int ApplyVfCurveOffsets_ClockBoostTableLocal");
+        int appMemory = appLocal.IndexOf("ApplyMemoryOffsetLocal(memoryOffsetMhz)", StringComparison.Ordinal);
+        int appRead = appLocal.IndexOf("ReadControlTable(gpu, out byte[] readback)", StringComparison.Ordinal);
+        int appCurve = appLocal.IndexOf("setControl(gpu, buffer)", StringComparison.Ordinal);
+
+        Assert.True(appMemory >= 0, "The local fallback applies the memory offset.");
+        Assert.True(appRead > appMemory, "The local fallback reads the table after the clocks.");
+        Assert.True(appCurve > appRead, "The local fallback writes the curve last.");
+        Assert.DoesNotContain("SetPerformanceStates20", appLocal[appCurve..], StringComparison.Ordinal);
+
+        string appMemoryBody = MethodBody(app, "private static void ApplyMemoryOffsetLocal");
+        Assert.Contains("PublicClockDomain.Memory", appMemoryBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("PublicClockDomain.Graphics", appMemoryBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("= 0xB84", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("= 0xBE0", app, StringComparison.Ordinal);
+    }
+
     private static string MethodBody(string source, string signature)
     {
         int start = source.IndexOf(signature, StringComparison.Ordinal);

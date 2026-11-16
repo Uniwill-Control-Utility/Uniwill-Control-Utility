@@ -3398,7 +3398,9 @@ namespace Uniwill_Control_Utility.Views.Windows
                 int tgp = (int)p.GpuTgp;
                 int dbOffset = p.GpuDynamicBoost ? (int)p.GpuDbOffset : 0;
                 Scripts.GPUs.NVIDIA.NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
-                Scripts.GPUs.NVIDIA.NvTuning.ApplyVfCurveOffsets_ClockBoostTable(p.VfCurveOffsets);
+                Scripts.GPUs.NVIDIA.NvTuning.ApplyVfCurveOffsets_ClockBoostTable(
+                    p.VfCurveOffsets,
+                    Settings.Default.EnableGpuClockControl ? (int)p.GpuMemOffset : 0);
                 Scripts.GPUs.NVIDIA.NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
             }
 

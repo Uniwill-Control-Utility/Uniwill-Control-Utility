@@ -366,7 +366,11 @@ namespace UCU.Contracts.Capabilities
         /// outside the usable point range are skipped, never written outside
         /// the buffer; <see cref="GpuTuningResultDto.AppliedPoints"/> says how
         /// many landed.</summary>
-        Task<GpuTuningResultDto> ApplyVfCurveAsync(Dictionary<int, int> offsetsMhz, CancellationToken cancellationToken = default);
+        /// <param name="memoryOffsetMhz">The profile's memory clock offset, re-applied
+        /// inside the same verb after the curve write (the curve rebuilds the pstate table,
+        /// which is where the memory delta lives). The curve owns the core, so no core
+        /// offset travels with it.</param>
+        Task<GpuTuningResultDto> ApplyVfCurveAsync(Dictionary<int, int> offsetsMhz, int memoryOffsetMhz = 0, CancellationToken cancellationToken = default);
 
         Task<GpuTuningResultDto> SetDrsPreferenceAsync(DrsGpuPreference preference, CancellationToken cancellationToken = default);
 

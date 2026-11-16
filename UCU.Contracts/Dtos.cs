@@ -727,10 +727,15 @@ namespace UCU.Contracts
         public List<string> Actions { get; init; } = new();
     }
 
-    /// <summary>Per-point V-F curve offsets (point index -> frequency delta in MHz).</summary>
+    /// <summary>Per-point V-F curve offsets (point index -> frequency delta in MHz), plus the
+    /// memory clock offset the same write must leave in force: the curve write rebuilds the
+    /// pstate table, which is where the memory delta lives, so carrying it here is the only
+    /// way the two cannot be separated.</summary>
     public sealed record VfCurveOffsetsDto
     {
         public Dictionary<int, int> OffsetsMhz { get; init; } = new();
+
+        public int MemoryOffsetMhz { get; init; }
     }
 
     /// <summary>Outcome of a privileged GPU tuning write: the raw NVAPI status is kept for the log.</summary>

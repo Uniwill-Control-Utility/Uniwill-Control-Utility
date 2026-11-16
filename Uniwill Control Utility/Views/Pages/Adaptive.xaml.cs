@@ -4320,7 +4320,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
                 NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
 
-                NvTuning.ApplyVfCurveOffsets_ClockBoostTable(_adpVfCurveOffsets);
+                NvTuning.ApplyVfCurveOffsets_ClockBoostTable(
+                    _adpVfCurveOffsets,
+                    Settings.Default.EnableGpuClockControl ? (int)AdpSdNvMem.Value : 0);
 
                 // Re-apply power limit after in case the driver overrides the EC ceiling.
                 NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);

@@ -23,7 +23,7 @@ namespace UCU.Engine
             add(EngineVerbs.Gpu.ApplyVfCurve, (p, ct) =>
             {
                 VfCurveOffsetsDto dto = EngineSerializer.BindParams<VfCurveOffsetsDto>(p);
-                return Task.FromResult<object?>(tuning.ApplyVfCurveOffsets(dto.OffsetsMhz));
+                return Task.FromResult<object?>(tuning.ApplyVfCurveOffsets(dto.OffsetsMhz, dto.MemoryOffsetMhz));
             });
 
             add(EngineVerbs.Gpu.SetDrsPreference, (p, ct) =>

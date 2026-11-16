@@ -446,7 +446,7 @@ namespace Uniwill_Control_Utility.Services
             // VF offsets and further reduce power if it sees a low ceiling.
             NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
 
-            int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(offsets);
+            int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(offsets, NvTuning.ActiveMemoryOffsetMhz);
             Debug.WriteLine($"[PresetProfileApplier] V-F curve applied: {(result > 0 ? "OK" : "failed")}, slot={activeSlot}");
 
             // Re-apply power limit AFTER in case the driver overrides the EC ceiling.
@@ -465,7 +465,8 @@ namespace Uniwill_Control_Utility.Services
 
             NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
 
-            int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(offsets);
+            int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(
+                offsets, Settings.Default.EnableGpuClockControl ? (int)preset.GpuMemOffset : 0);
             Debug.WriteLine($"[PresetProfileApplier] V-F curve applied from preset: {(result > 0 ? "OK" : "failed")}");
 
             NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);

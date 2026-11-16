@@ -1433,7 +1433,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
                         DebugLog($"  V-F curve: pre-apply power limit: {tgp + dbOffset}W, dbOffset={dbOffset}W");
 
-                        int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(offsets);
+                        int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(offsets, MemoryOffsetForCurve());
                         DebugLog($"  V-F curve applied: {(result > 0 ? "OK" : "failed")}");
 
                         // Also re-apply AFTER in case the driver overrides the EC ceiling.
@@ -1856,6 +1856,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         #endregion
+
+        /// <summary>
+        /// The memory offset a curve apply carries: the V-F curve write rebuilds the pstate
+        /// table, so the slider's memory offset has to ride the same call or it is erased
+        /// (field, 2026-11-16). 0 when the user disabled GPU clock control.
+        /// </summary>
+        private int MemoryOffsetForCurve() =>
+            Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
 
         private string buildCommandString()
         {

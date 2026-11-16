@@ -62,6 +62,13 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         public const int MaxClockLimit = 4000;
 
         private const int UsableVfPointCount = 127;
+
+        // The boost table's mask field is 4 x uint32 at 0x04..0x13; 0x14..0x23 is unknown1.
+        // The driver answers a 4- or 8-byte mask span and refuses a 32-byte 0xFF one (it also
+        // stamps unknown1) - measured 2026-11-16. Reads therefore walk the points in
+        // 64-point (8-byte) windows.
+        internal const int ClockBoostMaskBytes = 16;
+        internal const int ClockBoostMaskWindowPoints = 64;
         private const int VoltageStepMv = 25;
         private const int RampStartMv = 725;
         private const int VfToleranceMHz = 35;
@@ -143,6 +150,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             if (GpuInteropGuard.IsBlocked) return 0;
 
+            // The baseline the memory readback is judged against after the write: NVML
+            // reports the current pstate's clock, so the same pstate must be read twice.
+            ClockInfo? before = TryGetClocks(out ClockInfo baseline) ? baseline : null;
+
             // Same privilege gate as the V-F curve: an asInvoker pstate write is
             // answered NVAPI_INVALID_USER_PRIVILEGE (the field log's
             // "SetClocks: EXCEPTION NVIDIAApiException"), so the engine goes first.
@@ -154,6 +165,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     if (engine.Succeeded)
                     {
                         DiagnosticLogger.LogInfo($"SetClocks: engine applied core={core}MHz memory={memory}MHz");
+                        VerifyMemoryOffset("SetClocks (engine)", memory, before);
                         return 1;
                     }
 
@@ -211,6 +223,9 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 GPUApi.SetPerformanceStates20(internalGpu.Handle, overclock);
 
+                if (!readOnly)
+                    VerifyMemoryOffset("SetClocks (local)", memory, before);
+
                 return readOnly ? -1 : 1;
             }
             catch (Exception ex)
@@ -221,6 +236,58 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     DiagnosticLogger.LogWarning("SetClocks: the driver refused the write for lack of privilege - the core/memory offsets are NOT applied");
                 return -1;
             }
+        }
+
+        /// <summary>
+        /// The memory offset the active profile wants in force: the legacy Custom sliders (what
+        /// every apply copies its slot's values into), 0 under a stock preset - which yields the
+        /// GPU clocks to the firmware - and 0 when the user disabled GPU clock control. One
+        /// source for the curve and reset paths, which have no slider of their own.
+        /// </summary>
+        public static int ActiveMemoryOffsetMhz =>
+            !Properties.Settings.Default.EnableGpuClockControl ||
+            Services.PresetProfileApplier.IsBuiltInProfile(Properties.Settings.Default.presetProfile)
+                ? 0
+                : (int)Properties.Settings.Default.customNvMem;
+
+        /// <summary>
+        /// The last clock or curve write's memory readback, null until one has run. hardware.txt
+        /// renders it, because a driver accepts these writes and then erases the offset with the
+        /// next pstate write (field, 2026-11-16): without it the report cannot say whether the
+        /// offset the user set is actually in force.
+        /// </summary>
+        internal static UCU.Core.Gpu.MemoryOffsetVerdict? LastMemoryOffset { get; private set; }
+
+        /// <summary>
+        /// Reads the memory clock back and names whether the offset is in force. An offset that
+        /// was accepted but is not live is a warning, never a silent success.
+        /// </summary>
+        private static void VerifyMemoryOffset(string step, int requestedMhz, ClockInfo? before)
+        {
+            UCU.Core.Gpu.MemoryOffsetVerdict verdict;
+
+            if (before is not ClockInfo baseline || !TryGetClocks(out ClockInfo after))
+            {
+                verdict = new(requestedMhz, false, false,
+                    "the memory clock could not be read back (NVML unavailable)");
+            }
+            else
+            {
+                verdict = UCU.Core.Gpu.MemoryOffsetPolicy.Judge(
+                    requestedMhz,
+                    after.MaxMemoryMHz,
+                    baseline.CurrentMemoryMHz,
+                    after.CurrentMemoryMHz,
+                    baseline.PState,
+                    after.PState);
+            }
+
+            LastMemoryOffset = verdict;
+
+            if (verdict.Verified && !verdict.Live)
+                DiagnosticLogger.LogWarning($"{step}: memory offset {verdict.Summary} - the requested offset is NOT in force");
+            else
+                DiagnosticLogger.LogInfo($"{step}: memory offset {verdict.Summary}");
         }
 
         public static int SetPowerLimit(int totalWatts, int dbOffset = 0)
@@ -636,7 +703,12 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         {
             if (GpuInteropGuard.IsBlocked) return 0;
 
-            DiagnosticLogger.LogInfo("ResetVfCurveOffsets: reset GPU clock offsets to zero");
+            // The reset owns the curve and the core delta; the profile's memory offset is not
+            // a curve value and must still be in force afterwards (it only lives in this
+            // pstate table, which the write below rebuilds).
+            int memoryMhz = ActiveMemoryOffsetMhz;
+
+            DiagnosticLogger.LogInfo($"ResetVfCurveOffsets: reset the curve and the core offset, memory offset {memoryMhz} MHz stays");
             try
             {
                 // Use the same public NVAPI path as the Core Clock Offset slider
@@ -652,7 +724,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 var memoryClock = new PerformanceStates20ClockEntryV1(
                     PublicClockDomain.Memory,
-                    new PerformanceStates20ParameterDelta(0)
+                    new PerformanceStates20ParameterDelta(memoryMhz * Kilo)
                 );
 
                 var clocks = new[] { coreClock, memoryClock };
@@ -671,12 +743,13 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 GPUApi.SetPerformanceStates20(internalGpu.Handle, overclock);
                 DiagnosticLogger.LogInfo("ResetVfCurveOffsets: SetPerformanceStates20 completed");
 
-                // Also clear any per-point V-F curve offsets applied via the ClockBoostTable path.
-                // Build a full zero-offset dictionary for all 127 points.
+                // Also clear any per-point V-F curve offsets applied via the ClockBoostTable path,
+                // passing the memory offset so it is re-applied after that call (the curve write
+                // is what rebuilds the table and erases the offset).
                 var zeroOffsets = new Dictionary<int, int>();
                 for (int i = 0; i < UsableVfPointCount; i++)
                     zeroOffsets[i] = 0;
-                ApplyVfCurveOffsets_ClockBoostTable(zeroOffsets);
+                ApplyVfCurveOffsets_ClockBoostTable(zeroOffsets, memoryMhz);
 
                 return 1;
             }
@@ -931,8 +1004,9 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 var setControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(setControlPtr);
 
-                // Clear the 32-byte mask region, then set the single point bit.
-                Array.Clear(buffer, 0x04, 32);
+                // Clear the mask field (16 bytes), then set the single point bit: a mask that
+                // reaches into 0x14..0x23 (unknown1) is what the driver refuses.
+                Array.Clear(buffer, 0x04, ClockBoostMaskBytes);
                 buffer[0x04 + pointIndex / 8] = (byte)(1 << (pointIndex % 8));
 
                 // Delta offset: baseOffset + pointIndex * stride + deltaOffset
@@ -953,29 +1027,56 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// <summary>
         /// Applies per-point frequency offsets using NvAPI_GPU_SetClockBoostTable (0x0733E009)
         /// with the correct PrivateClockBoostTableV1 struct layout from LTT.NvAPIWrapper.
-        /// Struct: version(4) + masks(4*4) + unknown1(12*4) + gpuDeltas(80*36) + memFilled(23*4) + memDeltas(23*4) + unknown2(1529*4)
-        /// Each GPUDelta: 9 uint32 fields, _FrequencyDeltaInkHz at offset 0x14 (20 bytes per entry).
-        /// Total struct size: 0x2420 (9248 bytes) - matches our existing controlSize.
+        /// Struct: version(4) + mask(16) + unknown1(48) + point deltas + unknown2.
+        /// Each point entry starts at 0x44 with a 0x24 stride and _FrequencyDeltaInkHz at
+        /// offset 0x14. The delta array extends past 80 entries (all UsableVfPointCount points),
+        /// so 0xB84 = 0x44 + 80 * 0x24 is point 80's entry base, NOT a memory region: the
+        /// memory region is not mapped in this buffer and writing there makes the driver refuse
+        /// the whole call (measured 2026-11-16). Total struct size: 0x2420 (9248 bytes).
+        ///
+        /// <paramref name="memoryOffsetMhz"/> is applied BEFORE the curve as a separate,
+        /// memory-only pstate write: a pstate write after the curve erases the curve (measured
+        /// 2026-11-16), while the curve write leaves the offset in force. The core offset
+        /// deliberately does not travel here - the curve owns the core clock.
         /// </summary>
-        public static int ApplyVfCurveOffsets_ClockBoostTable(Dictionary<int, int> offsetsMHz)
+        public static int ApplyVfCurveOffsets_ClockBoostTable(Dictionary<int, int> offsetsMHz, int memoryOffsetMhz = 0)
         {
             if (GpuInteropGuard.IsBlocked) return 0;
 
-            DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: {offsetsMHz.Count} points");
+            DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: {offsetsMHz.Count} points, memory offset {memoryOffsetMhz} MHz");
+
+            // Baseline for the readback: NVML reports the current pstate's clock.
+            ClockInfo? before = TryGetClocks(out ClockInfo baseline) ? baseline : null;
+
+            int applied = -1;
+            bool engineHandled = false;
 
             if (Tuning != null)
             {
                 try
                 {
-                    var engine = Tuning.ApplyVfCurveAsync(offsetsMHz).GetAwaiter().GetResult();
+                    var engine = Tuning.ApplyVfCurveAsync(offsetsMHz, memoryOffsetMhz).GetAwaiter().GetResult();
                     if (engine.Succeeded)
                     {
                         DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: engine applied {engine.AppliedPoints} points");
-                        return engine.AppliedPoints;
+                        applied = engine.AppliedPoints;
+                        engineHandled = true;
                     }
-
-                    DiagnosticLogger.LogWarning(
-                        $"ApplyVfCurveOffsets_ClockBoostTable: engine refused 0x{engine.Status:X} ({engine.Detail}) - trying the local NVAPI write");
+                    else if (engine.AppliedPoints > 0)
+                    {
+                        // The curve landed but the engine's memory write did not. Re-running
+                        // the curve locally would fix nothing, so report what happened and let
+                        // the readback below say whether the offset is in force after all.
+                        DiagnosticLogger.LogWarning(
+                            $"ApplyVfCurveOffsets_ClockBoostTable: engine applied {engine.AppliedPoints} points but refused 0x{engine.Status:X} ({engine.Detail})");
+                        applied = engine.AppliedPoints;
+                        engineHandled = true;
+                    }
+                    else
+                    {
+                        DiagnosticLogger.LogWarning(
+                            $"ApplyVfCurveOffsets_ClockBoostTable: engine refused 0x{engine.Status:X} ({engine.Detail}) - trying the local NVAPI write");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -984,10 +1085,14 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 }
             }
 
-            return ApplyVfCurveOffsets_ClockBoostTableLocal(offsetsMHz);
+            if (!engineHandled)
+                applied = ApplyVfCurveOffsets_ClockBoostTableLocal(offsetsMHz, memoryOffsetMhz);
+
+            VerifyMemoryOffset("ApplyVfCurveOffsets_ClockBoostTable", memoryOffsetMhz, before);
+            return applied;
         }
 
-        private static int ApplyVfCurveOffsets_ClockBoostTableLocal(Dictionary<int, int> offsetsMHz)
+        private static int ApplyVfCurveOffsets_ClockBoostTableLocal(Dictionary<int, int> offsetsMHz, int memoryOffsetMhz)
         {
             try
             {
@@ -1004,42 +1109,28 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 // Green-curve buffer layout (verified working):
                 // Offset 0x00: version (v1, (1<<16) | size)
-                // Offset 0x04: 32-byte bitmap mask (one bit per point index)
-                // Offset 0x24: padding / unknown (0x24 to 0x44)
+                // Offset 0x04: 16-byte bitmap mask (one bit per point index)
+                // Offset 0x14: unknown1 (48 bytes) - not mask; stamping 0xFF here is refused
                 // Offset 0x44: entries start, stride = 0x24 (36 bytes) per point
                 //   Each entry: 5 uint32 + FrequencyDeltaInkHz(4) + 3 uint32 = 36 bytes
                 //   FrequencyDeltaInkHz at offset 0x14 within each entry
-                // Total buffer: 0x2420 (9248 bytes) � supports up to 255 point indices
+                // The delta array extends past 80 entries (0xB84 is point 80's entry base, not
+                // a memory region); the memory region is not mapped - a value there makes the
+                // driver refuse the whole call (measured 2026-11-16).
+                // Total buffer: 0x2420 (9248 bytes) - supports up to 255 point indices
 
-                const int bufferSize = 0x2420;
-                const int entryStride = 0x24; // 36 bytes per entry
-                const int freqDeltaOffset = 0x14; // _FrequencyDeltaInkHz within each entry
+                // Clocks first, curve last: a pstate write after the curve is what erases it
+                // (measured 2026-11-16 - the old "memory offset re-applied after the curve").
+                if (memoryOffsetMhz != 0)
+                    ApplyMemoryOffsetLocal(memoryOffsetMhz);
 
-                byte[] buffer = new byte[bufferSize];
+                // Read-modify-write: a refused read falls back to the from-zero buffer, and says
+                // so instead of passing the blank table off as preserved state.
+                byte[]? current = ReadControlTable(gpu, out byte[] readback) ? readback : null;
+                if (current == null)
+                    DiagnosticLogger.LogInfo("ApplyVfCurveOffsets_ClockBoostTable: curve readback refused - writing a from-zero table, fields outside the point deltas are not preserved");
 
-                // Version: v1, size = bufferSize
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), (1 << 16) | bufferSize);
-
-                // Set mask bits and frequency deltas for all points.
-                // Match green-curve's per-point layout: clear 32-byte mask region,
-                // then set bits and write deltas in a single batch.
-                foreach (var kvp in offsetsMHz)
-                {
-                    int pointIndex = kvp.Key;
-                    if (pointIndex < 0 || pointIndex >= UsableVfPointCount) continue;
-
-                    // Set mask bit � bitmap at offset 0x04, one bit per point index
-                    int maskByteOffset = 0x04 + (pointIndex / 8);
-                    int maskBit = pointIndex % 8;
-                    buffer[maskByteOffset] |= (byte)(1 << maskBit);
-
-                    // Write frequency delta (kHz)
-                    int deltaOffset = 0x44 + pointIndex * entryStride + freqDeltaOffset;
-                    if (deltaOffset + 4 <= bufferSize)
-                    {
-                        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(deltaOffset, 4), kvp.Value * Kilo);
-                    }
-                }
+                byte[] buffer = PrepareClockBoostWriteTable(current, offsetsMHz);
 
                 int status = setControl(gpu, buffer);
                 DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: setControl returned 0x{status:X}");
@@ -1057,6 +1148,84 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: EXCEPTION {ex.Message}");
                 return -1;
             }
+        }
+
+        /// <summary>
+        /// The app-side memory pstate write, the engine verb's mirror: a Memory delta and no
+        /// core offset (the curve owns the core). Run BEFORE the curve - a pstate write after
+        /// it erases the curve, and the curve leaves this offset in force.
+        /// </summary>
+        private static void ApplyMemoryOffsetLocal(int memoryOffsetMhz)
+        {
+            try
+            {
+                PhysicalGPU? internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
+                if (internalGpu == null) return;
+
+                var clocks = new[]
+                {
+                    new PerformanceStates20ClockEntryV1(
+                        PublicClockDomain.Memory,
+                        new PerformanceStates20ParameterDelta(memoryOffsetMhz * Kilo)),
+                };
+
+                var states = new[]
+                {
+                    new PerformanceState20(
+                        PerformanceStateId.P0_3DPerformance,
+                        clocks,
+                        Array.Empty<PerformanceStates20BaseVoltageEntryV1>()),
+                };
+
+                GPUApi.SetPerformanceStates20(internalGpu.Handle, new PerformanceStates20InfoV1(states, 2, 0));
+                DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: memory offset {memoryOffsetMhz} MHz applied before the curve");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogWarning($"ApplyVfCurveOffsets_ClockBoostTable: the memory offset {memoryOffsetMhz} MHz was refused: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// The 0x0733E009 buffer for a from-zero write: the curve's point deltas and nothing
+        /// else. The delta array extends past 80 entries, so 0xB84 is point 80's entry base and
+        /// not a memory region; the memory region is not mapped here - a value in it makes the
+        /// driver refuse the whole call (measured 2026-11-16).
+        /// </summary>
+        internal static byte[] BuildClockBoostTableBuffer(Dictionary<int, int> offsetsMHz) =>
+            PrepareClockBoostWriteTable(null, offsetsMHz);
+
+        /// <summary>
+        /// The buffer to write: the driver's current table when the read answered
+        /// (<paramref name="current"/>), otherwise a zero one, with this preset's point deltas
+        /// applied. Only the mask and the requested deltas are touched, so the version word, the
+        /// fields we do not understand and the deltas of points this preset leaves alone are
+        /// written back as read.
+        /// </summary>
+        internal static byte[] PrepareClockBoostWriteTable(byte[]? current, Dictionary<int, int> offsetsMHz)
+        {
+            const int bufferSize = 0x2420;
+            const int entryStride = 0x24;      // 36 bytes per point entry
+            const int freqDeltaOffset = 0x14;  // _FrequencyDeltaInkHz within each entry
+
+            byte[] buffer = current ?? new byte[bufferSize];
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), (1 << 16) | bufferSize);
+
+            // Only the mask field is rewritten: 0x14..0x23 is unknown1, and a mask that reached
+            // into it (the old 32-byte 0xFF) is what the driver refused.
+            buffer.AsSpan(0x04, ClockBoostMaskBytes).Clear();
+
+            foreach (var kvp in offsetsMHz)
+            {
+                int pointIndex = kvp.Key;
+                if (pointIndex < 0 || pointIndex >= UsableVfPointCount) continue;
+
+                buffer[0x04 + pointIndex / 8] |= (byte)(1 << (pointIndex % 8));
+                BinaryPrimitives.WriteInt32LittleEndian(
+                    buffer.AsSpan(0x44 + pointIndex * entryStride + freqDeltaOffset, 4), kvp.Value * Kilo);
+            }
+
+            return buffer;
         }
 
         /// <summary>
@@ -1203,7 +1372,13 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Reads the current VF control table via NvAPI getControl (0x23F1B133).
-        /// Required before setControl � the driver expects a valid base state.
+        /// Required before setControl so the driver starts from a valid base state.
+        ///
+        /// The mask is walked in 64-point (8-byte) windows: 4 and 8 mask bytes are answered
+        /// 0x00000000 and echoed back, while the old 32-byte 0xFF mask is answered 0xFFFFFFFF
+        /// and the table comes back empty (measured 2026-11-16). The mask field is 16 bytes
+        /// (0x04..0x13), so 32 also stamped unknown1 at 0x14..0x23. The driver fills only the
+        /// points it is asked for, hence the windows.
         /// </summary>
         private static bool ReadControlTable(IntPtr gpu, out byte[] buffer)
         {
@@ -1215,16 +1390,28 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             var getControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(getControlPtr);
 
             const int controlSize = 0x2420;
-            const int controlVersion = (1 << 16) | controlSize;
+            const int unknown1Offset = 0x04 + ClockBoostMaskBytes;
 
-            buffer = new byte[controlSize];
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), controlVersion);
+            byte[] merged = new byte[controlSize];
+            for (int firstPoint = 0; firstPoint < UsableVfPointCount; firstPoint += ClockBoostMaskWindowPoints)
+            {
+                byte[] read = new byte[controlSize];
+                BinaryPrimitives.WriteInt32LittleEndian(read.AsSpan(0, 4), (1 << 16) | controlSize);
 
-            // Set 32-byte mask to all 1s (request all points).
-            for (int i = 0; i < 32; i++)
-                buffer[0x04 + i] = 0xFF;
+                int lastPoint = Math.Min(firstPoint + ClockBoostMaskWindowPoints, UsableVfPointCount);
+                for (int point = firstPoint; point < lastPoint; point++)
+                    read[0x04 + point / 8] |= (byte)(1 << (point % 8));
 
-            return getControl(gpu, buffer) == 0;
+                if (getControl(gpu, read) != 0) return false;
+
+                // Everything but the per-window mask: the version echo, unknown1 and the
+                // selected point deltas.
+                Array.Copy(read, unknown1Offset, merged, unknown1Offset, controlSize - unknown1Offset);
+            }
+
+            BinaryPrimitives.WriteInt32LittleEndian(merged.AsSpan(0, 4), (1 << 16) | controlSize);
+            buffer = merged;
+            return true;
         }
 
         private static bool TryGetNvmlGpu(out IntPtr gpu)

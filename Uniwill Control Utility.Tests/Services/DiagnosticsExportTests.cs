@@ -103,6 +103,26 @@ public sealed class DiagnosticsExportTests
         }
     }
 
+    [Fact]
+    public void HardwareComposer_NamesTheMemoryOffsetAndWhetherItIsLive()
+    {
+        // A driver accepts the clock write and erases it with the next pstate write (field,
+        // 2026-11-16), so the report must carry the readback verdict, not the request.
+        Assert.Contains(
+            "GPU memory offset: +500 MHz (live) - memory 1750 -> 1812 MHz (+62) at pstate 0",
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected", memoryOffset: new UCU.Core.Gpu.MemoryOffsetVerdict(
+                500, true, true, "memory 1750 -> 1812 MHz (+62) at pstate 0")));
+
+        Assert.Contains(
+            "GPU memory offset: +500 MHz (NOT in force)",
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected", memoryOffset: new UCU.Core.Gpu.MemoryOffsetVerdict(
+                500, true, false, "memory reads 1750 MHz at pstate 0, the 1750 MHz stock clock")));
+
+        Assert.Contains(
+            "GPU memory offset: unknown (no clock or curve write this session)",
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected"));
+    }
+
     private static EcHardwareDumpDto Dump() => new()
     {
         EcVersionMajor = 116,
