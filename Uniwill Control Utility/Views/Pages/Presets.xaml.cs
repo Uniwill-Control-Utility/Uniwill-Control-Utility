@@ -246,6 +246,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            // The measurement tooltip is not in the visual tree until it opens, so its strings
+            // are applied explicitly instead of waiting for their own Loaded events.
+            LocalizationService.RefreshElement(spRomInfo);
+
             // Detect if a V-F curve preset has non-zero offsets on disk and activate it.
             // _vfActivePreset starts at -1; it gets set to 0 when the user opens the
             // curve editor. On app restart we need to re-detect so the "Curve" label
@@ -619,22 +623,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             _gpuPowerSupported = info?.Supported == true;
             sdNvidiaBody.IsEnabled = _gpuPowerSupported;
             sdNvidiaBody.Opacity = _gpuPowerSupported ? 1.0 : 0.55;
-            tbGpuPowerState.Visibility = Visibility.Visible;
-            tbGpuPowerDetail.Visibility = Visibility.Visible;
+            tbGpuPowerReason.Visibility = _gpuPowerSupported ? Visibility.Collapsed : Visibility.Visible;
 
             if (_gpuPowerSupported)
             {
-                tbGpuPowerState.Text = LocalizationService.Format("Board base TGP: {0} W", info!.DefaultTgpWatts);
-                tbGpuPowerDetail.Text = LocalizationService.Get("The preset's GPU wattage is measured against this base.");
                 return;
             }
 
             // Expanded as well as visible: the inert sliders and the reason are read together.
             sdNvidia.IsExpanded = true;
-            tbGpuPowerState.Text = LocalizationService.Get("GPU power control is not available on this machine.");
-            tbGpuPowerDetail.Text = RomReasonLine(string.IsNullOrWhiteSpace(info?.Reason)
-                ? LocalizationService.Get("The engine service is not available, so the current state could not be read.")
-                : info!.Reason);
+            tbGpuPowerReason.Text = LocalizationService.Get("GPU power control is not available on this machine.")
+                + " " + RomReasonLine(string.IsNullOrWhiteSpace(info?.Reason)
+                    ? LocalizationService.Get("The engine service is not available, so the current state could not be read.")
+                    : info!.Reason);
         }
 
         private bool IsHydroConnected => _waterCooler?.IsConnected == true;
@@ -2222,7 +2223,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             btnRomRestore.IsEnabled = restoreEnabled;
             btnRomRestore.Opacity = restoreEnabled ? 1.0 : 0.5;
 
-            chkRomConsent.Visibility = canUnlock ? Visibility.Visible : Visibility.Collapsed;
+            spRomConsentRow.Visibility = canUnlock ? Visibility.Visible : Visibility.Collapsed;
             chkRomConsent.IsEnabled = !busy;
 
             spRomBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
@@ -2349,6 +2350,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             milliwatts is int value ? (value / 1000.0).ToString("0.#") + " W" : "-- W";
 
         private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
+
+        // Hover opens the same tooltip; this is the keyboard's way in without a mouse.
+        private void btnRomInfo_Click(object sender, RoutedEventArgs e) => ttRomInfo.IsOpen = true;
 
         private void btnRomAdvanced_Click(object sender, RoutedEventArgs e)
         {
@@ -2527,27 +2531,27 @@ namespace Uniwill_Control_Utility.Views.Pages
             return true;
         }
 
-        /// <summary>"250 A · policy 210-294 A": what the rail carries now against the range the
-        /// slider can move it to — stock up to the driver's own maximum.</summary>
+        /// <summary>Each rail's value column carries what it draws now; its description carries
+        /// the range the slider spans — stock up to the driver's own maximum.</summary>
         private void UpdateRailReadouts()
         {
             UCU.Contracts.GpuRailLimitsDto? rails = _railLimits;
-            tbRailNvvdd.Text = RailText(sdRailNvvdd, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps, StockNvvddMilliamps, 0);
-            tbRailMsvdd.Text = RailText(sdRailMsvdd, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps, StockMsvddMilliamps, 0);
-            tbRailBoardInput.Text = RailText(sdRailBoardInput, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps, StockBoardInputMilliamps, 3);
+            UpdateRail(lblRailNvvdd, tbRailNvvdd, sdRailNvvdd, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps, StockNvvddMilliamps, 0);
+            UpdateRail(lblRailMsvdd, tbRailMsvdd, sdRailMsvdd, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps, StockMsvddMilliamps, 0);
+            UpdateRail(lblRailBoardInput, tbRailBoardInput, sdRailBoardInput, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps, StockBoardInputMilliamps, 3);
         }
 
-        private static string RailText(Slider slider, int? min, int? max, int stock, int decimals)
+        private static void UpdateRail(TextBlock value, TextBlock range, Slider slider, int? min, int? max, int stock, int decimals)
         {
-            if (min is not int low || max is not int high)
-                return "-- A";
-
             string format = AmpsFormat(decimals);
-            string policy = (Math.Max(low, stock) / 1000.0).ToString(format) + "-" + (high / 1000.0).ToString(format);
-            return LocalizationService.Format(
-                "{0} A · policy {1} A",
-                (slider.Value / 1000.0).ToString(format),
-                policy);
+            value.Text = (slider.Value / 1000.0).ToString(format) + " A";
+
+            range.Text = min is int low && max is int high
+                ? LocalizationService.Format(
+                    "Range {0}-{1} A",
+                    (Math.Max(low, stock) / 1000.0).ToString(format),
+                    (high / 1000.0).ToString(format))
+                : "-- A";
         }
 
         /// <summary>

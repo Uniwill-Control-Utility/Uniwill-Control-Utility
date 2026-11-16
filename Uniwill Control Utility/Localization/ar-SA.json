@@ -1142,8 +1142,6 @@
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "هذا يزيل التجاوز على مستوى برنامج التشغيل ويعيد تشغيل معالج الرسوميات. ستنطفئ الشاشة وستُغلق أي لعبة أو عمل على معالج الرسوميات قيد التشغيل.",
   "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "هذا يغيّر إعداد طاقة على مستوى برنامج التشغيل ويعيد تشغيل معالج الرسوميات. ستنطفئ الشاشة وستُغلق أي لعبة أو عمل على معالج الرسوميات قيد التشغيل. «استعادة الأصل» تلغي ذلك.",
   "GPU power control is not available on this machine.": "التحكم في طاقة وحدة معالجة الرسوميات غير متاح على هذا الجهاز.",
-  "Board base TGP: {0} W": "قدرة TGP الأساسية للوحة: {0} واط",
-  "The preset's GPU wattage is measured against this base.": "تُقاس طاقة وحدة معالجة الرسوميات في الإعداد المسبق بالنسبة إلى هذه القيمة.",
   "These values are machine-wide and are not saved with a preset.": "هذه القيم تخص الجهاز بالكامل ولا تُحفظ مع أي إعداد مسبق.",
   "NVVDD (GPU core)": "NVVDD (نواة كرت الرسوميات)",
   "MSVDD (memory)": "MSVDD (الذاكرة)",
@@ -1152,7 +1150,6 @@
   "Apply limits": "تطبيق الحدود",
   "Available once Extra GPU power is unlocked.": "متاح بعد رفع قفل الطاقة الإضافية لكرت الرسوميات.",
   "The current limits could not be read.": "تعذّر قراءة حدود التيار.",
-  "{0} A · policy {1} A": "{0} أمبير · المسموح {1} أمبير",
   "Applied: {0} A GPU, {1} A memory, {2} A board input": "مطبَّق: {0} أمبير للمعالج الرسوميات، {1} أمبير للذاكرة، {2} أمبير لدخل اللوحة",
   "Ceiling": "السقف",
   "Request": "الطلب",
@@ -1172,5 +1169,7 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "مع فرق نواة +233 ميغاهرتز قسنا 214 واط طاقة اللوحة عند 0,975-0,985 فولت، مع PerfCap VRel — لم تعد الطاقة هي الحد الفعلي. الفرق خاص بكل بطاقة وتضبطه في هذه الصفحة، وقد تتحمل وحدة أخرى أكثر أو تنهار عند قيمة أقل بكثير، ولم نقس أي قدرة بالواط بدون فرق. نقطة السخونة 58-63 °C عند 215 واط مع توصيل التبريد السائل، و81,7 °C بدونه.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "يتجاوز سياسة الطاقة في برنامج التشغيل فقط: البرنامج الثابت لمعالج الرسوميات لا يتغيّر، و«استعادة الأصل» يلغيه.",
   "Show advanced": "إظهار المتقدم",
-  "Hide advanced": "إخفاء المتقدم"
+  "Hide advanced": "إخفاء المتقدم",
+  "Range {0}-{1} A": "النطاق {0}-{1} A",
+  "Power limits and measurements": "حدود الطاقة والقياسات"
 }

@@ -1142,8 +1142,6 @@
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "यह ड्राइवर-स्तर का ओवरराइड हटाता है और GPU को पुनः चालू करता है। स्क्रीन खाली हो जाएगी और चल रहा कोई भी गेम या GPU कार्य बंद हो जाएगा।",
   "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "यह ड्राइवर-स्तर की पावर सेटिंग बदलता है और GPU को पुनः चालू करता है। स्क्रीन खाली हो जाएगी और चल रहा कोई भी गेम या GPU कार्य बंद हो जाएगा। \"मूल स्थिति में लौटाएँ\" इसे वापस ले लेता है।",
   "GPU power control is not available on this machine.": "इस मशीन पर GPU पावर नियंत्रण उपलब्ध नहीं है।",
-  "Board base TGP: {0} W": "बोर्ड का आधार TGP: {0} W",
-  "The preset's GPU wattage is measured against this base.": "प्रीसेट की GPU वाटेज इस आधार के सापेक्ष मापी जाती है।",
   "These values are machine-wide and are not saved with a preset.": "ये मान पूरी मशीन पर लागू होते हैं और किसी प्रीसेट के साथ सहेजे नहीं जाते।",
   "NVVDD (GPU core)": "NVVDD (GPU कोर)",
   "MSVDD (memory)": "MSVDD (मेमोरी)",
@@ -1152,7 +1150,6 @@
   "Apply limits": "सीमाएँ लागू करें",
   "Available once Extra GPU power is unlocked.": "एक्स्ट्रा GPU पावर अनलॉक होने के बाद उपलब्ध।",
   "The current limits could not be read.": "करंट सीमाएँ पढ़ी नहीं जा सकीं।",
-  "{0} A · policy {1} A": "{0} A · अनुमत {1} A",
   "Applied: {0} A GPU, {1} A memory, {2} A board input": "लागू: {0} A GPU, {1} A मेमोरी, {2} A बोर्ड इनपुट",
   "Ceiling": "सीमा",
   "Request": "अनुरोध",
@@ -1172,5 +1169,7 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "+233 MHz कोर ऑफ़सेट के साथ हमने 0.975-0.985 V पर 214 W बोर्ड पावर मापी, PerfCap VRel — पावर अब बाधा नहीं थी। ऑफ़सेट हर कार्ड का अपना होता है और इस पेज पर सेट होता है; कोई दूसरी यूनिट अधिक सह सकती है या इससे बहुत कम पर क्रैश कर सकती है, और बिना ऑफ़सेट हमने कोई वाट क्षमता नहीं मापी है। तरल कूलर जुड़ा होने पर 215 W पर हॉटस्पॉट 58-63 °C, बिना कूलर 81.7 °C।",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "केवल ड्राइवर की पावर नीति को ओवरराइड करता है: GPU का फ़र्मवेयर नहीं बदलता, और \"मूल स्थिति में लौटाएँ\" इसे वापस ले लेता है।",
   "Show advanced": "उन्नत दिखाएँ",
-  "Hide advanced": "उन्नत छिपाएँ"
+  "Hide advanced": "उन्नत छिपाएँ",
+  "Range {0}-{1} A": "सीमा {0}-{1} A",
+  "Power limits and measurements": "पावर सीमाएँ और माप"
 }

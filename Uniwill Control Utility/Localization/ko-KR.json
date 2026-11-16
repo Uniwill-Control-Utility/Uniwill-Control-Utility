@@ -1142,8 +1142,6 @@
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "드라이버 수준 재정의를 제거하고 GPU를 다시 시작합니다. 화면이 꺼지고 실행 중인 게임이나 GPU 작업이 종료됩니다.",
   "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "드라이버 수준의 전력 설정을 변경하고 GPU를 다시 시작합니다. 화면이 꺼지고 실행 중인 게임이나 GPU 작업이 종료됩니다. “원래대로 복원”으로 되돌릴 수 있습니다.",
   "GPU power control is not available on this machine.": "이 컴퓨터에서는 GPU 전력 제어를 사용할 수 없습니다.",
-  "Board base TGP: {0} W": "보드 기본 TGP: {0} W",
-  "The preset's GPU wattage is measured against this base.": "프리셋의 GPU 전력은 이 기준을 기준으로 측정됩니다.",
   "These values are machine-wide and are not saved with a preset.": "이 값은 기기 전체에 적용되며 프리셋에 저장되지 않습니다.",
   "NVVDD (GPU core)": "NVVDD (GPU 코어)",
   "MSVDD (memory)": "MSVDD (메모리)",
@@ -1152,7 +1150,6 @@
   "Apply limits": "제한 적용",
   "Available once Extra GPU power is unlocked.": "추가 GPU 전력을 잠금 해제하면 사용할 수 있습니다.",
   "The current limits could not be read.": "전류 제한을 읽지 못했습니다.",
-  "{0} A · policy {1} A": "{0} A · 허용 {1} A",
   "Applied: {0} A GPU, {1} A memory, {2} A board input": "적용됨: {0} A GPU, {1} A 메모리, {2} A 보드 입력",
   "Ceiling": "상한",
   "Request": "요청",
@@ -1172,5 +1169,7 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "+233 MHz 코어 오프셋으로 0.975-0.985 V에서 보드 전력 214 W, PerfCap VRel을 측정했습니다 — 전력은 더 이상 제한 요인이 아니었습니다. 오프셋은 카드마다 다르며 이 페이지에서 설정합니다. 다른 장치는 더 버티거나 훨씬 낮은 값에서 멈출 수 있고, 오프셋 없이 측정한 전력은 없습니다. 핫스팟은 액체 쿨러를 연결한 215 W에서 58-63 °C, 연결하지 않으면 81.7 °C입니다.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "드라이버의 전력 정책만 덮어씁니다. GPU 펌웨어는 변경하지 않으며 “원래대로 복원”으로 되돌릴 수 있습니다.",
   "Show advanced": "고급 설정 표시",
-  "Hide advanced": "고급 설정 숨기기"
+  "Hide advanced": "고급 설정 숨기기",
+  "Range {0}-{1} A": "범위 {0}-{1} A",
+  "Power limits and measurements": "전력 한도 및 측정값"
 }

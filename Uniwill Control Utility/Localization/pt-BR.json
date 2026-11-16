@@ -1142,8 +1142,6 @@
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Isso remove a substituição no nível do driver e reinicia a GPU. A tela fica preta e qualquer jogo ou carga de GPU em execução será fechado.",
   "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Isso altera uma configuração de energia no nível do driver e reinicia a GPU. A tela fica preta e qualquer jogo ou carga de GPU em execução será fechado. “Restaurar original” desfaz a mudança.",
   "GPU power control is not available on this machine.": "O controle de energia da GPU não está disponível nesta máquina.",
-  "Board base TGP: {0} W": "TGP base da placa: {0} W",
-  "The preset's GPU wattage is measured against this base.": "A potência da GPU do perfil é medida em relação a esta base.",
   "These values are machine-wide and are not saved with a preset.": "Estes valores valem para a máquina inteira e não são salvos em um perfil.",
   "NVVDD (GPU core)": "NVVDD (núcleo da GPU)",
   "MSVDD (memory)": "MSVDD (memória)",
@@ -1152,7 +1150,6 @@
   "Apply limits": "Aplicar limites",
   "Available once Extra GPU power is unlocked.": "Disponível depois de desbloquear a potência extra da GPU.",
   "The current limits could not be read.": "Não foi possível ler os limites de corrente.",
-  "{0} A · policy {1} A": "{0} A · permitido {1} A",
   "Applied: {0} A GPU, {1} A memory, {2} A board input": "Aplicado: {0} A GPU, {1} A memória, {2} A entrada da placa",
   "Ceiling": "Teto",
   "Request": "Solicitação",
@@ -1172,5 +1169,7 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Com offset de +233 MHz no núcleo medimos 214 W de potência da placa a 0,975-0,985 V, com PerfCap VRel — a potência já não era o limite. O offset é de cada placa e você o define nesta página; outra unidade pode aceitar mais ou travar bem abaixo, e não medimos nenhuma potência sem offset. Ponto quente 58-63 °C a 215 W com o resfriamento líquido conectado, 81,7 °C sem ele.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Substitui apenas a política de energia do driver: o firmware da GPU não muda e “Restaurar original” desfaz a mudança.",
   "Show advanced": "Mostrar avançado",
-  "Hide advanced": "Ocultar avançado"
+  "Hide advanced": "Ocultar avançado",
+  "Range {0}-{1} A": "Intervalo {0}-{1} A",
+  "Power limits and measurements": "Limites de energia e medições"
 }

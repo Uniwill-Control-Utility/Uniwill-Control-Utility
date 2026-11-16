@@ -1142,8 +1142,6 @@
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Ini menghapus penggantian tingkat driver dan memulai ulang GPU. Layar akan menjadi hitam, dan game atau beban kerja GPU yang berjalan akan tertutup.",
   "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "Ini mengubah pengaturan daya tingkat driver dan memulai ulang GPU. Layar akan menjadi hitam, dan game atau beban kerja GPU yang berjalan akan tertutup. “Pulihkan asli” membatalkannya.",
   "GPU power control is not available on this machine.": "Kontrol daya GPU tidak tersedia di mesin ini.",
-  "Board base TGP: {0} W": "TGP dasar papan: {0} W",
-  "The preset's GPU wattage is measured against this base.": "Daya GPU preset diukur terhadap dasar ini.",
   "These values are machine-wide and are not saved with a preset.": "Nilai ini berlaku untuk seluruh mesin dan tidak disimpan bersama preset.",
   "NVVDD (GPU core)": "NVVDD (inti GPU)",
   "MSVDD (memory)": "MSVDD (memori)",
@@ -1152,7 +1150,6 @@
   "Apply limits": "Terapkan batas",
   "Available once Extra GPU power is unlocked.": "Tersedia setelah daya GPU tambahan dibuka.",
   "The current limits could not be read.": "Batas arus tidak dapat dibaca.",
-  "{0} A · policy {1} A": "{0} A · diizinkan {1} A",
   "Applied: {0} A GPU, {1} A memory, {2} A board input": "Diterapkan: {0} A GPU, {1} A memori, {2} A masukan papan",
   "Ceiling": "Batas atas",
   "Request": "Permintaan",
@@ -1172,5 +1169,7 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Dengan offset inti +233 MHz kami mengukur 214 W daya papan pada 0,975-0,985 V, dengan PerfCap VRel — daya bukan lagi batasnya. Offset bersifat per kartu dan diatur di halaman ini; unit lain bisa lebih tahan atau gagal jauh di bawahnya, dan kami belum mengukur watt apa pun tanpa offset. Titik panas 58-63 °C pada 215 W dengan pendingin cair terpasang, 81,7 °C tanpanya.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Hanya menimpa kebijakan daya driver: firmware GPU tidak diubah, dan “Pulihkan asli” membatalkannya.",
   "Show advanced": "Tampilkan lanjutan",
-  "Hide advanced": "Sembunyikan lanjutan"
+  "Hide advanced": "Sembunyikan lanjutan",
+  "Range {0}-{1} A": "Rentang {0}-{1} A",
+  "Power limits and measurements": "Batas daya dan pengukuran"
 }

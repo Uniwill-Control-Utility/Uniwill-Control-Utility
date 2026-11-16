@@ -1142,8 +1142,6 @@
   "This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "ドライバーレベルの上書きを削除し、GPU を再起動します。画面が暗くなり、実行中のゲームや GPU 処理は終了します。",
   "This changes a driver-level power setting and restarts the GPU. The screen goes blank, and any running game or GPU workload will close. Restore stock undoes it.": "ドライバーレベルの電力設定を変更し、GPU を再起動します。画面が暗くなり、実行中のゲームや GPU 処理は終了します。「元に戻す」で取り消せます。",
   "GPU power control is not available on this machine.": "このマシンでは GPU の電力制御を利用できません。",
-  "Board base TGP: {0} W": "ボードの基準 TGP: {0} W",
-  "The preset's GPU wattage is measured against this base.": "プリセットの GPU ワット数はこの基準に対して測定されます。",
   "These values are machine-wide and are not saved with a preset.": "この値はマシン全体に適用され、プリセットには保存されません。",
   "NVVDD (GPU core)": "NVVDD (GPU コア)",
   "MSVDD (memory)": "MSVDD (メモリ)",
@@ -1152,7 +1150,6 @@
   "Apply limits": "上限を適用",
   "Available once Extra GPU power is unlocked.": "GPU の追加電力をロック解除すると利用できます。",
   "The current limits could not be read.": "電流上限を読み取れませんでした。",
-  "{0} A · policy {1} A": "{0} A · 許容 {1} A",
   "Applied: {0} A GPU, {1} A memory, {2} A board input": "適用中: {0} A GPU、{1} A メモリ、{2} A ボード入力",
   "Ceiling": "上限",
   "Request": "要求",
@@ -1172,5 +1169,7 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "+233 MHz のコアオフセットで測定: 0.975-0.985 V でボード電力 214 W、PerfCap VRel — 電力はもう制限要因ではありませんでした。オフセットはカードごとに異なりこのページで設定します。別の個体ではもっと耐えることも、はるかに低い値で落ちることもあり、オフセットなしのワット数は測っていません。ホットスポットは液冷接続時 215 W で 58-63 °C、未接続時は 81.7 °C です。",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "上書きするのはドライバーの電力ポリシーだけです。GPU のファームウェアは変更せず、「元に戻す」で取り消せます。",
   "Show advanced": "詳細を表示",
-  "Hide advanced": "詳細を隠す"
+  "Hide advanced": "詳細を隠す",
+  "Range {0}-{1} A": "範囲 {0}-{1} A",
+  "Power limits and measurements": "電力上限と測定値"
 }
