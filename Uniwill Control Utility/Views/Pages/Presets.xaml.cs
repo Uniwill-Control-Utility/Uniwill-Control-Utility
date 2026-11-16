@@ -2276,6 +2276,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         ///
         /// What the colours mean, stated once here — and every colour is rendered next to its
         /// own word, so no state depends on colour alone:
+        ///   Raised (success)   — the ceiling cell only. The driver's policy maximum is at or
+        ///                        above 250 W, so the records took. Permission, not a target:
+        ///                        nothing ever draws 250 W, the 225 W request below is the
+        ///                        number we measured.
+        ///   Low (caution)      — the ceiling cell only: read, but below 250 W, so the records
+        ///                        did not take and the driver clamps the request.
         ///   Tested (success)   — applied and inside the measured configuration: request at or
         ///                        above the 225 W target, budget at or above the request, and
         ///                        every rail at or below 250 / 70 / 14.026 A.
@@ -2307,7 +2313,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             int? board = state.BoardInputCurrentMilliamps;
 
             SetRomValue(tbRomStatCeiling, tbRomStatCeilingWord, Watts(ceiling),
-                ceiling is not null, unverified, ceiling is int c && c >= TestedCeilingMilliwatts);
+                ceiling is not null, unverified, ceiling is int c && c >= TestedCeilingMilliwatts,
+                testedWord: "Raised", untestedWord: "Low");
             SetRomValue(tbRomStatRequest, tbRomStatRequestWord, Watts(request),
                 request is not null, unverified, request is int r && r >= TestedTargetMilliwatts);
 
@@ -2325,7 +2332,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private void SetRomValue(
-            TextBlock valueText, TextBlock wordText, string text, bool read, bool unverified, bool tested)
+            TextBlock valueText, TextBlock wordText, string text, bool read, bool unverified, bool tested,
+            string testedWord = "Tested", string untestedWord = "Untested")
         {
             valueText.Text = text;
 
@@ -2334,8 +2342,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 : unverified
                     ? ("Unverified", "SystemFillColorCriticalBrush")
                     : tested
-                        ? ("Tested", "SystemFillColorSuccessBrush")
-                        : ("Untested", "SystemFillColorCautionBrush");
+                        ? (testedWord, "SystemFillColorSuccessBrush")
+                        : (untestedWord, "SystemFillColorCautionBrush");
 
             wordText.Text = LocalizationService.Get(word);
             System.Windows.Media.Brush colour = (System.Windows.Media.Brush)FindResource(brush);
@@ -2359,7 +2367,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 LocalizationService.Format("{0}: {1}", LocalizationService.Get(label), value);
 
             tbRomInfo.Text = string.Join("\n",
-                Row("Ceiling", "250 W"),
+                Row("Ceiling (driver)", "250 W"),
                 Row("Target", "225 W"),
                 Row("Rails", "250 A · 70 A · 14.026 A"),
                 Row("Stock rails", "210 A · 60 A · 11.053 A"),
