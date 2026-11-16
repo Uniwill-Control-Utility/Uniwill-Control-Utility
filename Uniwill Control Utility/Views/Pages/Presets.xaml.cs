@@ -2158,6 +2158,19 @@ namespace Uniwill_Control_Utility.Views.Pages
         private string? _railLimitsNote;
         private bool _railBinding;
 
+        // The tested tier and the stock rails, the UI's own copy of what the engine ships
+        // (GpuPowerTiers.ExtraGpuPower and RomOverrideLayout.Stock*MilliAmps in UCU.Hardware,
+        // which this project does not reference). The status row judges a reading against these
+        // without asking the engine what "tested" means, and the slider floor is the stock rail.
+        private const int TestedCeilingMilliwatts = 250_000;
+        private const int TestedTargetMilliwatts = 225_000;
+        private const int TestedNvvddMilliamps = 250_000;
+        private const int TestedMsvddMilliamps = 70_000;
+        private const int TestedBoardInputMilliamps = 14_026;
+        private const int StockNvvddMilliamps = 210_000;
+        private const int StockMsvddMilliamps = 60_000;
+        private const int StockBoardInputMilliamps = 11_053;
+
         private async Task RefreshRomOverrideAsync()
         {
             _gpuTuning ??= App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
@@ -2198,86 +2211,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool blocked = state?.State == UCU.Contracts.GpuRomOverrideStates.Unsupported;
             bool canUnlock = state != null && !unlocked && !blocked;
 
-            // Nothing renders before the first read, so the card never shows an empty
-            // status bar while the engine is being asked.
-            RomOverrideStatus.Visibility = Visibility.Visible;
-
-            // The read-back is what the engine read from the driver, never what was asked
-            // for. The tier values are labelled by ownership (applied vs. only proposed)
-            // and the live NVML limit is always its own line.
-            if (state == null)
-            {
-                spRomReadback.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                double ceilingW = state.PowerMilliwatts / 1000.0;
-                double nvVddA = state.NvVddMilliAmps / 1000.0;
-                double msVddA = state.MsVddMilliAmps / 1000.0;
-                double boardA = state.BoardInputMilliAmps / 1000.0;
-
-                spRomReadback.Visibility = Visibility.Visible;
-                tbRomTier.Text = unlocked
-                    ? LocalizationService.Format(
-                        "Applied: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
-                        ceilingW, nvVddA, msVddA, boardA)
-                    : LocalizationService.Format(
-                        "Would set: ceiling {0} W · {1} A GPU, {2} A memory, {3} A board input",
-                        ceilingW, nvVddA, msVddA, boardA);
-                tbRomCeiling.Text = state.CeilingLimitMilliwatts is int ceiling
-                    ? LocalizationService.Format("Live ceiling: {0} W", ceiling / 1000.0)
-                    : LocalizationService.Get("Live ceiling: not read");
-                // The request is the number that matters: the driver enforces it against the
-                // ceiling and the laptop's budget, and NVML's limit symbol answers
-                // NOT_SUPPORTED on this driver, so it is not reported at all.
-                tbRomRequest.Text = state.RequestedLimitMilliwatts is int request
-                    ? LocalizationService.Format("Live request: {0} W", request / 1000.0)
-                    : LocalizationService.Get("Live request: not read");
-                tbRomBudget.Text = state.BudgetMilliwatts is int budget
-                    ? LocalizationService.Format("Live budget: {0} W", budget / 1000.0)
-                    : LocalizationService.Get("Live budget: not read");
-            }
-
-            if (state == null)
-            {
-                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Informational;
-                RomOverrideStatus.Title = LocalizationService.Get(
-                    "The engine service is not available, so the current state could not be read.");
-                RomOverrideStatus.Message = string.Empty;
-            }
-            else if (blocked)
-            {
-                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Warning;
-                RomOverrideStatus.Title = LocalizationService.Get("The override cannot be used on this machine.");
-                RomOverrideStatus.Message = RomReasonLine(state.Reason) + "\n\n" + LocalizationService.Get(
-                    "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU.");
-            }
-            else if (uncertain)
-            {
-                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Warning;
-                RomOverrideStatus.Title = LocalizationService.Get("Partly applied: the change could not be verified.");
-                RomOverrideStatus.Message = RomReasonLine(state.Reason);
-            }
-            else if (unlocked)
-            {
-                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Success;
-                RomOverrideStatus.Title = LocalizationService.Get("Unlocked: the driver is enforcing the raised ceiling.");
-                RomOverrideStatus.Message = RomReasonLine(state.Reason);
-            }
-            else
-            {
-                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Informational;
-                RomOverrideStatus.Title = LocalizationService.Get("Stock power limit: the GPU runs on the firmware's own ceiling.");
-                RomOverrideStatus.Message = RomReasonLine(state.Reason);
-            }
-
-            if (_romOverrideError != null)
-            {
-                RomOverrideStatus.Severity = Wpf.Ui.Controls.InfoBarSeverity.Warning;
-                RomOverrideStatus.Title = LocalizationService.Get("The state could not be read back");
-                RomOverrideStatus.Message = RomReasonLine(_romOverrideError);
-            }
-
             // Both actions stay visible; each is gated separately and dimmed when off.
             bool consent = chkRomConsent.IsChecked == true;
             bool powerBoost = Settings.Default.EnablePowerBoostMode;
@@ -2294,24 +2227,136 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             spRomBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
 
-            // Never a control that looks live but ignores the click: the reason sits
-            // right under the buttons. State-driven disables (already unlocked, nothing
-            // staged, refused) are explained by the status line above.
-            tbRomOverrideNote.Text = busy
-                ? LocalizationService.Get("Restarting the GPU. The screen may go blank for up to 60 seconds.")
-                : canUnlock && !powerBoost
-                    ? LocalizationService.Get("Turn on Power boost mode in Settings first.")
-                    : canUnlock && !consent
-                        ? LocalizationService.Get("Tick the statement above first.")
-                        : string.Empty;
+            // One line, and only where there is something to explain: a refusal, a partial
+            // apply, a failed read, or the reason an action is dimmed. A clean unlock needs no
+            // sentence — the values row on the status card is the state, and the buttons moved
+            // when it changed.
+            string? line = busy
+                ? null
+                : _romOverrideError != null
+                    ? WithReason(LocalizationService.Get("The state could not be read back"), _romOverrideError)
+                    : state == null
+                        ? LocalizationService.Get("The engine service is not available, so the current state could not be read.")
+                        : blocked
+                            ? WithReason(
+                                LocalizationService.Get("The override cannot be used on this machine.") + "\n" + LocalizationService.Get(
+                                    "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU."),
+                                state.Reason)
+                            : uncertain
+                                ? WithReason(LocalizationService.Get("Partly applied: the change could not be verified."), state.Reason)
+                                : canUnlock && !powerBoost
+                                    ? LocalizationService.Get("Turn on Power boost mode in Settings first.")
+                                    : canUnlock && !consent
+                                        ? LocalizationService.Get("Tick the statement above first.")
+                                        : null;
 
-            // The rail sliders are gated on this same state, so they re-render with it.
+            tbRomOverrideNote.Text = line ?? string.Empty;
+            tbRomOverrideNote.Visibility = string.IsNullOrEmpty(line) ? Visibility.Collapsed : Visibility.Visible;
+
+            // The colour is decoration on a sentence that already says what is wrong.
+            tbRomOverrideNote.Foreground = (System.Windows.Media.Brush)FindResource(
+                !busy && (_romOverrideError != null || blocked || uncertain)
+                    ? "SystemFillColorCautionBrush"
+                    : "TextFillColorSecondaryBrush");
+
+            // Both follow this same state, so they re-render with it.
+            RenderRomStatusRow();
             RenderRailLimits();
         }
 
         private static string RomReasonLine(string? reason) =>
             string.IsNullOrWhiteSpace(reason) ? string.Empty : LocalizationService.Format("Reason: {0}", reason);
+
+        private static string WithReason(string text, string? reason) =>
+            string.IsNullOrWhiteSpace(reason) ? text : text + "\n" + RomReasonLine(reason);
+
+        /// <summary>
+        /// The unlock's numbers as the status card's second row: the three power values and the
+        /// three rails, each the driver's own read-back rather than the tier's request. The row
+        /// exists only while the unlock is applied (Unlocked or Uncertain); with it off, the
+        /// card above already says what the GPU runs on.
+        ///
+        /// What the colours mean, stated once here — and every colour is rendered next to its
+        /// own word, so no state depends on colour alone:
+        ///   Tested (success)   — applied and inside the measured configuration: request at or
+        ///                        above the 225 W target, budget at or above the request, and
+        ///                        every rail at or below 250 / 70 / 14.026 A.
+        ///   Untested (caution) — applied but outside it: budget below the request, request below
+        ///                        the target, or a rail above the tested value. Above 14.026 A on
+        ///                        the board input that is also the adapter-overload case.
+        ///   Unverified         — critical: refused or unverified (Unsupported / Uncertain).
+        ///   Not read           — critical: the driver could not be asked for that number, which
+        ///                        is not the same as a number that is fine.
+        /// </summary>
+        private void RenderRomStatusRow()
+        {
+            UCU.Contracts.GpuRomOverrideStateDto? state = _romOverride;
+            bool applied = state?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked
+                           || state?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain;
+
+            spRomStatusRow.Visibility = applied ? Visibility.Visible : Visibility.Collapsed;
+            if (!applied)
+                return;
+
+            // A partial apply is not a verdict: the numbers can read right and still be unverified.
+            bool unverified = state!.State != UCU.Contracts.GpuRomOverrideStates.Unlocked;
+
+            int? ceiling = state.CeilingLimitMilliwatts;
+            int? request = state.RequestedLimitMilliwatts;
+            int? budget = state.BudgetMilliwatts;
+            int? nvvdd = state.NvvddCurrentMilliamps;
+            int? msvdd = state.MsvddCurrentMilliamps;
+            int? board = state.BoardInputCurrentMilliamps;
+
+            SetRomValue(tbRomStatCeiling, tbRomStatCeilingWord, Watts(ceiling),
+                ceiling is not null, unverified, ceiling is int c && c >= TestedCeilingMilliwatts);
+            SetRomValue(tbRomStatRequest, tbRomStatRequestWord, Watts(request),
+                request is not null, unverified, request is int r && r >= TestedTargetMilliwatts);
+
+            // The driver enforces min(request, budget), so a budget under the request is the
+            // laptop's own cap holding the GPU back, not a fault.
+            SetRomValue(tbRomStatBudget, tbRomStatBudgetWord, Watts(budget),
+                budget is not null, unverified, budget is int b && b >= (request ?? TestedTargetMilliwatts));
+
+            SetRomValue(tbRomStatNvvdd, tbRomStatNvvddWord, Amps(nvvdd, 0) + " A",
+                nvvdd is not null, unverified, nvvdd is int n && n <= TestedNvvddMilliamps);
+            SetRomValue(tbRomStatMsvdd, tbRomStatMsvddWord, Amps(msvdd, 0) + " A",
+                msvdd is not null, unverified, msvdd is int m && m <= TestedMsvddMilliamps);
+            SetRomValue(tbRomStatBoard, tbRomStatBoardWord, Amps(board, 3) + " A",
+                board is not null, unverified, board is int i && i <= TestedBoardInputMilliamps);
+        }
+
+        private void SetRomValue(
+            TextBlock valueText, TextBlock wordText, string text, bool read, bool unverified, bool tested)
+        {
+            valueText.Text = text;
+
+            (string word, string brush) = !read
+                ? ("Not read", "SystemFillColorCriticalBrush")
+                : unverified
+                    ? ("Unverified", "SystemFillColorCriticalBrush")
+                    : tested
+                        ? ("Tested", "SystemFillColorSuccessBrush")
+                        : ("Untested", "SystemFillColorCautionBrush");
+
+            wordText.Text = LocalizationService.Get(word);
+            System.Windows.Media.Brush colour = (System.Windows.Media.Brush)FindResource(brush);
+            valueText.Foreground = colour;
+            wordText.Foreground = colour;
+        }
+
+        private static string Watts(int? milliwatts) =>
+            milliwatts is int value ? (value / 1000.0).ToString("0.#") + " W" : "-- W";
+
         private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
+
+        private void btnRomAdvanced_Click(object sender, RoutedEventArgs e)
+        {
+            bool show = spRomAdvanced.Visibility != Visibility.Visible;
+            spRomAdvanced.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            tbRomAdvanced.Text = LocalizationService.Get(show ? "Hide advanced" : "Show advanced");
+            icRomAdvanced.Glyph = show ? "\uE70E" : "\uE70D";
+        }
 
         private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>
             await RunRomOverrideAsync(restore: false);
@@ -2380,6 +2425,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _romOverrideBusy = false;
                 RenderRomOverride();
+
+                // The unlock rewrote the driver's own policy, and that policy is where the
+                // sliders get their bounds: without this read they would keep the stock range
+                // and stay inert until the page was reloaded.
+                await RefreshRailLimitsAsync();
             }
         }
 
@@ -2430,9 +2480,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 bounded =
-                    BindRail(sdRailNvvdd, rails?.NvvddMilliamps, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps) &
-                    BindRail(sdRailMsvdd, rails?.MsvddMilliamps, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps) &
-                    BindRail(sdRailBoardInput, rails?.BoardInputMilliamps, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps);
+                    BindRail(sdRailNvvdd, rails?.NvvddMilliamps, StockNvvddMilliamps, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps) &
+                    BindRail(sdRailMsvdd, rails?.MsvddMilliamps, StockMsvddMilliamps, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps) &
+                    BindRail(sdRailBoardInput, rails?.BoardInputMilliamps, StockBoardInputMilliamps, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps);
             }
             finally
             {
@@ -2459,39 +2509,41 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// One rail's slider bounds and position, from the driver's own policy: before an
-        /// unlock that policy is the stock value at both ends, so the slider is inert by
-        /// construction instead of by a rule. False when a number is missing — a guessed
-        /// range is worse than a disabled row.
+        /// One rail's slider bounds and position. The floor is the stock rail, not the driver's
+        /// own minimum: below stock the unlock cannot take the board past its stock 175 W ROM
+        /// ceiling, so those values would change nothing. The driver's policy maximum still caps
+        /// the slider (294 / 84 / 17.021 A after an unlock), so the tier's own currents sit
+        /// inside the range. False when a number is missing — a guessed range is worse than a
+        /// disabled row.
         /// </summary>
-        private static bool BindRail(Slider slider, int? current, int? min, int? max)
+        private static bool BindRail(Slider slider, int? current, int stockMilliAmps, int? policyMin, int? policyMax)
         {
-            if (current is not int value || min is not int low || max is not int high || high < low)
+            if (current is not int value || policyMin is not int low || policyMax is not int high || high < low)
                 return false;
 
-            slider.Minimum = low;
+            slider.Minimum = Math.Min(Math.Max(stockMilliAmps, low), high);
             slider.Maximum = high;
-            slider.Value = Math.Clamp(value, low, high);
+            slider.Value = Math.Clamp(value, slider.Minimum, high);
             return true;
         }
 
         /// <summary>"250 A · policy 210-294 A": what the rail carries now against the range the
-        /// driver allows, which is what the slider can move it to.</summary>
+        /// slider can move it to — stock up to the driver's own maximum.</summary>
         private void UpdateRailReadouts()
         {
             UCU.Contracts.GpuRailLimitsDto? rails = _railLimits;
-            tbRailNvvdd.Text = RailText(sdRailNvvdd, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps, 0);
-            tbRailMsvdd.Text = RailText(sdRailMsvdd, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps, 0);
-            tbRailBoardInput.Text = RailText(sdRailBoardInput, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps, 1);
+            tbRailNvvdd.Text = RailText(sdRailNvvdd, rails?.NvvddMinMilliamps, rails?.NvvddMaxMilliamps, StockNvvddMilliamps, 0);
+            tbRailMsvdd.Text = RailText(sdRailMsvdd, rails?.MsvddMinMilliamps, rails?.MsvddMaxMilliamps, StockMsvddMilliamps, 0);
+            tbRailBoardInput.Text = RailText(sdRailBoardInput, rails?.BoardInputMinMilliamps, rails?.BoardInputMaxMilliamps, StockBoardInputMilliamps, 3);
         }
 
-        private static string RailText(Slider slider, int? min, int? max, int decimals)
+        private static string RailText(Slider slider, int? min, int? max, int stock, int decimals)
         {
             if (min is not int low || max is not int high)
                 return "-- A";
 
-            string format = decimals == 0 ? "0" : "0.0";
-            string policy = (low / 1000.0).ToString(format) + "-" + (high / 1000.0).ToString(format);
+            string format = AmpsFormat(decimals);
+            string policy = (Math.Max(low, stock) / 1000.0).ToString(format) + "-" + (high / 1000.0).ToString(format);
             return LocalizationService.Format(
                 "{0} A · policy {1} A",
                 (slider.Value / 1000.0).ToString(format),
@@ -2505,7 +2557,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void UpdateRailCaution() =>
             // 14.026 A is the tested value the tier ships; warn only when the user goes above it
             // (which needs a bigger record, i.e. a different policy maximum).
-            tbRailCaution.Visibility = sdRailBoardInput.Value > 14_026 ? Visibility.Visible : Visibility.Collapsed;
+            tbRailCaution.Visibility = sdRailBoardInput.Value > TestedBoardInputMilliamps ? Visibility.Visible : Visibility.Collapsed;
 
         private void UpdateRailApply(bool canApply)
         {
@@ -2513,7 +2565,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool changed = rails != null &&
                 (Changed(sdRailNvvdd, rails.NvvddMilliamps, 0) |
                  Changed(sdRailMsvdd, rails.MsvddMilliamps, 0) |
-                 Changed(sdRailBoardInput, rails.BoardInputMilliamps, 1));
+                 Changed(sdRailBoardInput, rails.BoardInputMilliamps, 3));
 
             // Primary while it would do something, dimmed while it would not: the caption
             // above says why the group can be off, the button says why it is.
@@ -2523,15 +2575,25 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>The value a slider stands for, snapped to the precision it displays.</summary>
-        private static int Quantize(double milliAmps, int decimals) => decimals == 0
-            ? (int)Math.Round(milliAmps / 1000.0) * 1000
-            : (int)Math.Round(milliAmps / 100.0) * 100;
+        private static int Quantize(double milliAmps, int decimals) => decimals switch
+        {
+            0 => (int)Math.Round(milliAmps / 1000.0) * 1000,
+            1 => (int)Math.Round(milliAmps / 100.0) * 100,
+            _ => (int)Math.Round(milliAmps),
+        };
 
         private static bool Changed(Slider slider, int? current, int decimals) =>
             current is int value && Quantize(slider.Value, decimals) != Quantize(value, decimals);
 
+        private static string AmpsFormat(int decimals) => decimals switch
+        {
+            0 => "0",
+            1 => "0.0",
+            _ => "0.000",
+        };
+
         private static string Amps(int? milliAmps, int decimals) => milliAmps is int value
-            ? (value / 1000.0).ToString(decimals == 0 ? "0" : "0.0")
+            ? (value / 1000.0).ToString(AmpsFormat(decimals))
             : "--";
 
         private void RailSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -2566,7 +2628,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Only the rails that moved are sent; null means "leave this one alone".
             int? nvvdd = Changed(sdRailNvvdd, rails.NvvddMilliamps, 0) ? Quantize(sdRailNvvdd.Value, 0) : null;
             int? msvdd = Changed(sdRailMsvdd, rails.MsvddMilliamps, 0) ? Quantize(sdRailMsvdd.Value, 0) : null;
-            int? board = Changed(sdRailBoardInput, rails.BoardInputMilliamps, 1) ? Quantize(sdRailBoardInput.Value, 1) : null;
+            int? board = Changed(sdRailBoardInput, rails.BoardInputMilliamps, 3) ? Quantize(sdRailBoardInput.Value, 3) : null;
 
             if (nvvdd == null && msvdd == null && board == null)
                 return;
@@ -2586,7 +2648,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _railLimits = answer;
                     _railLimitsNote = LocalizationService.Format(
                         "Applied: {0} A GPU, {1} A memory, {2} A board input",
-                        Amps(answer.NvvddMilliamps, 0), Amps(answer.MsvddMilliamps, 0), Amps(answer.BoardInputMilliamps, 1));
+                        Amps(answer.NvvddMilliamps, 0), Amps(answer.MsvddMilliamps, 0), Amps(answer.BoardInputMilliamps, 3));
                 }
                 else
                 {
@@ -2615,6 +2677,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _railLimitsBusy = false;
                 RenderRailLimits();
             }
+
+            // The status card shows the rails the driver reports, and it reads them from the
+            // override state: refresh it after a successful write, and leave a failure's own
+            // message on screen untouched.
+            if (_railLimitsError == null)
+                await RefreshRomOverrideAsync();
         }
 
         #endregion

@@ -119,80 +119,135 @@
                         </UniformGrid>
                     </ui:Card>
 
-                    <!-- Status Card -->
-                    <ui:Card Margin="12,8,0,16" 
+                    <!-- Status Card: the live CPU/GPU contract, and — on its own row, under the
+                         same full-width rule the other cards use between sections — the
+                         unlock's numbers while it is applied. -->
+                    <ui:Card Margin="12,8,0,16"
                              Padding="15"
                              HorizontalAlignment="Center">
-                        <Grid HorizontalAlignment="Center" Margin="12,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <Grid HorizontalAlignment="Center" Margin="12,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="24,0,0,0">
-                                <ui:TextBlock FontTypography="BodyStrong" Text="CPU" Margin="0,0,0,8" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
+                                <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="24,0,0,0">
+                                    <ui:TextBlock FontTypography="BodyStrong" Text="CPU" Margin="0,0,0,8" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
 
-                                    <TextBlock x:Name="tbPl1Label" Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="Sustained (SPL)" />
-                                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="tbPl1" FontSize="13" FontWeight="SemiBold" Text="-- W" />
+                                        <TextBlock x:Name="tbPl1Label" Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="Sustained (SPL)" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="tbPl1" FontSize="13" FontWeight="SemiBold" Text="-- W" />
 
-                                    <TextBlock x:Name="tbPl2Label" Grid.Row="1" Grid.Column="0" FontSize="13" Text="Boost (FPL)" Margin="0,4,0,0" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbPl2" FontSize="13" FontWeight="SemiBold" Text="-- W" Margin="0,4,0,0" />
+                                        <TextBlock x:Name="tbPl2Label" Grid.Row="1" Grid.Column="0" FontSize="13" Text="Boost (FPL)" Margin="0,4,0,0" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbPl2" FontSize="13" FontWeight="SemiBold" Text="-- W" Margin="0,4,0,0" />
 
-                                    <TextBlock x:Name="tbTjMaxLabel" Grid.Row="2" Grid.Column="0" Width="120" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbTjMax" FontSize="13" FontWeight="SemiBold" Text="-- °C" Margin="0,4,0,0" />
+                                        <TextBlock x:Name="tbTjMaxLabel" Grid.Row="2" Grid.Column="0" Width="120" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbTjMax" FontSize="13" FontWeight="SemiBold" Text="-- °C" Margin="0,4,0,0" />
 
-                                    <TextBlock x:Name="tbCoLabel" Grid.Row="3" Grid.Column="0" Width="120" FontSize="13" Text="CO Offset" Margin="0,4,0,0" />
-                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbCoOffset" FontSize="13" FontWeight="SemiBold" Text="-- | --" Margin="0,4,0,0" />
-                                </Grid>
+                                        <TextBlock x:Name="tbCoLabel" Grid.Row="3" Grid.Column="0" Width="120" FontSize="13" Text="CO Offset" Margin="0,4,0,0" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbCoOffset" FontSize="13" FontWeight="SemiBold" Text="-- | --" Margin="0,4,0,0" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="0,0,24,0">
+                                    <ui:TextBlock FontTypography="BodyStrong" Text="GPU" Margin="0,0,0,8" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="GPU TGP" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="tbGpuTgp" FontSize="13" FontWeight="SemiBold" Text="-- W" />
+
+                                        <TextBlock x:Name="tbDbLabel" Grid.Row="1" Grid.Column="0" FontSize="13" Text="Dynamic Boost" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                        <TextBlock x:Name="tbGpuDb" Grid.Row="1" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="Off" Margin="0,4,0,0" />
+
+                                        <TextBlock x:Name="tbCoreLabel" Grid.Row="2" Grid.Column="0" FontSize="13" Text="Core Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                        <TextBlock x:Name="tbCoreClock" Grid.Row="2" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
+
+                                        <TextBlock x:Name="tbMemLabel" Grid.Row="3" Grid.Column="0" FontSize="13" Text="Memory Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                        <TextBlock x:Name="tbMemClock" Grid.Row="3" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- The unlock's numbers, read back from the driver. It exists only
+                                 while the unlock is applied; with it off the card already says
+                                 what the GPU is running on. Every coloured number carries its
+                                 own word, so nothing here is colour alone. -->
+                            <StackPanel x:Name="spRomStatusRow" Visibility="Collapsed">
+                                <Border Height="1"
+                                        Margin="0,12,0,10"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <StackPanel Orientation="Horizontal" Margin="24,0,24,0" VerticalAlignment="Center">
+                                    <ui:TextBlock FontTypography="BodyStrong"
+                                                  VerticalAlignment="Center"
+                                                  Text="Extra GPU power" />
+
+                                    <StackPanel Orientation="Horizontal" Margin="24,0,0,0">
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Ceiling" />
+                                            <TextBlock x:Name="tbRomStatCeiling" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
+                                            <TextBlock x:Name="tbRomStatCeilingWord" Margin="0,1,0,0" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Request" />
+                                            <TextBlock x:Name="tbRomStatRequest" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
+                                            <TextBlock x:Name="tbRomStatRequestWord" Margin="0,1,0,0" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Budget" />
+                                            <TextBlock x:Name="tbRomStatBudget" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
+                                            <TextBlock x:Name="tbRomStatBudgetWord" Margin="0,1,0,0" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="NVVDD" />
+                                            <TextBlock x:Name="tbRomStatNvvdd" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- A" />
+                                            <TextBlock x:Name="tbRomStatNvvddWord" Margin="0,1,0,0" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,16,0">
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="MSVDD" />
+                                            <TextBlock x:Name="tbRomStatMsvdd" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- A" />
+                                            <TextBlock x:Name="tbRomStatMsvddWord" Margin="0,1,0,0" FontSize="12" />
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Board input" />
+                                            <TextBlock x:Name="tbRomStatBoard" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- A" />
+                                            <TextBlock x:Name="tbRomStatBoardWord" Margin="0,1,0,0" FontSize="12" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
-
-                            <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="0,0,24,0
-                                        ">
-                                <ui:TextBlock FontTypography="BodyStrong" Text="GPU" Margin="0,0,0,8" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="GPU TGP" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="tbGpuTgp" FontSize="13" FontWeight="SemiBold" Text="-- W" />
-
-                                    <TextBlock x:Name="tbDbLabel" Grid.Row="1" Grid.Column="0" FontSize="13" Text="Dynamic Boost" Margin="0,4,0,0" HorizontalAlignment="Left" />
-                                    <TextBlock x:Name="tbGpuDb" Grid.Row="1" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="Off" Margin="0,4,0,0" />
-
-                                    <TextBlock x:Name="tbCoreLabel" Grid.Row="2" Grid.Column="0" FontSize="13" Text="Core Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
-                                    <TextBlock x:Name="tbCoreClock" Grid.Row="2" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
-
-                                    <TextBlock x:Name="tbMemLabel" Grid.Row="3" Grid.Column="0" FontSize="13" Text="Memory Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
-                                    <TextBlock x:Name="tbMemClock" Grid.Row="3" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
-                                </Grid>
-                            </StackPanel>
-                        </Grid>
+                        </StackPanel>
                     </ui:Card>
 
                     <!-- GPU power ceiling override. Sits above the tuning editors so it is
                          reachable from every preset: it is a machine-wide driver-level
-                         setting, not a per-preset value. The sliders below stay the
-                         advanced path. -->
+                         setting, not a per-preset value.
+
+                         The layout is the act first (consent, the two buttons), then the
+                         measured facts as one scannable block, then the rail sliders closed
+                         behind a disclosure row. The live numbers the unlock produces are on
+                         the status card above, so this card never repeats them. -->
                     <ui:Card x:Name="cardRomOverride"
                              Margin="0,0,0,8"
                              Padding="15"
@@ -204,48 +259,9 @@
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                            TextWrapping="Wrap"
                                            Text="Raises the GPU's power ceiling at driver level" />
-                            <TextBlock Margin="0,10,0,0"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap"
-                                       Text="The unlock raises the driver's power ceiling to 250 W and asks for 225 W. The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off. Rails: 250 A NVVDD, 70 A MSVDD, 14.026 A board input — stock is 210 A / 60 A / 11.053 A, and the driver allows up to 294 A / 84 A / 14.026 A." />
-                            <TextBlock Margin="0,4,0,0"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap"
-                                       Text="Measured on our unit with a +233 MHz core offset: 214 W board power at 0.975-0.985 V, with PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it." />
-                            <TextBlock Margin="0,4,0,0"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       TextWrapping="Wrap"
-                                       Text="This overrides the driver's power policy. It does not change the GPU's firmware, and Restore stock undoes it." />
-
-                            <ui:InfoBar x:Name="RomOverrideStatus"
-                                        Margin="0,12,0,0"
-                                        IsClosable="False"
-                                        IsOpen="True"
-                                        Visibility="Collapsed"
-                                        Severity="Informational" />
-
-                            <!-- The tier values are what we would set; the ceiling is what the
-                                 records raise, and the request and budget are what the driver
-                                 enforces, reported honestly next to it. -->
-                            <StackPanel x:Name="spRomReadback"
-                                        Margin="0,8,0,0"
-                                        Visibility="Collapsed">
-                                <TextBlock x:Name="tbRomTier" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRomCeiling" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRomRequest" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRomBudget" Margin="0,2,0,0" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock Margin="0,2,0,0"
-                                           FontSize="12"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           TextWrapping="Wrap"
-                                           Text="The ceiling is what this card raises. The request is what the driver enforces against it, and the budget is the laptop's own cap: the lower of the two wins." />
-                            </StackPanel>
 
                             <CheckBox x:Name="chkRomConsent"
-                                      Margin="0,14,0,0"
+                                      Margin="0,16,0,0"
                                       FontSize="12"
                                       Visibility="Collapsed"
                                       Checked="chkRomConsent_Changed"
@@ -254,7 +270,7 @@
 
                             <!-- Both actions stay on the card: the irrelevant one is disabled
                                  and explained, never hidden and never a silent no-op. -->
-                            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                 <ui:Button x:Name="btnRomUnlock"
                                            Padding="16,6"
                                            Appearance="Primary"
@@ -268,14 +284,18 @@
                                            Content="Restore stock" />
                             </StackPanel>
 
+                            <!-- One line, and only for a state that needs explaining: a refusal,
+                                 a partial apply, a read that failed, or why an action is
+                                 dimmed. A clean unlock says itself in the status card's row. -->
                             <TextBlock x:Name="tbRomOverrideNote"
-                                       Margin="0,6,0,0"
+                                       Margin="0,8,0,0"
                                        FontSize="12"
                                        TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                       Visibility="Collapsed"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
                             <StackPanel x:Name="spRomBusy"
-                                        Margin="0,12,0,0"
+                                        Margin="0,10,0,0"
                                         Visibility="Collapsed">
                                 <ProgressBar Height="4" IsIndeterminate="True" />
                                 <TextBlock Margin="0,6,0,0"
@@ -285,15 +305,88 @@
                                            Text="Restarting the GPU. The screen may go blank for up to 60 seconds." />
                             </StackPanel>
 
-                            <!-- Advanced: the runtime rail currents. A separate, live NVAPI
-                                 write (no restart, no blank screen, no consent), so it sits
-                                 below the unlock act and follows its state. -->
-                            <Border Height="1" Margin="0,14,0,0" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Facts the numbers cannot say: the tier we measured, the stock
+                                 rails it replaces, and the run behind the example offset. -->
+                            <Border Height="1"
+                                    Margin="0,16,0,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <ui:TextBlock FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Measured on our test unit" />
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" MinWidth="90" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                            <StackPanel Margin="0,10,0,0">
-                                <ui:TextBlock FontTypography="BodyStrong" Text="Advanced — current limits" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
+                                <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Ceiling" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" FontSize="12" Text="250 W" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Target" Margin="0,2,0,0" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" FontSize="12" Text="225 W" Margin="0,2,0,0" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Rails" Margin="0,2,0,0" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" FontSize="12" TextWrapping="Wrap" Text="250 A · 70 A · 14.026 A" Margin="0,2,0,0" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Stock rails" Margin="0,2,0,0" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" FontSize="12" TextWrapping="Wrap" Text="210 A · 60 A · 11.053 A" Margin="0,2,0,0" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Driver max" Margin="0,2,0,0" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" FontSize="12" TextWrapping="Wrap" Text="294 A · 84 A · 17.021 A" Margin="0,2,0,0" />
+                            </Grid>
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off." />
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it." />
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it." />
+
+                            <!-- Advanced: the runtime rail currents. A separate, live NVAPI
+                                 write (no restart, no blank screen, no consent), so it stays
+                                 closed until asked for and follows the unlock's state. -->
+                            <Border Height="1"
+                                    Margin="0,16,0,4"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <ui:Button x:Name="btnRomAdvanced"
+                                       Padding="0,6"
+                                       HorizontalAlignment="Left"
+                                       Appearance="Transparent"
+                                       Click="btnRomAdvanced_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:FontIcon x:Name="icRomAdvanced"
+                                                 FontFamily="Segoe Fluent Icons"
+                                                 Glyph="&#xE70D;"
+                                                 FontSize="12"
+                                                 Margin="0,0,8,0"
+                                                 VerticalAlignment="Center" />
+                                    <TextBlock x:Name="tbRomAdvanced"
+                                               VerticalAlignment="Center"
+                                               FontSize="12"
+                                               Text="Show advanced" />
+                                </StackPanel>
+                            </ui:Button>
+
+                            <StackPanel x:Name="spRomAdvanced"
+                                        Margin="0,8,0,0"
+                                        Visibility="Collapsed">
+                                <ui:TextBlock FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                TextWrapping="Wrap"
                                                Text="These values are machine-wide and are not saved with a preset." />
