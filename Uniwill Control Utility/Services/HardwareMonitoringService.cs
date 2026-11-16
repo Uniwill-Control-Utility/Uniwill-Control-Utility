@@ -149,6 +149,18 @@ namespace Uniwill_Control_Utility.Services
         HardwareMetricsSnapshot ReadSnapshot();
         float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName);
         void ResetComputer();
+
+        /// <summary>
+        /// Parks every probe group for a GPU device restart (the unlock's own
+        /// <c>pnputil /restart-device</c>): the handles this session holds are
+        /// dead once the device restarts, and the NEXT call on one is an access
+        /// violation in native NVML code that no managed catch can stop - the
+        /// process simply dies (field 2026-11-16: the app and HWiNFO64 both
+        /// faulted in nvml.dll in the same second as a <c>pnputil</c> restart).
+        /// Dispose releases the park; the groups stay closed through their reset
+        /// cooldown first, so the driver has time to come back.
+        /// </summary>
+        IDisposable Suspend();
     }
 
     public sealed partial class HardwareMonitoringService : IHardwareMonitoringService, IDisposable
@@ -547,6 +559,62 @@ namespace Uniwill_Control_Utility.Services
             KickRefreshes();
         }
 
+        /// <summary>
+        /// Parks both groups for a GPU device restart and keeps them closed until
+        /// the returned lease is disposed. The park is what makes the restart safe:
+        /// a poll that reaches NVML after the device restart is an access violation
+        /// in native code, so no poll may run in that window at all.
+        ///
+        /// Call it BEFORE the verb that restarts the device (the engine issues the
+        /// <c>pnputil /restart-device</c> itself). Nothing here takes a group gate -
+        /// the caller is the app thread running the restart and must never wait on
+        /// driver I/O - so the close happens on the pass this kick queues, before
+        /// the verb is even sent.
+        /// </summary>
+        public IDisposable Suspend()
+        {
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+            }
+
+            try { Serilog.Log.Information("[LHM] monitoring parked for a GPU restart"); }
+            catch { /* Serilog may not be ready */ }
+
+            // Park first, then request the close: the pass this kick queues is the
+            // gate owner that performs the driver I/O, and every pass from now on
+            // serves Empty instead of touching a handle the restart will kill.
+            _fast.SetSuspended(true);
+            _slow.SetSuspended(true);
+            _fast.RequestReset();
+            _slow.RequestReset();
+            InvalidateCaches();
+            KickRefreshes();
+
+            return new MonitoringSuspension(this);
+        }
+
+        /// <summary>The end of a <see cref="Suspend"/> park: both groups stay
+        /// closed for their reset cooldown, then the deferred reopen rebuilds
+        /// their handles from scratch.</summary>
+        private void ReleaseSuspension()
+        {
+            _fast.SetSuspended(false);
+            _slow.SetSuspended(false);
+
+            lock (_sync)
+            {
+                if (_disposed)
+                    return;
+            }
+
+            InvalidateCaches();
+            KickRefreshes();
+
+            try { Serilog.Log.Information("[LHM] monitoring released after the GPU restart"); }
+            catch { /* Serilog may not be ready */ }
+        }
+
         private void Release(long id)
         {
             bool categoriesChanged;
@@ -911,6 +979,15 @@ namespace Uniwill_Control_Utility.Services
             /// <summary>A ResetComputer() this group's gate owner applies on its next pass.</summary>
             private int _resetPending;
 
+            /// <summary>1 while a GPU device restart parks this group (written
+            /// by the app thread, read by the gate owner).</summary>
+            private int _suspended;
+
+            /// <summary>Cooldown end of a released park, as UTC ticks: the device
+            /// restart invalidated the handles, and the driver needs its moment
+            /// before this group opens again.</summary>
+            private long _parkedUntilTicks;
+
             /// <summary>Per-group breadcrumb debounce clock, so one group
             /// parked never hides the other group's breadcrumb.</summary>
             private DateTime _lastSlowLogUtc = DateTime.MinValue;
@@ -938,6 +1015,29 @@ namespace Uniwill_Control_Utility.Services
             /// driver I/O a filter driver can hold, and no app thread may ever
             /// wait behind it.</summary>
             public void RequestReset() => Interlocked.Exchange(ref _resetPending, 1);
+
+            /// <summary>Park/release this group for a GPU device restart. Takes no
+            /// gate (the caller must not wait on driver I/O); the release starts
+            /// this group's reopen cooldown from the moment it is called.</summary>
+            public void SetSuspended(bool suspended)
+            {
+                Interlocked.Exchange(
+                    ref _parkedUntilTicks,
+                    suspended ? 0 : DateTime.UtcNow.Add(ResetCooldown).Ticks);
+                Interlocked.Exchange(ref _suspended, suspended ? 1 : 0);
+            }
+
+            /// <summary>True while a GPU restart holds this group closed, and for
+            /// the cooldown after it: no driver call may run in that window, so
+            /// the pass serves Empty and does not reopen.</summary>
+            private bool IsParked()
+            {
+                if (Volatile.Read(ref _suspended) != 0)
+                    return true;
+
+                long until = Interlocked.Read(ref _parkedUntilTicks);
+                return until != 0 && DateTime.UtcNow.Ticks < until;
+            }
 
             /// <summary>What the group's Computer is built for, derived from
             /// the lease union: the fast group takes only the CPU/GPU/battery
@@ -981,13 +1081,38 @@ namespace Uniwill_Control_Utility.Services
                 try
                 {
                     ApplyPendingReset();
+
+                    if (IsParked())
+                    {
+                        // A GPU device restart is in progress or just finished: the
+                        // handles are closed and NO driver call may run, so the pass
+                        // serves Empty (the LHM fields render "--", never a frozen
+                        // frame) while the OS/EC/engine sources refill beside them.
+                        Volatile.Write(ref _lastState, HardwareMonitoringState.Empty);
+                        return HardwareMonitoringState.Empty;
+                    }
+
                     UpdateHardware();
 
                     Stopwatch buildSw = Stopwatch.StartNew();
-                    HardwareMetricsSnapshot partial = _systemDevices
-                        ? BuildSlowSnapshot(_computer)
-                        : BuildFastSnapshot(_computer);
-                    var state = new HardwareMonitoringState(partial, CaptureSensorReadings());
+                    HardwareMonitoringState state;
+                    try
+                    {
+                        HardwareMetricsSnapshot partial = _systemDevices
+                            ? BuildSlowSnapshot(_computer)
+                            : BuildFastSnapshot(_computer);
+                        state = new HardwareMonitoringState(partial, CaptureSensorReadings());
+                    }
+                    catch (Exception ex)
+                    {
+                        // The GPU row's read is NVML too: a managed failure here means
+                        // the handles are dead, and the NEXT call on one is the one
+                        // that faults in native code. Release them now instead of
+                        // serving the rest of this pass from a dead handle.
+                        ClearComputerAfterFailure(ex, "snapshot build");
+                        return HardwareMonitoringState.Empty;
+                    }
+
                     buildSw.Stop();
 
                     Volatile.Write(ref _lastState, state);
@@ -1222,16 +1347,25 @@ namespace Uniwill_Control_Utility.Services
                  * thread from taking down the process, then clear the computer so the next
                  * call to UpdateHardware() will attempt a reopen with fresh handles.
                  */
+                ClearComputerAfterFailure(ex, "UpdateHardware");
+            }
+        }
+
+            /// <summary>The one failure path for a driver handle that may already be
+            /// dead: count it, log it, and close/release the Computer so the next
+            /// pass reopens fresh. Continuing on the handle is what runs into the
+            /// uncatchable native access violation.</summary>
+            private void ClearComputerAfterFailure(Exception ex, string stage)
+            {
                 _updateFailureCount++;
                 _lastUpdateFailureUtc = DateTime.UtcNow;
 
-                try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware failed (failure #{Count}) — clearing Computer for next refresh", _updateFailureCount); } catch { /* Serilog may not be ready */ }
+                try { Serilog.Log.Warning(ex, "[LHM] {Stage} failed (failure #{Count}) — clearing Computer for next refresh", stage, _updateFailureCount); } catch { /* Serilog may not be ready */ }
 
                 // Close and clear — the next UpdateHardware() call will handle reopen.
-                _computer?.Close();
+                try { _computer?.Close(); } catch { /* the handles are already gone */ }
                 _computer = null;
             }
-        }
 
             private static void UpdateHardwareTree(IHardware hardware)
             {
@@ -1435,6 +1569,17 @@ namespace Uniwill_Control_Utility.Services
         {
             public static EmptyLease Instance { get; } = new();
             public void Dispose() { }
+        }
+
+        /// <summary>The park a GPU device restart holds; Dispose releases it once.</summary>
+        private sealed class MonitoringSuspension : IDisposable
+        {
+            private HardwareMonitoringService? _owner;
+
+            public MonitoringSuspension(HardwareMonitoringService owner) => _owner = owner;
+
+            public void Dispose() =>
+                System.Threading.Interlocked.Exchange(ref _owner, null)?.ReleaseSuspension();
         }
 
         [LibraryImport("kernel32.dll")]

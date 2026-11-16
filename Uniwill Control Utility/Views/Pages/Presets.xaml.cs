@@ -2423,7 +2423,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                _romOverride = await _gpuTuning.SetRomOverrideAsync(!restore).ConfigureAwait(true);
+                // The verb ends in the engine's pnputil restart of the GPU: park hardware
+                // monitoring across it (the guard holds the park through the driver
+                // cooldown), or a poll lands on a dead NVML handle and kills the process.
+                UCU.Contracts.Capabilities.IGpuTuningCapability tuning = _gpuTuning;
+                _romOverride = await GpuDeviceRestartGuard.RunAsync(
+                    App.GetService<IHardwareMonitoringService>(),
+                    () => tuning.SetRomOverrideAsync(!restore)).ConfigureAwait(true);
                 DebugLog($"GPU ROM override: asked {(!restore ? "unlock" : "restore")}, engine answered {_romOverride.State}");
             }
             catch (Exception ex)
