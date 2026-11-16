@@ -363,16 +363,32 @@ namespace UCU.Hardware.Gpu
             var getTable = Marshal.GetDelegateForFunctionPointer<NvApi.GpuBufferDelegate>(getPtr);
 
             byte[] merged = new byte[ClockBoostTableSize];
+            bool first = true;
             for (int firstPoint = 0; firstPoint < UsableVfPointCount; firstPoint += ClockBoostMaskWindowPoints)
             {
                 byte[] read = BuildClockBoostReadTable(firstPoint);
                 if (getTable(gpu, read) != 0)
                     return false;
 
-                // Everything but the per-window mask: the version echo, unknown1 and the
-                // selected point deltas.
-                Array.Copy(read, ClockBoostMaskOffset + ClockBoostMaskBytes, merged, ClockBoostMaskOffset + ClockBoostMaskBytes,
-                    ClockBoostTableSize - (ClockBoostMaskOffset + ClockBoostMaskBytes));
+                // Each read answers only for the points its mask selected; everything else comes
+                // back zero. Merging "everything after the mask" therefore let the second window
+                // overwrite the first one's deltas - a 101-point curve verified as 63. Take the
+                // header and the tail from the first read and the deltas of this window's points
+                // from each read in turn.
+                if (first)
+                {
+                    Array.Copy(read, 0, merged, 0, ClockBoostEntryBase);
+                    int tail = ClockBoostEntryBase + (UsableVfPointCount * ClockBoostEntryStride);
+                    Array.Copy(read, tail, merged, tail, ClockBoostTableSize - tail);
+                    first = false;
+                }
+
+                int end = Math.Min(firstPoint + ClockBoostMaskWindowPoints, UsableVfPointCount);
+                for (int point = firstPoint; point < end; point++)
+                {
+                    int offset = ClockBoostEntryBase + (point * ClockBoostEntryStride) + ClockBoostDeltaOffset;
+                    Array.Copy(read, offset, merged, offset, 4);
+                }
             }
 
             BinaryPrimitives.WriteInt32LittleEndian(merged.AsSpan(0, 4), (1 << 16) | ClockBoostTableSize);
