@@ -127,7 +127,7 @@ namespace Uniwill_Control_Utility.Services
                 }
 
                 await File.WriteAllTextAsync(
-                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote, ReadBudget(), ReadRailLimits(),
+                    Path.Combine(staging, "hardware.txt"), ComposeHardware(dump, hardwareNote, ReadRomOverride(), ReadRailLimits(),
                         Scripts.GPUs.NVIDIA.NvTuning.LastMemoryOffset), cancellationToken);
 
                 string? directory = Path.GetDirectoryName(targetZip);
@@ -202,7 +202,7 @@ namespace Uniwill_Control_Utility.Services
         public static string ComposeHardware(
             EcHardwareDumpDto? dump,
             string note,
-            int? budgetMilliwatts = null,
+            GpuRomOverrideStateDto? romOverride = null,
             GpuRailLimitsDto? railLimits = null,
             UCU.Core.Gpu.MemoryOffsetVerdict? memoryOffset = null)
         {
@@ -223,7 +223,12 @@ namespace Uniwill_Control_Utility.Services
             // min(request, budget), so without this number a report cannot say why a
             // raised ceiling still enforced 150 W.
             text.AppendLine("GPU power budget (F7): " +
-                            (budgetMilliwatts is int budget ? Watts(budget) : "unknown (engine unreachable)"));
+                            (romOverride?.BudgetMilliwatts is int budget ? Watts(budget) : "unknown (engine unreachable)"));
+
+            // The intent marker and the live half: after a reboot the records are still
+            // staged while the EC offset, the rails, the budget and the driver's request
+            // are not, so "enabled" alone does not mean the card is drawing the watts.
+            text.AppendLine("GPU power override: " + OverrideLine(romOverride));
 
             // The runtime rail currents: the records only widen the policy, so with
             // everything else identical these instead of the stock ones are what took the
@@ -270,10 +275,11 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// The F7 budget the engine sees, read-only and best-effort: an unreachable engine
-        /// renders "unknown" instead of failing the export.
+        /// The override state the engine sees, read-only and best-effort: it carries both
+        /// the F7 budget and the intent marker, so the report can say the unlock is enabled
+        /// while the live half is not in force. An unreachable engine renders "unknown".
         /// </summary>
-        private int? ReadBudget()
+        private GpuRomOverrideStateDto? ReadRomOverride()
         {
             if (_gpu is null)
                 return null;
@@ -281,7 +287,7 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 using var gpuCts = new CancellationTokenSource(HardwareDumpBudget);
-                return _gpu.GetRomOverrideStateAsync(gpuCts.Token).GetAwaiter().GetResult().BudgetMilliwatts;
+                return _gpu.GetRomOverrideStateAsync(gpuCts.Token).GetAwaiter().GetResult();
             }
             catch
             {
@@ -308,6 +314,19 @@ namespace Uniwill_Control_Utility.Services
             {
                 return null;
             }
+        }
+
+        /// <summary>One line: the intent marker and whether the driver-side half is in force.</summary>
+        private static string OverrideLine(GpuRomOverrideStateDto? romOverride)
+        {
+            if (romOverride is null)
+                return "unknown (engine unreachable)";
+
+            string live = romOverride.State == GpuRomOverrideStates.Unlocked
+                ? "live half in force"
+                : "live half not verified" + (romOverride.Reason is string reason ? " (" + reason + ")" : string.Empty);
+
+            return (romOverride.Enabled ? "enabled" : "not enabled") + ", state " + romOverride.State + ": " + live;
         }
 
         /// <summary>One line: each rail's current and the policy range it was checked against.</summary>

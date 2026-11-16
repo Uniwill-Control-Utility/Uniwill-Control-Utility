@@ -2277,11 +2277,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// The unlock's numbers as the status card's second row: TGP and the budget, plus the three
-        /// rails, each the driver's own read-back rather than the tier's request. The row exists
-        /// only while the unlock is applied (Unlocked or Uncertain); with it off, the card above
-        /// already says what the GPU runs on. It is named in the slider's own vocabulary - TGP -
-        /// while the driver's 250 W ceiling is permission, not a target, and is explained in the
-        /// section's tooltip instead.
+        /// rails, each the driver's own read-back rather than the tier's request. The row is keyed to
+        /// <see cref="UCU.Contracts.GpuRomOverrideStateDto.Enabled"/>, not to the derived state: it is
+        /// absent until the owner has unlocked at least once, and once enabled it renders whatever the
+        /// numbers are — including "Not read"/"Unverified" while a start-up re-apply is settling. With
+        /// it off, the card above already says what the GPU runs on. It is named in the slider's own
+        /// vocabulary - TGP - while the driver's 250 W ceiling is permission, not a target, and is
+        /// explained in the section's tooltip instead.
         ///
         /// What the colours mean, stated once here — and every colour is rendered next to its
         /// own word, so no state depends on colour alone:
@@ -2298,11 +2300,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void RenderRomStatusRow()
         {
             UCU.Contracts.GpuRomOverrideStateDto? state = _romOverride;
-            bool applied = state?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked
-                           || state?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain;
+            bool enabled = state?.Enabled == true;
 
-            spRomStatusRow.Visibility = applied ? Visibility.Visible : Visibility.Collapsed;
-            if (!applied)
+            spRomStatusRow.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+            if (!enabled)
                 return;
 
             // A partial apply is not a verdict: the numbers can read right and still be unverified.

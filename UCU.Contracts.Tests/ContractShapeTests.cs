@@ -367,6 +367,19 @@ public sealed class ContractShapeTests
         Assert.False(element.TryGetProperty("nvvddMilliamps", out _));
     }
 
+    [Fact]
+    public void GpuRomOverrideState_CarriesTheIntentMarkerOnTheWire()
+    {
+        // The app keys the status row's visibility on this, not on the derived state: after
+        // a reboot the state reads Uncertain until the engine re-applies the live half, and
+        // the owner must not see a row for a feature they never enabled.
+        JsonElement enabled = EngineSerializer.ToParamsObject(new GpuRomOverrideStateDto { Enabled = true });
+        Assert.True(enabled.GetProperty("enabled").GetBoolean());
+
+        JsonElement absent = EngineSerializer.ToParamsObject(new GpuRomOverrideStateDto());
+        Assert.False(absent.GetProperty("enabled").GetBoolean());
+    }
+
     private static string[] AllVerbs() =>
         typeof(EngineVerbs)
             .GetNestedTypes(BindingFlags.Public)

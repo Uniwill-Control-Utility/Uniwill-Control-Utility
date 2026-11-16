@@ -832,6 +832,15 @@ namespace UCU.Contracts
         public bool Restarted { get; init; }
 
         /// <summary>
+        /// True when an unlock has been completed and its intent marker is on disk
+        /// (<c>%ProgramData%\UCU\gpu-rom-overrides\enabled</c>). The state alone cannot
+        /// tell a rebooted unlock from one that was never made — after a reboot it reads
+        /// Uncertain until the engine re-applies the live half — so the status row keys
+        /// its visibility on this instead.
+        /// </summary>
+        public bool Enabled { get; init; }
+
+        /// <summary>
         /// The runtime NVVDD rail current the card carries (mA), read back from the driver.
         /// The records above only widen the policy; this is a separate NVAPI write, and
         /// with everything else identical the stock rail held the board at 175-179 W where

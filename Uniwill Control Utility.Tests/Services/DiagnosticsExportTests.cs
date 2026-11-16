@@ -189,8 +189,46 @@ public sealed class DiagnosticsExportTests
     {
         // The driver enforces min(request, budget): a report without this number cannot
         // explain why a raised ceiling still enforced 150 W.
-        Assert.Contains("GPU power budget (F7): 225 W (225000 mW)", DiagnosticsExportService.ComposeHardware(Dump(), "collected", 225_000));
+        Assert.Contains("GPU power budget (F7): 225 W (225000 mW)", DiagnosticsExportService.ComposeHardware(
+            Dump(), "collected", new GpuRomOverrideStateDto { BudgetMilliwatts = 225_000 }));
         Assert.Contains("GPU power budget (F7): unknown", DiagnosticsExportService.ComposeHardware(Dump(), "collected"));
+    }
+
+    [Fact]
+    public void HardwareComposer_SaysWhetherTheUnlockIsEnabledAndWhetherItIsInForce()
+    {
+        // The marker outlives a reboot, the driver-side half does not: the report must be
+        // able to say "enabled, live half not verified" without implying the card draws it.
+        Assert.Contains(
+            "GPU power override: enabled, state Unlocked: live half in force",
+            DiagnosticsExportService.ComposeHardware(
+                Dump(), "collected",
+                new GpuRomOverrideStateDto
+                {
+                    State = GpuRomOverrideStates.Unlocked,
+                    Enabled = true,
+                    BudgetMilliwatts = 225_000,
+                }));
+
+        Assert.Contains(
+            "GPU power override: enabled, state Uncertain: live half not verified (the driver carries no power request, so the card stays on its EC-derived limit)",
+            DiagnosticsExportService.ComposeHardware(
+                Dump(), "collected",
+                new GpuRomOverrideStateDto
+                {
+                    State = GpuRomOverrideStates.Uncertain,
+                    Enabled = true,
+                    Reason = "the driver carries no power request, so the card stays on its EC-derived limit",
+                }));
+
+        Assert.Contains(
+            "GPU power override: not enabled, state NotUnlocked: live half not verified",
+            DiagnosticsExportService.ComposeHardware(
+                Dump(), "collected", new GpuRomOverrideStateDto()));
+
+        Assert.Contains(
+            "GPU power override: unknown (engine unreachable)",
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected"));
     }
 
     [Fact]
@@ -214,7 +252,7 @@ public sealed class DiagnosticsExportTests
         Assert.Contains(
             "GPU rail currents: NVVDD 250000 mA (policy 210000-294000 mA), " +
             "MSVDD 70000 mA (policy 60000-84000 mA), board input 14026 mA (policy 11053-14026 mA)",
-            DiagnosticsExportService.ComposeHardware(Dump(), "collected", 225_000, rails));
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected", new GpuRomOverrideStateDto { BudgetMilliwatts = 225_000 }, rails));
 
         Assert.Contains(
             "GPU rail currents: unknown (engine unreachable)",

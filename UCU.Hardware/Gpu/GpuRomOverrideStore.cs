@@ -68,6 +68,13 @@ namespace UCU.Hardware.Gpu
         /// <summary>true stages the tier's records and restarts the GPU; false restores stock.</summary>
         GpuRomOverrideStateDto SetEnabled(bool enabled);
 
+        /// <summary>
+        /// Re-applies the live half of a completed unlock once, at engine start: a reboot
+        /// keeps the records but clears the EC offset, the rails, the laptop budget and the
+        /// driver's request. Null when no unlock was ever completed (no intent marker).
+        /// </summary>
+        GpuRomOverrideStateDto? ReapplyAtStartup();
+
         /// <summary>The three runtime rail currents and the live policy ranges the sliders are bounded by.</summary>
         GpuRailLimitsDto GetRailLimits();
 
@@ -110,6 +117,7 @@ namespace UCU.Hardware.Gpu
         private readonly IGpuRailControl _rails;
         private readonly GpuPowerTier _tier;
         private readonly string _originalsPath;
+        private readonly string _markerPath;
 
         public GpuRomOverrideStore(
             IGpuRomRegistry registry,
@@ -135,6 +143,11 @@ namespace UCU.Hardware.Gpu
                 "UCU",
                 "gpu-rom-overrides",
                 "originals.txt");
+
+            // The intent marker, beside the originals: it is the only record that the
+            // owner ever completed an unlock, so the start-up re-apply and the status row
+            // can tell a rebooted unlock from one that was never made.
+            _markerPath = Path.Combine(Path.GetDirectoryName(_originalsPath) ?? string.Empty, "enabled");
         }
 
         public GpuRomOverrideStateDto GetState()
@@ -219,19 +232,11 @@ namespace UCU.Hardware.Gpu
 
             try
             {
-                version = _registry.ReadVbiosVersion();
-                if (version == null)
-                    return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request, budget: budget);
-
-                if (!RomOverrideLayout.IsPinned(version))
-                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request, budget: budget);
-
-                IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
-                if (!TryReadOriginals(out Originals? originals, out string? fileError))
-                    return State(GpuRomOverrideStates.Unsupported, fileError, version, limits, request, budget: budget);
-
-                if (ForeignRecordReason(records, originals) is string foreign)
-                    return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request, budget: budget);
+                if (Check(out version, out Originals? originals, out IReadOnlyDictionary<string, byte[]> records)
+                    is GpuRomOverrideStateDto refused)
+                {
+                    return refused;
+                }
 
                 // (a) The EC's cTGP offset, against this board's own DefaultTGP. The
                 // declared TgpOffsetMax is not enforced (130 → 225 W was accepted).
@@ -260,7 +265,8 @@ namespace UCU.Hardware.Gpu
                 int offset = EcSpecCodec.CtgpOffsetForTgp(_tier.TgpTargetWatts, info.DefaultTgpWatts);
                 _ec.ActivateGpuPowerControl(offset, 0);
 
-                IReadOnlyList<(string Name, byte[] Data)> desired = RomOverrideLayout.BuildRecords(_tier, version);
+                string pinned = version!;
+                IReadOnlyList<(string Name, byte[] Data)> desired = RomOverrideLayout.BuildRecords(_tier, pinned);
                 bool staged = Matches(records, desired);
                 bool restarted = false;
 
@@ -268,7 +274,7 @@ namespace UCU.Hardware.Gpu
                 {
                     // (b) The records: originals first, then write and read back.
                     if (originals == null)
-                        WriteOriginals(version);
+                        WriteOriginals(pinned);
 
                     foreach ((string name, byte[] data) in desired)
                         _registry.WriteRecord(name, data);
@@ -286,114 +292,19 @@ namespace UCU.Hardware.Gpu
                     restarted = _restarter.Restart(_registry.InstanceId);
                 }
 
-                // (d) The runtime rail currents: a separate NVAPI call from the records,
-                // and the lever that moves the board power itself (measured 2026-11-15:
-                // same records, budget and request, stock rails 175-179 W, tier rails
-                // 205-214 W). Written after the restart, which reloads the driver's own
-                // defaults.
-                rails = _rails.Set(
-                    _tier.NvVddCurrentMilliAmps, _tier.MsVddCurrentMilliAmps, _tier.BoardInputCurrentMilliAmps);
-                if (rails.Reason is string railed)
-                {
-                    return State(
-                        GpuRomOverrideStates.Uncertain,
-                        "the records are staged and the EC is offset, but the runtime rails could not be " +
-                        $"set to the tier: {railed}",
-                        version, limits, request, restarted, budget, rails);
-                }
-
-                // (e) The laptop's own power budget. The driver enforces
-                // min(request, budget) and the EC publishes a ~150 W budget, so the
-                // request alone is answered with 150 W (measured 2026-11-15) — this is
-                // the lever that makes the raised ceiling reachable.
-                budget = _budget.Read();
-                if (budget.Budget is not GpuPowerBudget current)
-                {
-                    return State(
-                        GpuRomOverrideStates.Uncertain,
-                        "the records are staged and the EC is offset, but the laptop power budget " +
-                        $"could not be read: {budget.Reason}",
-                        version, limits, request, restarted, budget, rails);
-                }
-
-                // The reference's budget_original_: captured once, before the first raise,
-                // and kept in the originals file so a restore after an app restart still
-                // knows the stock values.
-                if (originals?.Budget == null)
-                    WriteOriginals(version, current);
-
-                if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
-                {
-                    if (!current.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised))
-                    {
-                        return State(
-                            GpuRomOverrideStates.Uncertain,
-                            "the records are staged and the EC is offset, but the raised laptop power budget overflows",
-                            version, limits, request, restarted, budget, rails);
-                    }
-
-                    GpuPowerBudgetState set = _budget.Set(raised);
-                    if (set.Budget is not GpuPowerBudget appliedBudget)
-                    {
-                        return State(
-                            GpuRomOverrideStates.Uncertain,
-                            "the records are staged and the EC is offset, but the laptop power budget " +
-                            $"could not be raised to {Watts(_tier.TgpTargetMilliwatts)}: {set.Reason}",
-                            version, limits, request, restarted, set, rails);
-                    }
-
-                    // Set only answers after its own exact F7 readback matched.
-                    budget = set;
-                    Log.Information(
-                        "gpu.set_rom_override: laptop budget raised {FromF7} -> {F7} mW, platform {Platform} mW",
-                        current.F7Milliwatts, appliedBudget.F7Milliwatts, appliedBudget.PlatformMilliwatts);
-                }
-
-                // (e) The request: without it the ceiling moves and the card stays on its
-                // EC-derived limit, which is the failure this tier shipped with.
-                request = _request.Request(_tier.TgpTargetMilliwatts);
-                limits = _ceiling.Read();
-
-                // (f) The rails read back: the tier's currents are what the card runs.
-                rails = _rails.Read();
-
-                Log.Information(
-                    "gpu.set_rom_override: {Tier} staged on {Version} ({Records} records), GPU restart {Restart}, rails {Nv}/{Ms}/{Input} mA, ceiling {Ceiling} mW, current limit {Current} mW, budget {Budget} mW, request {Request} mW",
-                    _tier.Id, version, desired.Count, restarted ? "yes" : "no",
-                    rails.NvVdd.CurrentMilliamps?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
-                    rails.MsVdd.CurrentMilliamps?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
-                    rails.BoardInput.CurrentMilliamps?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
-                    limits.CeilingMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
-                    limits.CurrentMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
-                    budget.F7Milliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
-                    request.RequestedMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "none");
-
-                // (g) All five, or it is Uncertain and the reason names the failed step.
-                if (RailsReason(rails) is string notRailed)
-                    return State(GpuRomOverrideStates.Uncertain, notRailed, version, limits, request, restarted, budget, rails);
-
-                if (request.Reason is string refused)
-                {
-                    return State(
-                        GpuRomOverrideStates.Uncertain,
-                        $"the records are staged and the ceiling is {CeilingText(limits)}, " +
-                        $"but the {Watts(_tier.TgpTargetMilliwatts)} power request failed: {refused}",
-                        version, limits, request, restarted, budget, rails);
-                }
-
-                if (CeilingReason(limits) is string shortfall)
-                    return State(GpuRomOverrideStates.Uncertain, shortfall, version, limits, request, restarted, budget, rails);
-
-                if (RequestReason(request) is string notAsked)
-                    return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, restarted, budget, rails);
-
-                if (BudgetReason(budget) is string capped)
-                    return State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, restarted, budget, rails);
-
-                return State(
-                    GpuRomOverrideStates.Unlocked,
+                GpuRomOverrideStateDto state = ApplyLive(
+                    "gpu.set_rom_override",
                     staged ? "the records were already staged; the GPU was not restarted" : null,
-                    version, limits, request, restarted, budget, rails);
+                    pinned, restarted, limits, request, budget, rails,
+                    captureBudgetFor: originals?.Budget == null ? pinned : null);
+
+                // The intent marker is what survives a reboot beside the records: written
+                // only by a completed unlock, and deleted only by Restore stock.
+                if (state.State != GpuRomOverrideStates.Unlocked)
+                    return state;
+
+                WriteMarker();
+                return state with { Enabled = true };
             }
             catch (Exception ex)
             {
@@ -401,6 +312,236 @@ namespace UCU.Hardware.Gpu
                 Log.Information("gpu.set_rom_override: {Type} {Message}", ex.GetType().Name, ex.Message);
                 return State(GpuRomOverrideStates.Uncertain, ex.Message, version, limits, request, budget: budget, rails: rails);
             }
+        }
+
+        /// <summary>
+        /// The live moves after the EC offset — the runtime rails, the laptop budget raise
+        /// and the driver's own request — with the read-back verdict. A fresh apply reaches
+        /// this with the records just staged; the start-up re-apply reaches it with them
+        /// staged by a previous boot, so the same steps and the same witnesses prove both.
+        /// <paramref name="verb"/> is the log prefix, <paramref name="note"/> rides the
+        /// Unlocked answer, and <paramref name="captureBudgetFor"/> is the version to
+        /// capture the stock budget into the originals file for (null: never — the
+        /// start-up re-apply must not rewrite the recovery file).
+        /// </summary>
+        private GpuRomOverrideStateDto ApplyLive(
+            string verb,
+            string? note,
+            string version,
+            bool restarted,
+            GpuPowerLimits limits,
+            GpuPowerRequestState request,
+            GpuPowerBudgetState budget,
+            GpuRailLimits rails,
+            string? captureBudgetFor = null)
+        {
+            // (d) The runtime rail currents: a separate NVAPI call from the records,
+            // and the lever that moves the board power itself (measured 2026-11-15:
+            // same records, budget and request, stock rails 175-179 W, tier rails
+            // 205-214 W). Written after the restart, which reloads the driver's own
+            // defaults.
+            rails = _rails.Set(
+                _tier.NvVddCurrentMilliAmps, _tier.MsVddCurrentMilliAmps, _tier.BoardInputCurrentMilliAmps);
+            if (rails.Reason is string railed)
+            {
+                return State(
+                    GpuRomOverrideStates.Uncertain,
+                    "the records are staged and the EC is offset, but the runtime rails could not be " +
+                    $"set to the tier: {railed}",
+                    version, limits, request, restarted, budget, rails);
+            }
+
+            // (e) The laptop's own power budget. The driver enforces
+            // min(request, budget) and the EC publishes a ~150 W budget, so the
+            // request alone is answered with 150 W (measured 2026-11-15) — this is
+            // the lever that makes the raised ceiling reachable.
+            budget = _budget.Read();
+            if (budget.Budget is not GpuPowerBudget current)
+            {
+                return State(
+                    GpuRomOverrideStates.Uncertain,
+                    "the records are staged and the EC is offset, but the laptop power budget " +
+                    $"could not be read: {budget.Reason}",
+                    version, limits, request, restarted, budget, rails);
+            }
+
+            // The reference's budget_original_: captured once, before the first raise, and
+            // kept in the originals file so a restore after an app restart still knows the
+            // stock values.
+            if (captureBudgetFor is string capture)
+                WriteOriginals(capture, current);
+
+            if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
+            {
+                if (!current.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised))
+                {
+                    return State(
+                        GpuRomOverrideStates.Uncertain,
+                        "the records are staged and the EC is offset, but the raised laptop power budget overflows",
+                        version, limits, request, restarted, budget, rails);
+                }
+
+                GpuPowerBudgetState set = _budget.Set(raised);
+                if (set.Budget is not GpuPowerBudget appliedBudget)
+                {
+                    return State(
+                        GpuRomOverrideStates.Uncertain,
+                        "the records are staged and the EC is offset, but the laptop power budget " +
+                        $"could not be raised to {Watts(_tier.TgpTargetMilliwatts)}: {set.Reason}",
+                        version, limits, request, restarted, set, rails);
+                }
+
+                // Set only answers after its own exact F7 readback matched.
+                budget = set;
+                Log.Information(
+                    "{Verb}: laptop budget raised {FromF7} -> {F7} mW, platform {Platform} mW",
+                    verb, current.F7Milliwatts, appliedBudget.F7Milliwatts, appliedBudget.PlatformMilliwatts);
+            }
+
+            // (e) The request: without it the ceiling moves and the card stays on its
+            // EC-derived limit, which is the failure this tier shipped with.
+            request = _request.Request(_tier.TgpTargetMilliwatts);
+            limits = _ceiling.Read();
+
+            // (f) The rails read back: the tier's currents are what the card runs.
+            rails = _rails.Read();
+
+            Log.Information(
+                "{Verb}: {Tier} staged on {Version} ({Records} records), GPU restart {Restart}, rails {Nv}/{Ms}/{Input} mA, ceiling {Ceiling} mW, current limit {Current} mW, budget {Budget} mW, request {Request} mW",
+                verb, _tier.Id, version, RomOverrideLayout.Fields.Length, restarted ? "yes" : "no",
+                rails.NvVdd.CurrentMilliamps?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                rails.MsVdd.CurrentMilliamps?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                rails.BoardInput.CurrentMilliamps?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                limits.CeilingMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                limits.CurrentMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                budget.F7Milliwatts?.ToString(CultureInfo.InvariantCulture) ?? "unknown",
+                request.RequestedMilliwatts?.ToString(CultureInfo.InvariantCulture) ?? "none");
+
+            // (g) All five, or it is Uncertain and the reason names the failed step.
+            if (RailsReason(rails) is string notRailed)
+                return State(GpuRomOverrideStates.Uncertain, notRailed, version, limits, request, restarted, budget, rails);
+
+            if (request.Reason is string refused)
+            {
+                return State(
+                    GpuRomOverrideStates.Uncertain,
+                    $"the records are staged and the ceiling is {CeilingText(limits)}, " +
+                    $"but the {Watts(_tier.TgpTargetMilliwatts)} power request failed: {refused}",
+                    version, limits, request, restarted, budget, rails);
+            }
+
+            if (CeilingReason(limits) is string shortfall)
+                return State(GpuRomOverrideStates.Uncertain, shortfall, version, limits, request, restarted, budget, rails);
+
+            if (RequestReason(request) is string notAsked)
+                return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, restarted, budget, rails);
+
+            if (BudgetReason(budget) is string capped)
+                return State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, restarted, budget, rails);
+
+            return State(GpuRomOverrideStates.Unlocked, note, version, limits, request, restarted, budget, rails);
+        }
+
+        /// <summary>
+        /// The live half of a completed unlock, re-applied once at engine start. A reboot
+        /// keeps the seven records and the originals file, and clears everything the EC and
+        /// the driver hold: the cTGP offset, the rails, the laptop budget and the driver's
+        /// own request. So the four live moves are made again, with no record write and no
+        /// adapter restart (that would blank the screen at every boot), and the verdict is
+        /// the same read-back an apply makes. Null when no unlock was ever completed.
+        /// </summary>
+        public GpuRomOverrideStateDto? ReapplyAtStartup()
+        {
+            if (!MarkerExists())
+                return null;
+
+            try
+            {
+                if (Check(out string? version, out _, out IReadOnlyDictionary<string, byte[]> records)
+                    is GpuRomOverrideStateDto refused)
+                {
+                    return NotReapplied(refused, refused.Reason ?? "the driver key is not usable");
+                }
+
+                if (!Matches(records, RomOverrideLayout.BuildRecords(_tier, version!)))
+                    return NotReapplied(GetState(), $"the driver key does not carry the {_tier.Id} records");
+
+                string tier = File.ReadAllText(_markerPath).Trim();
+                if (tier.Length != 0 && !string.Equals(tier, _tier.Id, StringComparison.Ordinal))
+                    return NotReapplied(GetState(), $"the marker names tier '{tier}', not '{_tier.Id}'");
+
+                // The EC offset goes first, exactly as in an apply: nothing is written
+                // before it, so a refusal here is clean.
+                GpuPowerInfoDto info = _ec.GetGpuPowerInfo();
+                if (!info.Supported)
+                {
+                    return NotReapplied(
+                        State(
+                            GpuRomOverrideStates.Unsupported,
+                            $"the EC publishes no usable DefaultTGP, so the cTGP offset cannot be computed: {info.Reason}",
+                            version, new GpuPowerLimits(null, null)),
+                        "the EC publishes no usable DefaultTGP");
+                }
+
+                _ec.ActivateGpuPowerControl(EcSpecCodec.CtgpOffsetForTgp(_tier.TgpTargetWatts, info.DefaultTgpWatts), 0);
+
+                GpuRomOverrideStateDto state = ApplyLive(
+                    "gpu.startup", null, version!, restarted: false,
+                    new GpuPowerLimits(null, null), new GpuPowerRequestState(null, null, null, null),
+                    new GpuPowerBudgetState(null, null, null), GpuRailLimits.None);
+
+                Log.Information(
+                    "gpu.startup: {Tier} re-applied on {Version}: {State}{Reason}",
+                    _tier.Id, version, state.State,
+                    state.Reason is null ? string.Empty : " — " + state.Reason);
+
+                return state;
+            }
+            catch (Exception ex)
+            {
+                // One attempt, no retry loop: a failure is the Uncertain state the verb
+                // reports, not a reason to hammer the EC at every boot.
+                Log.Information("gpu.startup: re-apply failed: {Type} {Message}", ex.GetType().Name, ex.Message);
+                return State(GpuRomOverrideStates.Uncertain, ex.Message, null, new GpuPowerLimits(null, null));
+            }
+        }
+
+        private GpuRomOverrideStateDto NotReapplied(GpuRomOverrideStateDto state, string reason)
+        {
+            Log.Information(
+                "gpu.startup: the unlock is enabled but was not re-applied: {Reason}; the state stays {State}",
+                reason, state.State);
+            return state;
+        }
+
+        /// <summary>
+        /// The checks every apply path makes before it writes anything: a pinned VBIOS, an
+        /// originals file that can be read, and a key that carries no one else's override.
+        /// Returns the refusal, or null with the three inputs the caller needs.
+        /// </summary>
+        private GpuRomOverrideStateDto? Check(
+            out string? version,
+            out Originals? originals,
+            out IReadOnlyDictionary<string, byte[]> records)
+        {
+            version = _registry.ReadVbiosVersion();
+            records = _registry.ReadRecords();
+            originals = null;
+            var none = new GpuPowerLimits(null, null);
+
+            if (version == null)
+                return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, none);
+
+            if (!RomOverrideLayout.IsPinned(version))
+                return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, none);
+
+            if (!TryReadOriginals(out originals, out string? fileError))
+                return State(GpuRomOverrideStates.Unsupported, fileError, version, none);
+
+            if (ForeignRecordReason(records, originals) is string foreign)
+                return State(GpuRomOverrideStates.Unsupported, foreign, version, none);
+
+            return null;
         }
 
         private GpuRomOverrideStateDto Restore()
@@ -446,6 +587,11 @@ namespace UCU.Hardware.Gpu
                     rails = _rails.Read();
                     if (RailsAboveStock(rails))
                         rails = RestoreStockRails(out railsReason);
+
+                    // Nothing is staged any more, so no intent survives either: without this
+                    // a marker whose records a driver reinstall removed would re-apply at
+                    // the next boot against a key that carries nothing.
+                    DiscardMarker();
 
                     if (originals != null)
                     {
@@ -577,6 +723,7 @@ namespace UCU.Hardware.Gpu
             RequestedLimitMilliwatts = request?.RequestedMilliwatts,
             EnforcedLimitMoved = limits.CeilingMilliwatts is int ceiling && ceiling > RomOverrideLayout.StockPowerMilliwatts,
             Restarted = restarted,
+            Enabled = MarkerExists(),
         };
 
         /// <summary>
@@ -874,6 +1021,36 @@ namespace UCU.Hardware.Gpu
         {
             if (File.Exists(_originalsPath))
                 File.Delete(_originalsPath);
+
+            // The intent goes with them: a marker without records would make the next
+            // boot re-apply an unlock nobody has staged.
+            DiscardMarker();
+        }
+
+        private bool MarkerExists() => File.Exists(_markerPath);
+
+        /// <summary>
+        /// Records the owner's intent beside the originals. Only a completed unlock calls
+        /// this; the engine reads it at start to know the live half has to be re-applied,
+        /// and Restore stock is the only thing that deletes it.
+        /// </summary>
+        private void WriteMarker()
+        {
+            string? directory = Path.GetDirectoryName(_markerPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllText(_markerPath, _tier.Id);
+            Log.Information("gpu.set_rom_override: intent marker written to {Path}", _markerPath);
+        }
+
+        private void DiscardMarker()
+        {
+            if (File.Exists(_markerPath))
+            {
+                File.Delete(_markerPath);
+                Log.Information("gpu.set_rom_override: intent marker removed from {Path}", _markerPath);
+            }
         }
 
         private sealed record Originals(string Version, Dictionary<uint, uint> Values, GpuPowerBudget? Budget);

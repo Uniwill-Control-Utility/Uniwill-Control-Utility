@@ -181,6 +181,7 @@ public sealed class GpuVerbsTests
                 RequestedLimitMilliwatts = 225_000,
                 EnforcedLimitMoved = true,
                 Restarted = true,
+                Enabled = true,
             },
         };
 
@@ -198,6 +199,11 @@ public sealed class GpuVerbsTests
         Assert.Equal(225_000, state.RequestedLimitMilliwatts);
         Assert.True(state.EnforcedLimitMoved);
         Assert.True(state.Restarted);
+        Assert.True(state.Enabled);
+
+        // The engine re-applies a completed unlock once at start-up, before the pipe server
+        // answers: the verb is exercised against the same fake.
+        Assert.Equal(1, overrides.ReapplyCalls);
         Assert.Null(overrides.LastEnabled);
     }
 

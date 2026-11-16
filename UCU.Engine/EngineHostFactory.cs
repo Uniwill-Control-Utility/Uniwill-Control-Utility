@@ -117,6 +117,11 @@ namespace UCU.Engine
                         new UCU.Hardware.Gpu.NvApiPowerBudget(),
                         new UCU.Hardware.Gpu.NvApiRailControl()));
 
+                // The reboot clears the driver-resident half of a completed unlock (the
+                // records survive); this re-applies it once, before the pipe server can
+                // answer its first gpu.get_rom_override_state.
+                services.AddHostedService<GpuRomOverrideStartup>();
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
         // Keeps the EC activated (0x0741 bit 0) and re-initialises it after a resume.

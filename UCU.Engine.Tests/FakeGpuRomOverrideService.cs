@@ -13,6 +13,9 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
 {
     public bool? LastEnabled { get; private set; }
 
+    /// <summary>How many times the engine's start-up re-apply reached this fake.</summary>
+    public int ReapplyCalls { get; private set; }
+
     public (int? Nvvdd, int? Msvdd, int? BoardInput)? LastRailSet { get; private set; }
 
     public GpuRomOverrideStateDto Answer { get; set; } = new()
@@ -51,6 +54,12 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
     {
         LastEnabled = enabled;
         return Answer;
+    }
+
+    public GpuRomOverrideStateDto? ReapplyAtStartup()
+    {
+        ReapplyCalls++;
+        return Answer.Enabled ? Answer : null;
     }
 
     public GpuRailLimitsDto GetRailLimits() => RailAnswer;

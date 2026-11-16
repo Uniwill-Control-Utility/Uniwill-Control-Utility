@@ -968,6 +968,202 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Null(refused.BoardInputMilliamps);
     }
 
+    [Fact]
+    public void StartupReapply_RunsTheLiveHalfInOrder_WithoutTouchingTheRecordsOrTheGpu()
+    {
+        // The measured reboot: the seven records and the originals file survive, while the
+        // EC offset, the rails, the F7 budget and the driver's request do not. The re-apply
+        // is the same four live moves as an apply, and it never rewrites a record or
+        // restarts the adapter (a boot-time restart would blank the screen every boot).
+        var registry = new FakeRomRegistry(_log);
+        var restarter = new FakeRestarter(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 150_000 };
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(registry, restarter, ceiling, ec, request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        Assert.True(File.Exists(MarkerPath));
+
+        request.Forget();
+        budget.Reset();
+        rails.NvVddCurrent = RomOverrideLayout.StockNvVddMilliAmps;
+        rails.MsVddCurrent = RomOverrideLayout.StockMsVddMilliAmps;
+        rails.BoardCurrent = RomOverrideLayout.StockBoardInputMilliAmps;
+        _log.Clear();
+        int writesBefore = registry.Writes.Count;
+        int requestsBefore = request.Requests.Count;
+
+        GpuRomOverrideStateDto? state = store.ReapplyAtStartup();
+
+        Assert.NotNull(state);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state!.State);
+        Assert.Null(state.Reason);
+        Assert.True(state.Enabled);
+        Assert.False(state.Restarted);
+        Assert.Equal(1, restarter.Calls);
+        Assert.Equal(writesBefore, registry.Writes.Count);
+        Assert.Empty(registry.Deletes);
+
+        // The same order as an apply, minus the records and the restart.
+        int ecIndex = _log.IndexOf("ec.activate:130,0");
+        int railsIndex = _log.IndexOf("rails.set:250000,70000,14026");
+        int budgetIndex = _log.IndexOf("budget.set:225000,500000");
+        int requestIndex = _log.IndexOf("request:225000");
+        Assert.True(ecIndex >= 0 && ecIndex < railsIndex, string.Join(",", _log));
+        Assert.True(railsIndex < budgetIndex, string.Join(",", _log));
+        Assert.True(budgetIndex < requestIndex, string.Join(",", _log));
+
+        Assert.Equal(requestsBefore + 1, request.Requests.Count);
+        Assert.Equal(225_000, request.Requests[^1]);
+        Assert.Equal(225_000, state.RequestedLimitMilliwatts);
+        Assert.Equal(250_000, state.NvvddCurrentMilliamps);
+    }
+
+    [Fact]
+    public void StartupReapply_WithoutTheStagedRecords_WritesNothing_AndStaysTruthful()
+    {
+        // A driver reinstall can remove the records while the marker and the originals file
+        // stay. Guessing would write somebody's numbers: the state stays what the key says.
+        SeedOriginalsAndMarker();
+
+        var registry = new FakeRomRegistry(_log);
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log);
+        var rails = new FakeRails(_log);
+        var restarter = new FakeRestarter(_log);
+
+        GpuRomOverrideStateDto? state = NewStore(
+            registry, restarter, new FakeCeiling(_log), ec, request, rails: rails).ReapplyAtStartup();
+
+        Assert.NotNull(state);
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, state!.State);
+        Assert.True(state.Enabled);
+        Assert.Empty(registry.Writes);
+        Assert.Empty(ec.Activations);
+        Assert.Empty(request.Requests);
+        Assert.Empty(rails.Sets);
+        Assert.Equal(0, restarter.Calls);
+    }
+
+    [Fact]
+    public void StartupReapply_RefusesAKeyAnotherToolOwns()
+    {
+        SeedOriginalsAndMarker();
+
+        var registry = new FakeRomRegistry(_log);
+        registry.Records["VBIOS"] = Array.Empty<byte>();
+        var ec = new FakeEc(_log);
+
+        GpuRomOverrideStateDto? state = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log), ec, new FakeRequest(_log)).ReapplyAtStartup();
+
+        Assert.NotNull(state);
+        Assert.Equal(GpuRomOverrideStates.Unsupported, state!.State);
+        Assert.Contains("VBIOS", state.Reason!, StringComparison.Ordinal);
+        Assert.Empty(registry.Writes);
+        Assert.Empty(ec.Activations);
+    }
+
+    [Fact]
+    public void StartupReapply_WithRecordsThatAreNotTheTier_DoesNotGuess()
+    {
+        // Ours by shape (the VBIOS prefix and an offset the originals file owns), but a
+        // 220 W ceiling: not this build's tier, so nothing is re-applied.
+        SeedOriginalsAndMarker();
+
+        var registry = new FakeRomRegistry(_log);
+        registry.Records["romOverride00"] =
+            RomOverrideRecord.Encode(RomOverrideLayout.PinnedVbiosVersion, 0x57C36, 220_000);
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log);
+
+        GpuRomOverrideStateDto? state = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, request).ReapplyAtStartup();
+
+        Assert.NotNull(state);
+        Assert.Equal(GpuRomOverrideStates.Uncertain, state!.State);
+        Assert.Empty(registry.Writes);
+        Assert.Empty(ec.Activations);
+        Assert.Empty(request.Requests);
+    }
+
+    [Fact]
+    public void StartupReapply_WithAMarkerForAnotherTier_DoesNotGuess()
+    {
+        // A marker written by a build that shipped a different tier: the records are ours
+        // but their meaning is not this build's, so nothing is re-applied.
+        SeedOriginalsAndMarker(tier: "some_other_tier");
+
+        var registry = new FakeRomRegistry(_log);
+        foreach ((string name, byte[] data) in
+                 RomOverrideLayout.BuildRecords(GpuPowerTiers.ExtraGpuPower, RomOverrideLayout.PinnedVbiosVersion))
+        {
+            registry.Records[name] = data;
+        }
+
+        var ec = new FakeEc(_log);
+
+        GpuRomOverrideStateDto? state = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, new FakeRequest(_log))
+            .ReapplyAtStartup();
+
+        Assert.NotNull(state);
+        Assert.True(state!.Enabled);
+        Assert.Empty(registry.Writes);
+        Assert.Empty(ec.Activations);
+    }
+
+    [Fact]
+    public void StartupReapply_WithoutTheMarker_DoesNothing()
+    {
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log);
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, request, rails: rails);
+
+        Assert.Null(store.ReapplyAtStartup());
+        Assert.Empty(ec.Activations);
+        Assert.Empty(request.Requests);
+        Assert.Empty(rails.Sets);
+        Assert.False(store.GetState().Enabled);
+    }
+
+    [Fact]
+    public void Restore_DeletesTheIntentMarker_AndEnabledFollowsIt()
+    {
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), new FakeRequest(_log));
+
+        Assert.False(store.GetState().Enabled);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        Assert.Equal(GpuPowerTiers.ExtraGpuPower.Id, File.ReadAllText(MarkerPath));
+        Assert.True(store.GetState().Enabled);
+
+        ceiling.Ceiling = 175_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+        Assert.False(File.Exists(MarkerPath));
+        Assert.False(store.GetState().Enabled);
+    }
+
+    private string MarkerPath => Path.Combine(Path.GetDirectoryName(OriginalsPath)!, "enabled");
+
+    /// <summary>The state a completed unlock leaves on disk, without touching the driver key.</summary>
+    private void SeedOriginalsAndMarker(string? tier = null)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(OriginalsPath)!);
+
+        var lines = new List<string> { RomOverrideLayout.PinnedVbiosVersion };
+        lines.AddRange(RomOverrideLayout.Fields.Select(f => $"{f.Offset}={f.StockValue}"));
+        File.WriteAllLines(OriginalsPath, lines);
+        File.WriteAllText(MarkerPath, tier ?? GpuPowerTiers.ExtraGpuPower.Id);
+    }
+
     private void AssertRefusal(Action<FakeRomRegistry> seed, string expected, bool withOriginals = false)
     {
         var registry = new FakeRomRegistry(_log);
