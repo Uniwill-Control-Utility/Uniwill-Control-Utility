@@ -545,7 +545,7 @@ public sealed class WatcherHubServiceTests
         var toasts = new List<(string Title, string Body, string? Accent)>();
         var now = T0;
         var arbiter = new PresetArbiter(
-            apply: (profile, _) => Task.CompletedTask,
+            apply: (profile, _, _) => Task.CompletedTask,
             isAdaptiveRunning: () => false,
             persistSelection: _ => { },
             clock: () => now);

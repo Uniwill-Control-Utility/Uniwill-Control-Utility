@@ -1167,5 +1167,7 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "EC 公布的基準 TGP 是 95 W，因此 cTGP 偏移為 130，Dynamic Boost 已關閉。",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "在加上 +233 MHz 核心偏移的情況下，我們實測板功耗 214 W，電壓 0.975-0.985 V，PerfCap 為 VRel — 功耗已不再是限制因素。偏移因卡而異，在本頁設定；另一台機器可能承受更多，也可能遠低於此就崩潰，而我們沒有在無偏移的情況下測過任何瓦數。熱點溫度：接水冷時 215 W 為 58-63 °C，不接水冷為 81.7 °C。",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "只覆寫驅動程式的功耗原則：GPU 韌體不變，「還原原始設定」可復原。",
-  "Range {0}-{1} A": "範圍 {0}-{1} A"
+  "Range {0}-{1} A": "範圍 {0}-{1} A",
+  "Apply GPU clock offsets at startup": "啟動時套用 GPU 時脈偏移",
+  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "關閉：啟動時會略過核心時脈偏移、V-F 曲線和記憶體偏移，電源限制與風扇設定仍會套用"
 }

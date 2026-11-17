@@ -196,6 +196,33 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
+                            <!-- Row: Apply GPU clock offsets at startup -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Apply GPU clock offsets at startup" TextWrapping="Wrap" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply"
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbApplyGpuClocksOnStartup"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbApplyGpuClocksOnStartup_Checked"
+                                                 Unchecked="cbApplyGpuClocksOnStartup_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
                             <!-- Row: Start minimised -->
                             <Grid>
                                 <Grid.ColumnDefinitions>

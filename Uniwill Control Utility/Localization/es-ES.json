@@ -1167,5 +1167,7 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "El EC publica un TGP base de 95 W, así que el desfase cTGP es 130 y Dynamic Boost está desactivado.",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Con un desfase de +233 MHz en el núcleo medimos 214 W de potencia de placa a 0,975-0,985 V, con PerfCap VRel — la potencia ya no era el límite. El desfase es de cada tarjeta y se ajusta en esta página; otra unidad puede admitir más o fallar muy por debajo, y no hemos medido ningún vataje sin desfase. Punto caliente 58-63 °C a 215 W con la refrigeración líquida conectada, 81,7 °C sin ella.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Sobrescribe solo la política de energía del controlador: el firmware de la GPU no cambia y «Restaurar original» lo deshace.",
-  "Range {0}-{1} A": "Intervalo {0}-{1} A"
+  "Range {0}-{1} A": "Intervalo {0}-{1} A",
+  "Apply GPU clock offsets at startup": "Aplicar los desplazamientos de reloj de la GPU al iniciar",
+  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Desactivado: el desplazamiento del reloj del núcleo, la curva V-F y el desplazamiento de memoria se omiten al iniciar, mientras que los límites de potencia y los ajustes de ventilador sí se aplican"
 }

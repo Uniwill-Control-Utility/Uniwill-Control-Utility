@@ -33,7 +33,7 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     public sealed class PresetArbiter
     {
-        private readonly Func<string, string?, Task> _apply;
+        private readonly Func<string, string?, bool, Task> _apply;
         private readonly Func<bool> _isAdaptiveRunning;
         private readonly Action<string> _persistSelection;
         private readonly Func<DateTime> _clock;
@@ -49,11 +49,13 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>Production wiring: apply through the full preset pipeline,
         /// persist the selection to user settings, read the Adaptive flag from
-        /// settings as the existing writers do.</summary>
+        /// settings as the existing writers do. The startup flag tells the applier
+        /// this is the boot restore, the one apply that honours
+        /// "Apply GPU clock offsets at startup".</summary>
         public PresetArbiter()
             : this(
-                (profile, display) => PresetProfileApplier.ApplyProfileAsync(
-                    profile, display ?? PresetProfileApplier.DisplayName(profile)),
+                (profile, display, startup) => PresetProfileApplier.ApplyProfileAsync(
+                    profile, display ?? PresetProfileApplier.DisplayName(profile), startup),
                 () => Settings.Default.isAdaptiveModeRunning,
                 profile =>
                 {
@@ -64,9 +66,10 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>Test seam: injected applier, Adaptive flag, persistence sink
-        /// and clock so the pipeline is unit-testable without settings or hardware.</summary>
+        /// and clock so the pipeline is unit-testable without settings or hardware.
+        /// The applier's third argument is "this is the startup restore".</summary>
         public PresetArbiter(
-            Func<string, string?, Task> apply,
+            Func<string, string?, bool, Task> apply,
             Func<bool> isAdaptiveRunning,
             Action<string> persistSelection,
             Func<DateTime>? clock = null)
@@ -111,7 +114,10 @@ namespace Uniwill_Control_Utility.Services
 
                 try
                 {
-                    await _apply(profile, null).ConfigureAwait(false);
+                    // BootRestore is the startup apply: only that one may skip the GPU
+                    // clock offsets (Settings.ApplyGpuClocksOnStartup). Every other
+                    // source is a live selection change or an automation edge.
+                    await _apply(profile, null, source == PresetIntentSource.BootRestore).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

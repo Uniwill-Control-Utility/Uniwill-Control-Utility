@@ -21,7 +21,7 @@ public sealed class PresetArbiterTests
     private Func<string, string?, Task>? _applierOverride;
 
     private PresetArbiter Create() => new(
-        apply: async (profile, _) =>
+        apply: async (profile, _, _) =>
         {
             if (_applierOverride is not null)
             {

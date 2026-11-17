@@ -1167,5 +1167,7 @@
   "The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off.": "EC сообщает базовый TGP 95 Вт, поэтому смещение cTGP равно 130, а Dynamic Boost выключен.",
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "Со смещением ядра +233 МГц мы замерили 214 Вт мощности платы при 0,975-0,985 В, PerfCap VRel — мощность больше не была ограничителем. Смещение индивидуально для карты и задаётся на этой странице; другой экземпляр может выдержать больше или упасть намного ниже, и без смещения мы не замеряли никакой мощности. Горячая точка 58-63 °C при 215 Вт с подключённым жидкостным охлаждением, 81,7 °C без него.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Переопределяет только политику питания драйвера: прошивка GPU не меняется, а «Восстановить исходное» отменяет изменение.",
-  "Range {0}-{1} A": "Диапазон {0}-{1} A"
+  "Range {0}-{1} A": "Диапазон {0}-{1} A",
+  "Apply GPU clock offsets at startup": "Применять смещения частоты GPU при запуске",
+  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Выкл.: при запуске смещение частоты ядра, кривая V-F и смещение памяти пропускаются, а ограничения мощности и настройки вентиляторов по-прежнему применяются"
 }

@@ -877,6 +877,14 @@ namespace Uniwill_Control_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ApplyGpuClocksOnStartup {
+            get { return ((bool)(this["ApplyGpuClocksOnStartup"])); }
+            set { this["ApplyGpuClocksOnStartup"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool EnableAdaptiveNavigation {
             get { return ((bool)(this["EnableAdaptiveNavigation"])); }
             set { this["EnableAdaptiveNavigation"] = value; }

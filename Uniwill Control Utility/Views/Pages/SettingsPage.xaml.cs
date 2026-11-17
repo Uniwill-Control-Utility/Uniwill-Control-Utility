@@ -152,6 +152,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
             StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
             cbShowStartupProgress.IsChecked = Settings.Default.ShowStartupProgressOverlay;
+            cbApplyGpuClocksOnStartup.IsChecked = Settings.Default.ApplyGpuClocksOnStartup;
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbDisableMiniTray.IsChecked = Settings.Default.DisableMiniTrayWindow;
@@ -479,6 +480,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbDisableToastPopups_Checked(object sender, RoutedEventArgs e)
         {
             Settings.Default.DisableToastPopups = true;
+            Settings.Default.Save();
+        }
+
+        private void cbApplyGpuClocksOnStartup_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ApplyGpuClocksOnStartup = true;
+            Settings.Default.Save();
+        }
+
+        private void cbApplyGpuClocksOnStartup_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ApplyGpuClocksOnStartup = false;
             Settings.Default.Save();
         }
 

@@ -473,7 +473,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     if (bootArbiter is not null)
                         await bootArbiter.RequestAsync(PresetIntentSource.BootRestore, profileName);
                     else
-                        await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+                        await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName), startup: true);
                     ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", profileName), accent: profileName);
                     return;
                 }
@@ -565,7 +565,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         }
                         else
                         {
-                            await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                            await RyzenAdj_To_UCU.TranslateAsync(StartupCommandWithoutGpuClocks(Settings.Default.CommandString));
                             ToastNotification.ShowToastNotification("Settings Reapplied");
                         }
                     }
@@ -585,7 +585,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         }
                         else
                         {
-                            await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                            await RyzenAdj_To_UCU.TranslateAsync(StartupCommandWithoutGpuClocks(Settings.Default.CommandString));
                             ToastNotification.ShowToastNotification("Settings Reapplied");
                         }
                     }
@@ -2247,7 +2247,9 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (arbiter is not null)
                 return await arbiter.RequestAsync(source, profileName);
 
-            await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+            await PresetProfileApplier.ApplyProfileAsync(
+                profileName, PresetProfileApplier.DisplayName(profileName),
+                startup: source == PresetIntentSource.BootRestore);
             return new PresetArbiterResult(true, PresetArbiterAction.Apply, "applied (no arbiter)");
         }
 
@@ -3342,6 +3344,42 @@ namespace Uniwill_Control_Utility.Views.Windows
         #region Custom Preset Boot Apply
 
         /// <summary>
+        /// The stored CommandString replayed at startup may carry a --NVIDIA-Clocks
+        /// token from an earlier manual apply. With "Apply GPU clock offsets at
+        /// startup" off, only its power fields survive (as --NVIDIA-Power); the clock
+        /// fields are dropped rather than zeroed, because writing core/memory 0 resets
+        /// the offsets to stock instead of leaving them alone.
+        /// </summary>
+        private static string StartupCommandWithoutGpuClocks(string command)
+        {
+            if (Settings.Default.ApplyGpuClocksOnStartup || string.IsNullOrWhiteSpace(command))
+                return command;
+
+            bool skipped = false;
+            var tokens = command.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(token =>
+                {
+                    if (!token.StartsWith("--NVIDIA-Clocks=", StringComparison.Ordinal))
+                        return token;
+
+                    skipped = true;
+                    string[] fields = token["--NVIDIA-Clocks=".Length..].Split('-');
+                    // 0-core-mem-watts-dbOffset; a negative offset leaves an empty field.
+                    return fields.Length >= 5 ? $"--NVIDIA-Power={string.Join('-', fields[^2..])}" : string.Empty;
+                })
+                .Where(token => token.Length > 0);
+
+            string stripped = string.Join(' ', tokens);
+            if (skipped)
+            {
+                Log.Information(
+                    "[Startup] GPU clocks skipped by 'Apply GPU clock offsets at startup': core clock offset, V-F curve and memory offset not applied (power limits and fans still applied)");
+            }
+
+            return stripped;
+        }
+
+        /// <summary>
         /// Builds a RyzenAdj command string from a CustomPreset, mirroring Presets.buildCommandString().
         /// </summary>
         private static string BuildCustomCommandString(Models.CustomPreset p)
@@ -3373,7 +3411,15 @@ namespace Uniwill_Control_Utility.Views.Windows
             // When a V-F curve is active, ApplyCustomOnStart handles the power limit
             // around the curve write. Emit only the clock tokens here to avoid a
             // redundant SetPowerLimit call from the translator.
-            if (p.VfCurveOffsets.Count > 0)
+            //
+            // "Apply GPU clock offsets at startup" off: no clock token at all (writing
+            // core/memory 0 would reset the offsets to stock instead of leaving them
+            // alone), just the power limit.
+            if (!Settings.Default.ApplyGpuClocksOnStartup)
+            {
+                parts.Add($"--NVIDIA-Power={totalWatts}-{dbOffset}");
+            }
+            else if (p.VfCurveOffsets.Count > 0)
             {
                 parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}");
             }
@@ -3392,8 +3438,11 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             await Scripts.RyzenAdj_To_UCU.TranslateAsync(command, appliedName: "Custom Preset", localizeAppliedName: false);
 
-            // Apply V-F curve offsets if the preset has them
-            if (p.VfCurveOffsets.Count > 0)
+            // Apply V-F curve offsets if the preset has them. Skipped when the user
+            // unchecked "Apply GPU clock offsets at startup": the curve carries the core
+            // offsets and the memory offset, and its power-limit writes ride the
+            // --NVIDIA-Power token instead.
+            if (p.VfCurveOffsets.Count > 0 && Settings.Default.ApplyGpuClocksOnStartup)
             {
                 int tgp = (int)p.GpuTgp;
                 int dbOffset = p.GpuDynamicBoost ? (int)p.GpuDbOffset : 0;
@@ -3402,6 +3451,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                     p.VfCurveOffsets,
                     Settings.Default.EnableGpuClockControl ? (int)p.GpuMemOffset : 0);
                 Scripts.GPUs.NVIDIA.NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+            }
+            else if (!Settings.Default.ApplyGpuClocksOnStartup)
+            {
+                Log.Information(
+                    "[Startup] GPU clocks skipped by 'Apply GPU clock offsets at startup': core clock offset, V-F curve and memory offset not applied (power limits and fans still applied)");
             }
 
             // Apply EC CPU power limits (AMD)

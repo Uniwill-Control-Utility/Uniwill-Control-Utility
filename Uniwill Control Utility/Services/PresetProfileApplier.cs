@@ -242,14 +242,18 @@ namespace Uniwill_Control_Utility.Services
         /// For custom presets, loads values from the saved preset slot.
         /// Skips GPU power if a V-F curve is active on that slot
         /// (power is applied separately through SetPowerLimit around the curve).
+        /// <paramref name="startup"/> is the startup restore's flag: with
+        /// "Apply GPU clock offsets at startup" off it emits the power limit without
+        /// any clock write, so core/memory/V-F stay as the user left them.
         /// Returns empty string for "None" or unknown profiles.
         /// </summary>
-        public static string BuildCommandString(string profileName)
+        public static string BuildCommandString(string profileName, bool startup = false)
         {
             if (string.IsNullOrEmpty(profileName) || profileName.Equals("None", StringComparison.OrdinalIgnoreCase))
                 return string.Empty;
 
             var parts = new List<string>();
+            bool skipClocks = SkipsGpuClocks(startup);
 
             // Check if this is a custom preset (e.g. "Custom 1", "Custom 3", "Custom 1 (Boost)")
             var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
@@ -260,7 +264,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     var preset = presets[customSlot];
                     bool vfCurveActive = preset.VfCurveOffsets.Count > 0;
-                    BuildCustomCommandFromPreset(parts, preset, skipGpuPower: vfCurveActive);
+                    BuildCustomCommandFromPreset(parts, preset, skipGpuPower: vfCurveActive && !skipClocks, skipClocks: skipClocks);
                 }
                 else
                 {
@@ -271,11 +275,11 @@ namespace Uniwill_Control_Utility.Services
             {
                 // Legacy "Custom" (no slot number) — use Settings values.
                 bool vfCurveActive = HasActiveVfCurve();
-                BuildCustomCommand(parts, skipGpuPower: vfCurveActive);
+                BuildCustomCommand(parts, skipGpuPower: vfCurveActive && !skipClocks, skipClocks: skipClocks);
             }
             else
             {
-                BuildSkuProfileCommand(profileName, parts);
+                BuildSkuProfileCommand(profileName, parts, skipClocks);
             }
 
             return string.Join(" ", parts) + " ";
@@ -285,9 +289,10 @@ namespace Uniwill_Control_Utility.Services
         /// Fully applies a profile: RyzenAdj commands, V-F curve (Custom only),
         /// and EC CPU power limits (AMD APU only). Mirrors Presets.applyProfileAsync().
         /// </summary>
-        public static async Task ApplyProfileAsync(string profileName, string? displayName)
+        public static async Task ApplyProfileAsync(string profileName, string? displayName, bool startup = false)
         {
-            string command = BuildCommandString(profileName);
+            bool skipClocks = SkipsGpuClocks(startup);
+            string command = BuildCommandString(profileName, startup);
             if (string.IsNullOrWhiteSpace(command))
                 return;
 
@@ -318,9 +323,17 @@ namespace Uniwill_Control_Utility.Services
                 }
             }
 
-            // 2. V-F curve (Custom profile only, if active)
+            // 2. V-F curve (Custom profile only, if active). Skipped outright when the
+            // startup apply is told to leave the GPU clocks alone: the curve carries
+            // the core offsets and the memory offset, so writing it would defeat the
+            // option. The power limit above already landed.
             var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
-            if (customSlot >= 0)
+            if (skipClocks)
+            {
+                Scripts.Misc.DiagnosticLogger.LogInfo(
+                    "[Startup] GPU clocks skipped by 'Apply GPU clock offsets at startup': core clock offset, V-F curve and memory offset not applied (power limits and fans still applied)");
+            }
+            else if (customSlot >= 0)
             {
                 var presets = CustomPresetStore.Load(customMode);
                 if (customSlot < presets.Length && presets[customSlot].VfCurveOffsets.Count > 0)
@@ -417,6 +430,16 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
+        /// <summary>
+        /// True when a startup apply must leave the GPU clock offsets alone: the user
+        /// unchecked "Apply GPU clock offsets at startup". The power limit and every
+        /// other preset value (EC limits, fans, activation) still apply; only the core
+        /// offset, the V-F curve and the memory offset are skipped. A manual apply
+        /// passes startup=false and ignores the setting.
+        /// </summary>
+        private static bool SkipsGpuClocks(bool startup) =>
+            startup && !Settings.Default.ApplyGpuClocksOnStartup;
+
         private static void ApplyVfCurve()
         {
             var presets = VfCurvePresetStore.Load();
@@ -475,7 +498,7 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Builds RyzenAdj command parts from a CustomPreset object.
         /// </summary>
-        private static void BuildCustomCommandFromPreset(List<string> parts, CustomPreset preset, bool skipGpuPower)
+        private static void BuildCustomCommandFromPreset(List<string> parts, CustomPreset preset, bool skipGpuPower, bool skipClocks = false)
         {
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
@@ -504,11 +527,13 @@ namespace Uniwill_Control_Utility.Services
                 int totalWatts = tgp + dbOffset;
                 int core = (int)preset.GpuCoreOffset;
                 int mem = (int)preset.GpuMemOffset;
-                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                parts.Add(skipClocks
+                    ? $"--NVIDIA-Power={totalWatts}-{dbOffset}"
+                    : $"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
             }
         }
 
-        private static void BuildSkuProfileCommand(string profileName, List<string> parts)
+        private static void BuildSkuProfileCommand(string profileName, List<string> parts, bool skipClocks = false)
         {
             var skuProfile = SkuResolver.GetProfile(profileName.ToLowerInvariant());
             int cpuPl1, cpuPl2;
@@ -549,13 +574,13 @@ namespace Uniwill_Control_Utility.Services
             // NVIDIA GPU power: stock presets yield GPU power to the firmware's
             // per-mode factory table (OpenRevo's approach), so only the clock
             // fields are emitted and no cTGP/DB write happens.
-            if (!string.IsNullOrEmpty(NvTuning.GetGpuName()))
+            if (!skipClocks && !string.IsNullOrEmpty(NvTuning.GetGpuName()))
             {
                 parts.Add("--NVIDIA-Clocks=0-0-0");
             }
         }
 
-        private static void BuildCustomCommand(List<string> parts, bool skipGpuPower)
+        private static void BuildCustomCommand(List<string> parts, bool skipGpuPower, bool skipClocks = false)
         {
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
@@ -611,7 +636,9 @@ namespace Uniwill_Control_Utility.Services
                 int totalWatts = tgp + dbOffset;
                 int core = (int)Settings.Default.customNvCore;
                 int mem = (int)Settings.Default.customNvMem;
-                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                parts.Add(skipClocks
+                    ? $"--NVIDIA-Power={totalWatts}-{dbOffset}"
+                    : $"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
             }
         }
 

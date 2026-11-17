@@ -387,7 +387,15 @@ namespace Uniwill_Control_Utility.Scripts
                 // MSI Afterburner keep their offsets. Power limit changes still apply.
                 bool gpuClockEnabled = Settings.Default.EnableGpuClockControl;
 
-                if (command == "NVIDIA-Clocks" && variables.Length == 2)
+                if (command == "NVIDIA-Power" && variables.Length == 2)
+                {
+                    // Clock-free power apply: the startup restore uses this when the
+                    // user unchecked "Apply GPU clock offsets at startup", so the
+                    // power limit still lands while core/memory offsets are untouched.
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetPowerLimit({variables[0]}, dbOffset={variables[1]}) — clocks not written");
+                    NvTuning.SetPowerLimit(int.Parse(variables[0]), int.Parse(variables[1]));
+                }
+                else if (command == "NVIDIA-Clocks" && variables.Length == 2)
                 {
                     if (!gpuClockEnabled)
                     {
