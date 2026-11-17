@@ -457,6 +457,16 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         internal static async Task ApplyOnStart()
         {
+            await ApplyOnStartCore();
+
+            // Bounded clock settle: a clock write issued seconds after boot is accepted and
+            // does not take (field, 2026-11-17), so if the apply's own memory readback says
+            // the offset is NOT in force, re-issue the same write at +5/+15/+30/+60 s.
+            Services.GpuClockSettle.ScheduleAfterStartup();
+        }
+
+        private static async Task ApplyOnStartCore()
+        {
             try
             {
                 // Stock presets (Office/Gaming/Turbo) always apply on startup regardless of the checkbox.

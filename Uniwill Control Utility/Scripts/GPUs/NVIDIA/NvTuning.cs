@@ -143,6 +143,31 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             int RequestedVoltageDeltaMv
         );
 
+        /// <summary>What the last clock write asked for - the startup settle re-issues exactly this.</summary>
+        internal readonly record struct ClockWrite(int Core, int MemoryMhz, Dictionary<int, int>? VfOffsets);
+
+        /// <summary>
+        /// The last clock write, null until one ran. A write issued seconds after boot is
+        /// accepted and does not take while the identical call on a settled GPU lands
+        /// (field, 2026-11-17), so the startup settle replays it; keeping the request here
+        /// means the retry can never drift from what the apply actually asked for.
+        /// </summary>
+        internal static ClockWrite? LastClockWrite { get; private set; }
+
+        /// <summary>
+        /// Re-issues the last clock write unchanged - the settle's only write path. A curve
+        /// apply travels whole: a memory-only pstate write after the curve erases the curve
+        /// (measured 2026-11-16).
+        /// </summary>
+        internal static int ReapplyLastClockWrite()
+        {
+            if (LastClockWrite is not ClockWrite write) return 0;
+
+            return write.VfOffsets is null
+                ? SetClocks(write.Core, write.MemoryMhz)
+                : ApplyVfCurveOffsets_ClockBoostTable(write.VfOffsets, write.MemoryMhz);
+        }
+
         public static int SetClocks(int core, int memory, int voltage = 0)
         {
             if (core < MinCoreOffset || core > MaxCoreOffset ||
@@ -150,6 +175,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 return 0;
 
             if (GpuInteropGuard.IsBlocked) return 0;
+
+            LastClockWrite = new ClockWrite(core, memory, null);
 
             // The baseline the memory readback is judged against after the write: NVML
             // reports the current pstate's clock, so the same pstate must be read twice.
@@ -1053,6 +1080,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         public static int ApplyVfCurveOffsets_ClockBoostTable(Dictionary<int, int> offsetsMHz, int memoryOffsetMhz = 0)
         {
             if (GpuInteropGuard.IsBlocked) return 0;
+
+            LastClockWrite = new ClockWrite(0, memoryOffsetMhz, offsetsMHz);
 
             DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: {offsetsMHz.Count} points, memory offset {memoryOffsetMhz} MHz");
 
