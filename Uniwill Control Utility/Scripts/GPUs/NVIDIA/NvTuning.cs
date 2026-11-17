@@ -77,15 +77,16 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         private const int MinPowerLimitWatts = 5;
         private const int MaxPowerLimitWattsDefault = 175;
 
-        // The raised ceiling is 250 W and the EC's Dynamic Boost maximum is 25 W, so 225 W is
-        // the most a base-TGP request can be: above it the EC drops what it cannot use (the
-        // 225 W target measured 214 W, where a 250 W request would be answered by the old
-        // 175 W limit). The offset stays target - DefaultTGP, so 225 W is 130 here.
-        private const int MaxPowerLimitWattsBoost = 225;
+        // The raised ceiling is 250 W, so the slider offers the full 250 W the driver permit
+        // allows. Note what the EC will do with it: its cTGP offset is target - DefaultTGP
+        // (155 at 250 W here) and the EC answered a 155 offset with its 150 W fallback in
+        // measurement, which is why the shipped unlock asks for 225 W (offset 130). Raising
+        // the slider widens what a user may ask for; it does not make the EC deliver it.
+        private const int MaxPowerLimitWattsBoost = 250;
 
         /// <summary>
         /// Returns the effective maximum power limit based on the user's power boost setting.
-        /// With boost enabled: 225W (ceiling minus Dynamic Boost). Otherwise: 175W.
+        /// With boost enabled: 250W (the raised ceiling). Otherwise: 175W.
         /// </summary>
         public static int MaxPowerLimitWatts =>
             Properties.Settings.Default.EnablePowerBoostMode
@@ -294,10 +295,20 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         {
             try
             {
-                if (totalWatts < MinPowerLimitWatts || totalWatts > MaxPowerLimitWatts)
+                if (totalWatts < MinPowerLimitWatts)
                 {
-                    DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): out of range {MinPowerLimitWatts}-{MaxPowerLimitWatts}W, skipped");
+                    DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): below the {MinPowerLimitWatts}W floor, skipped");
                     return 0;
+                }
+
+                // Above the maximum we clamp instead of skipping. A preset asking for more than
+                // the slider allows used to send nothing at all, so the app reported the preset
+                // as applied while the GPU kept its previous limit (a tester's 275 W preset).
+                if (totalWatts > MaxPowerLimitWatts)
+                {
+                    DiagnosticLogger.LogWarning(
+                        $"SetPowerLimit({totalWatts}W, db={dbOffset}W): above the {MaxPowerLimitWatts}W maximum, clamping to {MaxPowerLimitWatts}W");
+                    totalWatts = MaxPowerLimitWatts;
                 }
 
                 // Battery envelope (measured 2026-11-02, CPU + GPU loaded:

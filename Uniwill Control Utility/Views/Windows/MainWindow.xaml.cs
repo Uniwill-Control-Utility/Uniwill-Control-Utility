@@ -3434,6 +3434,15 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // No voltage control on Intel â€” undervolt removed
                 parts.Add($"--intel-pl={p.IntelPl1:F0},{p.IntelPl2:F0}");
             }
+            else
+            {
+                // No CPU family detected, so nothing above was emitted: the preset's power limits
+                // and Curve Optimizer are dropped while the UI still reports the preset as
+                // applied. A tester reported exactly that (50 W preset, CPU drawing 70 W+), so
+                // make the gap visible instead of silent.
+                DiagnosticLogger.LogWarning(
+                    $"[Startup] CPU part skipped: processor family is {Family.TYPE}, so the preset's power limits and Curve Optimizer were not sent");
+            }
 
             // NVIDIA GPU clocks
             int core = (int)p.GpuCoreOffset;
