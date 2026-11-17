@@ -832,11 +832,13 @@ namespace UCU.Contracts
         public bool Restarted { get; init; }
 
         /// <summary>
-        /// True when an unlock has been completed and its intent marker is on disk
-        /// (<c>%ProgramData%\UCU\gpu-rom-overrides\enabled</c>). The state alone cannot
-        /// tell a rebooted unlock from one that was never made — after a reboot it reads
-        /// Uncertain until the engine re-applies the live half — so the status row keys
-        /// its visibility on this instead.
+        /// True when an unlock is staged on this machine: the tier's records on the display
+        /// driver key, owned by UCU's originals file (<c>%ProgramData%\UCU\gpu-rom-overrides\originals.txt</c>).
+        /// That state cannot exist unless the owner unlocked (a restore removes the records, a
+        /// virgin machine has none), so it survives a reboot that the informational marker
+        /// file does not. The state alone cannot tell a rebooted unlock from one that was
+        /// never made — after a reboot it reads Uncertain until the engine re-applies the live
+        /// half — so the status row keys its visibility on this instead.
         /// </summary>
         public bool Enabled { get; init; }
 

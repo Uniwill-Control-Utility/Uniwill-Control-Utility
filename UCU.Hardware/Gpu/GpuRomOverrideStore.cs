@@ -60,6 +60,25 @@ namespace UCU.Hardware.Gpu
         GpuPowerLimits Read();
     }
 
+    /// <summary>What one start-up re-apply attempt settled, for the engine's retry loop.</summary>
+    public enum GpuReapplyVerdict
+    {
+        /// <summary>No unlock is staged: nothing to do, at this boot or any later one.</summary>
+        NoIntent,
+
+        /// <summary>The live half is back and every witness holds.</summary>
+        Applied,
+
+        /// <summary>Another attempt can still succeed (the driver/key/NVAPI is not up yet).</summary>
+        Transient,
+
+        /// <summary>Retrying cannot help: the key, the VBIOS or the tier refuses.</summary>
+        Refused,
+    }
+
+    /// <summary>One start-up attempt: the verdict and the state it read back (null for NoIntent).</summary>
+    public sealed record GpuReapplyResult(GpuReapplyVerdict Verdict, GpuRomOverrideStateDto? State);
+
     /// <summary>The four gpu.* ROM/rail verbs' target.</summary>
     public interface IGpuRomOverrideService
     {
@@ -69,11 +88,13 @@ namespace UCU.Hardware.Gpu
         GpuRomOverrideStateDto SetEnabled(bool enabled);
 
         /// <summary>
-        /// Re-applies the live half of a completed unlock once, at engine start: a reboot
-        /// keeps the records but clears the EC offset, the rails, the laptop budget and the
-        /// driver's request. Null when no unlock was ever completed (no intent marker).
+        /// One attempt at re-applying the live half of a completed unlock, for engine start:
+        /// a reboot keeps the records but clears the EC offset, the rails, the laptop budget
+        /// and the driver's request. The verdict says whether another attempt can help —
+        /// the engine retries the transient ones with backoff, because the service starts
+        /// before the display driver and NVAPI are necessarily ready.
         /// </summary>
-        GpuRomOverrideStateDto? ReapplyAtStartup();
+        GpuReapplyResult ReapplyAtStartup();
 
         /// <summary>The three runtime rail currents and the live policy ranges the sliders are bounded by.</summary>
         GpuRailLimitsDto GetRailLimits();
@@ -119,6 +140,14 @@ namespace UCU.Hardware.Gpu
         private readonly string _originalsPath;
         private readonly string _markerPath;
 
+        /// <summary>
+        /// The last start-up attempt's state (null before one ran, cleared by a completed
+        /// apply). A boot whose re-apply never landed must not read as Unlocked: after a
+        /// driver reset the rails sit at the record maxima, which no live read-back in
+        /// <see cref="GetState"/> would call wrong.
+        /// </summary>
+        private volatile GpuRomOverrideStateDto? _startup;
+
         public GpuRomOverrideStore(
             IGpuRomRegistry registry,
             IGpuRestarter restarter,
@@ -144,9 +173,10 @@ namespace UCU.Hardware.Gpu
                 "gpu-rom-overrides",
                 "originals.txt");
 
-            // The intent marker, beside the originals: it is the only record that the
-            // owner ever completed an unlock, so the start-up re-apply and the status row
-            // can tell a rebooted unlock from one that was never made.
+            // The intent marker, beside the originals. It is only an informational copy of
+            // the intent, written by a completed unlock: nothing reads it to decide anything,
+            // because a boot can lose it (measured 2026-11-17 — the file was gone while the
+            // records and originals survived, and the unlock stopped re-applying).
             _markerPath = Path.Combine(Path.GetDirectoryName(_originalsPath) ?? string.Empty, "enabled");
         }
 
@@ -182,9 +212,22 @@ namespace UCU.Hardware.Gpu
                 if (RequestReason(request) is string notAsked)
                     return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, budget: budget, rails: rails);
 
-                return BudgetReason(budget) is string capped
-                    ? State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, budget: budget, rails: rails)
-                    : State(GpuRomOverrideStates.Unlocked, null, version, limits, request, budget: budget, rails: rails);
+                if (BudgetReason(budget) is string capped)
+                    return State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, budget: budget, rails: rails);
+
+                // Every live witness can hold while a start-up attempt still failed (the
+                // rails it could not move read back as the record maxima): say so instead of
+                // reporting an unlock the card does not carry.
+                if (_startup is GpuRomOverrideStateDto unfinished &&
+                    unfinished.State != GpuRomOverrideStates.Unlocked)
+                {
+                    return State(
+                        GpuRomOverrideStates.Uncertain,
+                        unfinished.Reason ?? "the start-up re-apply has not landed",
+                        version, limits, request, budget: budget, rails: rails);
+                }
+
+                return State(GpuRomOverrideStates.Unlocked, null, version, limits, request, budget: budget, rails: rails);
             }
             catch (Exception ex)
             {
@@ -298,13 +341,15 @@ namespace UCU.Hardware.Gpu
                     pinned, restarted, limits, request, budget, rails,
                     captureBudgetFor: originals?.Budget == null ? pinned : null);
 
-                // The intent marker is what survives a reboot beside the records: written
-                // only by a completed unlock, and deleted only by Restore stock.
+                // The marker is an informational copy of the intent (the records and the
+                // originals file are the intent); it survives a boot only sometimes, so
+                // nothing may depend on it.
                 if (state.State != GpuRomOverrideStates.Unlocked)
                     return state;
 
+                _startup = null;
                 WriteMarker();
-                return state with { Enabled = true };
+                return state;
             }
             catch (Exception ex)
             {
@@ -443,75 +488,102 @@ namespace UCU.Hardware.Gpu
         }
 
         /// <summary>
-        /// The live half of a completed unlock, re-applied once at engine start. A reboot
-        /// keeps the seven records and the originals file, and clears everything the EC and
-        /// the driver hold: the cTGP offset, the rails, the laptop budget and the driver's
-        /// own request. So the four live moves are made again, with no record write and no
-        /// adapter restart (that would blank the screen at every boot), and the verdict is
-        /// the same read-back an apply makes. Null when no unlock was ever completed.
+        /// One attempt at the live half of a completed unlock: a reboot keeps the seven
+        /// records and the originals file, and clears everything the EC and the driver hold
+        /// — the cTGP offset, the rails, the laptop budget and the driver's own request. So
+        /// the four live moves are made again, with no record write and no adapter restart
+        /// (that would blank the screen at every boot), and the verdict is the same read-back
+        /// an apply makes.
+        ///
+        /// The intent is derived from what a reboot cannot take away: our records staged on
+        /// the driver key, matching this build's tier, with our originals file owning them.
+        /// That combination has no other cause — a restore deletes the records and the file,
+        /// a virgin machine has neither — while the marker file is only an informational
+        /// copy (a boot lost it once and the unlock silently stopped re-applying). The
+        /// verdict tells the caller whether another attempt can help: a key that is not
+        /// readable yet, the EC, or NVAPI warming up are transient; a foreign key, an
+        /// unpinned VBIOS or records of another tier are not.
         /// </summary>
-        public GpuRomOverrideStateDto? ReapplyAtStartup()
+        public GpuReapplyResult ReapplyAtStartup()
         {
-            if (!MarkerExists())
-                return null;
+            string? version = null;
+            GpuPowerLimits none = new(null, null);
 
             try
             {
-                if (Check(out string? version, out _, out IReadOnlyDictionary<string, byte[]> records)
-                    is GpuRomOverrideStateDto refused)
-                {
-                    return NotReapplied(refused, refused.Reason ?? "the driver key is not usable");
-                }
+                IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
+                version = _registry.ReadVbiosVersion();
 
-                if (!Matches(records, RomOverrideLayout.BuildRecords(_tier, version!)))
-                    return NotReapplied(GetState(), $"the driver key does not carry the {_tier.Id} records");
+                // Nothing staged and no originals: no unlock was ever completed (or it was
+                // restored), so there is nothing to do — not now, not two minutes from now.
+                if (records.Count == 0 && !File.Exists(_originalsPath))
+                    return new(GpuReapplyVerdict.NoIntent, null);
 
-                string tier = File.ReadAllText(_markerPath).Trim();
-                if (tier.Length != 0 && !string.Equals(tier, _tier.Id, StringComparison.Ordinal))
-                    return NotReapplied(GetState(), $"the marker names tier '{tier}', not '{_tier.Id}'");
+                if (version == null)
+                    return Attempt(GpuReapplyVerdict.Transient, State(
+                        GpuRomOverrideStates.Uncertain, "the display driver key is not readable yet", null, none));
+
+                if (!RomOverrideLayout.IsPinned(version))
+                    return Attempt(GpuReapplyVerdict.Refused, State(
+                        GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, none));
+
+                // An empty key beside an originals file is the adapter or its class key not
+                // being there yet (a driver reinstall looks the same; the retry is bounded).
+                if (records.Count == 0)
+                    return Attempt(GpuReapplyVerdict.Transient, State(
+                        GpuRomOverrideStates.NotUnlocked, "the driver key carries no records yet", version, none));
+
+                if (!TryReadOriginals(out Originals? originals, out string? fileError))
+                    return Attempt(GpuReapplyVerdict.Refused, State(
+                        GpuRomOverrideStates.Unsupported, fileError, version, none));
+
+                if (ForeignRecordReason(records, originals) is string foreign)
+                    return Attempt(GpuReapplyVerdict.Refused, State(
+                        GpuRomOverrideStates.Unsupported, foreign, version, none));
+
+                if (!Matches(records, RomOverrideLayout.BuildRecords(_tier, version)))
+                    return Attempt(GpuReapplyVerdict.Refused, State(
+                        GpuRomOverrideStates.Uncertain,
+                        $"the driver key does not carry the {_tier.Id} records", version, none));
 
                 // The EC offset goes first, exactly as in an apply: nothing is written
                 // before it, so a refusal here is clean.
                 GpuPowerInfoDto info = _ec.GetGpuPowerInfo();
                 if (!info.Supported)
                 {
-                    return NotReapplied(
-                        State(
-                            GpuRomOverrideStates.Unsupported,
-                            $"the EC publishes no usable DefaultTGP, so the cTGP offset cannot be computed: {info.Reason}",
-                            version, new GpuPowerLimits(null, null)),
-                        "the EC publishes no usable DefaultTGP");
+                    return Attempt(GpuReapplyVerdict.Transient, State(
+                        GpuRomOverrideStates.Unsupported,
+                        $"the EC publishes no usable DefaultTGP, so the cTGP offset cannot be computed: {info.Reason}",
+                        version, none));
                 }
 
                 _ec.ActivateGpuPowerControl(EcSpecCodec.CtgpOffsetForTgp(_tier.TgpTargetWatts, info.DefaultTgpWatts), 0);
 
                 GpuRomOverrideStateDto state = ApplyLive(
-                    "gpu.startup", null, version!, restarted: false,
-                    new GpuPowerLimits(null, null), new GpuPowerRequestState(null, null, null, null),
+                    "gpu.startup", null, version, restarted: false,
+                    none, new GpuPowerRequestState(null, null, null, null),
                     new GpuPowerBudgetState(null, null, null), GpuRailLimits.None);
 
-                Log.Information(
-                    "gpu.startup: {Tier} re-applied on {Version}: {State}{Reason}",
-                    _tier.Id, version, state.State,
-                    state.Reason is null ? string.Empty : " — " + state.Reason);
-
-                return state;
+                return Attempt(state.State == GpuRomOverrideStates.Unlocked
+                    ? GpuReapplyVerdict.Applied
+                    : GpuReapplyVerdict.Transient, state);
             }
             catch (Exception ex)
             {
-                // One attempt, no retry loop: a failure is the Uncertain state the verb
-                // reports, not a reason to hammer the EC at every boot.
-                Log.Information("gpu.startup: re-apply failed: {Type} {Message}", ex.GetType().Name, ex.Message);
-                return State(GpuRomOverrideStates.Uncertain, ex.Message, null, new GpuPowerLimits(null, null));
+                // Unknown, so it is given the benefit of the retry: the driver, NVAPI or the
+                // EC may simply not be up yet, and the attempt is bounded by the caller.
+                return Attempt(GpuReapplyVerdict.Transient, State(GpuRomOverrideStates.Uncertain, ex.Message, version, none));
             }
         }
 
-        private GpuRomOverrideStateDto NotReapplied(GpuRomOverrideStateDto state, string reason)
+        /// <summary>One attempt's line — every attempt, whatever it settled, is logged.</summary>
+        private GpuReapplyResult Attempt(GpuReapplyVerdict verdict, GpuRomOverrideStateDto state)
         {
             Log.Information(
-                "gpu.startup: the unlock is enabled but was not re-applied: {Reason}; the state stays {State}",
-                reason, state.State);
-            return state;
+                "gpu.startup: {Verdict}: {State}{Reason}",
+                verdict, state.State, state.Reason is null ? string.Empty : " — " + state.Reason);
+            _startup = state;
+            return new(verdict, state);
         }
 
         /// <summary>
@@ -552,6 +624,10 @@ namespace UCU.Hardware.Gpu
             GpuRailLimits rails = GpuRailLimits.None;
             string? budgetReason = null;
             string? railsReason = null;
+
+            // A restore ends the intent, so a boot verdict about it must not outlive the
+            // records: whatever happens below, the state verb reads the live machine again.
+            _startup = null;
 
             try
             {
@@ -723,8 +799,37 @@ namespace UCU.Hardware.Gpu
             RequestedLimitMilliwatts = request?.RequestedMilliwatts,
             EnforcedLimitMoved = limits.CeilingMilliwatts is int ceiling && ceiling > RomOverrideLayout.StockPowerMilliwatts,
             Restarted = restarted,
-            Enabled = MarkerExists(),
+            Enabled = IntentHolds(),
         };
+
+        /// <summary>
+        /// True when the owner's unlock is staged on this machine: our records on the driver
+        /// key, matching this build's tier, with our originals file owning them. No other
+        /// state produces that — a restore deletes the records and the file, a virgin machine
+        /// has neither, and a key another tool wrote fails the ownership check — so it is the
+        /// intent, and the marker file beside the originals is never consulted for it.
+        /// </summary>
+        private bool IntentHolds()
+        {
+            try
+            {
+                string? version = _registry.ReadVbiosVersion();
+                if (version == null || !RomOverrideLayout.IsPinned(version))
+                    return false;
+
+                if (!TryReadOriginals(out Originals? originals, out _) || originals == null)
+                    return false;
+
+                IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
+                return ForeignRecordReason(records, originals) == null
+                    && Matches(records, RomOverrideLayout.BuildRecords(_tier, version));
+            }
+            catch (Exception ex)
+            {
+                Log.Information("gpu: the unlock intent could not be judged: {Type} {Message}", ex.GetType().Name, ex.Message);
+                return false;
+            }
+        }
 
         /// <summary>
         /// Why the ceiling is not confirmed, or null when it is. The ceiling is the
@@ -1022,17 +1127,16 @@ namespace UCU.Hardware.Gpu
             if (File.Exists(_originalsPath))
                 File.Delete(_originalsPath);
 
-            // The intent goes with them: a marker without records would make the next
-            // boot re-apply an unlock nobody has staged.
+            // The informational copy goes with them, and so does a verdict about a boot that
+            // no longer has anything staged.
             DiscardMarker();
+            _startup = null;
         }
 
-        private bool MarkerExists() => File.Exists(_markerPath);
-
         /// <summary>
-        /// Records the owner's intent beside the originals. Only a completed unlock calls
-        /// this; the engine reads it at start to know the live half has to be re-applied,
-        /// and Restore stock is the only thing that deletes it.
+        /// Records the intent beside the originals, for support bundles and for a human: a
+        /// completed unlock is already readable from the records and the originals file, so
+        /// no decision reads this back.
         /// </summary>
         private void WriteMarker()
         {

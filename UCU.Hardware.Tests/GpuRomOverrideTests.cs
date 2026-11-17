@@ -58,13 +58,13 @@ public sealed class GpuRomOverrideTests : IDisposable
 
         Assert.Equal(7, records.Count);
 
-        // ceiling 250 W, board input 14.026 A, NVVDD 294 A, MSVDD 84 A — computed from
-        // the tier, so a different tier cannot silently ship another set. The ceiling is
-        // deliberately not the 225 W target: a request equal to the ceiling is answered
-        // with the stock 175 W limit.
+        // ceiling 250 W, board input 17.021 A (the policy ceiling, as the reference writes
+        // it), NVVDD 294 A, MSVDD 84 A — computed from the tier, so a different tier cannot
+        // silently ship another set. The ceiling is deliberately not the 225 W target: a
+        // request equal to the ceiling is answered with the stock 175 W limit.
         Assert.Equal("98-03-5E-00-5D-36-7C-05-00-04-90-D0-03-00", Hex(records[0].Data));
-        Assert.Equal("98-03-5E-00-5D-FC-7E-05-00-04-CA-36-00-00", Hex(records[1].Data));
-        Assert.Equal("98-03-5E-00-5D-00-7F-05-00-04-CA-36-00-00", Hex(records[2].Data));
+        Assert.Equal("98-03-5E-00-5D-FC-7E-05-00-04-7D-42-00-00", Hex(records[1].Data));
+        Assert.Equal("98-03-5E-00-5D-00-7F-05-00-04-7D-42-00-00", Hex(records[2].Data));
         Assert.Equal("98-03-5E-00-5D-94-80-05-00-04-70-7C-04-00", Hex(records[3].Data));
         Assert.Equal("98-03-5E-00-5D-98-80-05-00-04-70-7C-04-00", Hex(records[4].Data));
         Assert.Equal("98-03-5E-00-5D-FA-80-05-00-04-20-48-01-00", Hex(records[5].Data));
@@ -74,13 +74,17 @@ public sealed class GpuRomOverrideTests : IDisposable
             new[] { "romOverride00", "romOverride01", "romOverride02", "romOverride03", "romOverride04", "romOverride05", "romOverride06" },
             records.Select(r => r.Name));
 
-        // The tier's own numbers, as measured against MechControl-RE on 2026-11-15.
+        // The tier's own numbers, as measured against MechControl-RE on 2026-11-15. The
+        // board input carries both: the record maximum the reference writes (17.021 A, the
+        // policy ceiling the sliders read) and the runtime current we apply (14.026 A, which
+        // keeps a 225 W TGP inside the 420 W adapter).
         Assert.Equal(250_000, GpuPowerTiers.ExtraGpuPower.PowerMilliwatts);
         Assert.Equal(225_000, GpuPowerTiers.ExtraGpuPower.TgpTargetMilliwatts);
         Assert.Equal(225, GpuPowerTiers.ExtraGpuPower.TgpTargetWatts);
         Assert.Equal(294_000, GpuPowerTiers.ExtraGpuPower.NvVddMilliAmps);
         Assert.Equal(84_000, GpuPowerTiers.ExtraGpuPower.MsVddMilliAmps);
-        Assert.Equal(14_026, GpuPowerTiers.ExtraGpuPower.BoardInputMilliAmps);
+        Assert.Equal(17_021, GpuPowerTiers.ExtraGpuPower.BoardInputMilliAmps);
+        Assert.Equal(14_026, GpuPowerTiers.ExtraGpuPower.BoardInputCurrentMilliAmps);
     }
 
     [Fact]
@@ -951,7 +955,7 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal(210_000, stock.NvvddMilliamps);
         Assert.Equal(294_000, stock.NvvddMaxMilliamps);
         Assert.Equal(11_053, stock.BoardInputMilliamps);
-        Assert.Equal(14_026, stock.BoardInputMaxMilliamps);
+        Assert.Equal(17_021, stock.BoardInputMaxMilliamps);
 
         // The set answers the same shape: values passed through, live ranges alongside.
         GpuRailLimitsDto moved = store.SetRailLimits(250_000, 70_000, 14_026);
@@ -996,10 +1000,11 @@ public sealed class GpuRomOverrideTests : IDisposable
         int writesBefore = registry.Writes.Count;
         int requestsBefore = request.Requests.Count;
 
-        GpuRomOverrideStateDto? state = store.ReapplyAtStartup();
+        GpuReapplyResult result = store.ReapplyAtStartup();
 
-        Assert.NotNull(state);
-        Assert.Equal(GpuRomOverrideStates.Unlocked, state!.State);
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        GpuRomOverrideStateDto state = result.State!;
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
         Assert.Null(state.Reason);
         Assert.True(state.Enabled);
         Assert.False(state.Restarted);
@@ -1027,6 +1032,8 @@ public sealed class GpuRomOverrideTests : IDisposable
     {
         // A driver reinstall can remove the records while the marker and the originals file
         // stay. Guessing would write somebody's numbers: the state stays what the key says.
+        // (An empty key is also what a not-yet-enumerated adapter looks like at boot, hence
+        // the transient verdict: the retry is live and bounded, the write still is not.)
         SeedOriginalsAndMarker();
 
         var registry = new FakeRomRegistry(_log);
@@ -1035,12 +1042,12 @@ public sealed class GpuRomOverrideTests : IDisposable
         var rails = new FakeRails(_log);
         var restarter = new FakeRestarter(_log);
 
-        GpuRomOverrideStateDto? state = NewStore(
+        GpuReapplyResult result = NewStore(
             registry, restarter, new FakeCeiling(_log), ec, request, rails: rails).ReapplyAtStartup();
 
-        Assert.NotNull(state);
-        Assert.Equal(GpuRomOverrideStates.NotUnlocked, state!.State);
-        Assert.True(state.Enabled);
+        Assert.Equal(GpuReapplyVerdict.Transient, result.Verdict);
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, result.State!.State);
+        Assert.False(result.State.Enabled);
         Assert.Empty(registry.Writes);
         Assert.Empty(ec.Activations);
         Assert.Empty(request.Requests);
@@ -1057,12 +1064,12 @@ public sealed class GpuRomOverrideTests : IDisposable
         registry.Records["VBIOS"] = Array.Empty<byte>();
         var ec = new FakeEc(_log);
 
-        GpuRomOverrideStateDto? state = NewStore(
+        GpuReapplyResult result = NewStore(
             registry, new FakeRestarter(_log), new FakeCeiling(_log), ec, new FakeRequest(_log)).ReapplyAtStartup();
 
-        Assert.NotNull(state);
-        Assert.Equal(GpuRomOverrideStates.Unsupported, state!.State);
-        Assert.Contains("VBIOS", state.Reason!, StringComparison.Ordinal);
+        Assert.Equal(GpuReapplyVerdict.Refused, result.Verdict);
+        Assert.Equal(GpuRomOverrideStates.Unsupported, result.State!.State);
+        Assert.Contains("VBIOS", result.State.Reason!, StringComparison.Ordinal);
         Assert.Empty(registry.Writes);
         Assert.Empty(ec.Activations);
     }
@@ -1071,7 +1078,8 @@ public sealed class GpuRomOverrideTests : IDisposable
     public void StartupReapply_WithRecordsThatAreNotTheTier_DoesNotGuess()
     {
         // Ours by shape (the VBIOS prefix and an offset the originals file owns), but a
-        // 220 W ceiling: not this build's tier, so nothing is re-applied.
+        // 220 W ceiling: not this build's tier, so nothing is re-applied and no retry can
+        // turn that into this build's tier.
         SeedOriginalsAndMarker();
 
         var registry = new FakeRomRegistry(_log);
@@ -1080,21 +1088,22 @@ public sealed class GpuRomOverrideTests : IDisposable
         var ec = new FakeEc(_log);
         var request = new FakeRequest(_log);
 
-        GpuRomOverrideStateDto? state = NewStore(
+        GpuReapplyResult result = NewStore(
             registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, request).ReapplyAtStartup();
 
-        Assert.NotNull(state);
-        Assert.Equal(GpuRomOverrideStates.Uncertain, state!.State);
+        Assert.Equal(GpuReapplyVerdict.Refused, result.Verdict);
+        Assert.Equal(GpuRomOverrideStates.Uncertain, result.State!.State);
         Assert.Empty(registry.Writes);
         Assert.Empty(ec.Activations);
         Assert.Empty(request.Requests);
     }
 
     [Fact]
-    public void StartupReapply_WithAMarkerForAnotherTier_DoesNotGuess()
+    public void StartupReapply_WithAMarkerForAnotherTier_StillReapplies()
     {
-        // A marker written by a build that shipped a different tier: the records are ours
-        // but their meaning is not this build's, so nothing is re-applied.
+        // The marker is informational: a build that shipped another tier once wrote it, and
+        // it may name that tier. The records and the originals file are the intent, so the
+        // re-apply happens — the marker cannot veto it.
         SeedOriginalsAndMarker(tier: "some_other_tier");
 
         var registry = new FakeRomRegistry(_log);
@@ -1106,18 +1115,73 @@ public sealed class GpuRomOverrideTests : IDisposable
 
         var ec = new FakeEc(_log);
 
-        GpuRomOverrideStateDto? state = NewStore(
+        GpuReapplyResult result = NewStore(
             registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, new FakeRequest(_log))
             .ReapplyAtStartup();
 
-        Assert.NotNull(state);
-        Assert.True(state!.Enabled);
-        Assert.Empty(registry.Writes);
-        Assert.Empty(ec.Activations);
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, result.State!.State);
+        Assert.Equal(new[] { (130, 0) }, ec.Activations);
     }
 
     [Fact]
-    public void StartupReapply_WithoutTheMarker_DoesNothing()
+    public void StartupReapply_WithTheMarkerGone_StillReapplies()
+    {
+        // The measured boot loss (2026-11-17): the marker vanished — nothing had restored the
+        // unlock — while the records and the originals file survived. The state on disk is the
+        // intent, so the live half is re-applied anyway.
+        var registry = new FakeRomRegistry(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        File.Delete(MarkerPath);   // what the reboot did
+        request.Forget();
+        budget.Reset();
+        rails.NvVddCurrent = RomOverrideLayout.StockNvVddMilliAmps;
+        rails.BoardCurrent = 17_021;   // what a driver reset leaves: the record maxima
+
+        GpuReapplyResult result = store.ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, result.State!.State);
+        Assert.Equal(14_026, result.State.BoardInputCurrentMilliamps);
+    }
+
+    [Fact]
+    public void StartupReapply_WhenTheEcIsNotReady_IsTransient()
+    {
+        // The EC behind a boot-time service can be unreadable for a while: another attempt
+        // can succeed, so the caller is told to retry instead of giving up.
+        SeedOriginalsAndMarker();
+
+        var registry = new FakeRomRegistry(_log);
+        foreach ((string name, byte[] data) in
+                 RomOverrideLayout.BuildRecords(GpuPowerTiers.ExtraGpuPower, RomOverrideLayout.PinnedVbiosVersion))
+        {
+            registry.Records[name] = data;
+        }
+
+        var ec = new FakeEc(_log) { Supported = false, Reason = "the EC service is not up yet" };
+        var restarter = new FakeRestarter(_log);
+
+        GpuReapplyResult result = NewStore(
+            registry, restarter, new FakeCeiling(_log), ec, new FakeRequest(_log)).ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.Transient, result.Verdict);
+        Assert.Contains("DefaultTGP", result.State!.Reason!, StringComparison.Ordinal);
+        Assert.Empty(ec.Activations);
+        Assert.Empty(registry.Writes);
+        Assert.Equal(0, restarter.Calls);
+    }
+
+    [Fact]
+    public void StartupReapply_WithoutTheIntent_DoesNothing()
     {
         var ec = new FakeEc(_log);
         var request = new FakeRequest(_log);
@@ -1125,7 +1189,10 @@ public sealed class GpuRomOverrideTests : IDisposable
         GpuRomOverrideStore store = NewStore(
             new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, request, rails: rails);
 
-        Assert.Null(store.ReapplyAtStartup());
+        GpuReapplyResult result = store.ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.NoIntent, result.Verdict);
+        Assert.Null(result.State);
         Assert.Empty(ec.Activations);
         Assert.Empty(request.Requests);
         Assert.Empty(rails.Sets);
@@ -1133,7 +1200,68 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
-    public void Restore_DeletesTheIntentMarker_AndEnabledFollowsIt()
+    public void StartupReapply_AfterARestore_IsNoIntent_SoNothingIsRetried()
+    {
+        // The unlock is restored while the engine is up: the records and the originals file
+        // are gone, so the next attempt has nothing to re-apply (and writes nothing).
+        var registry = new FakeRomRegistry(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), ceiling, new FakeEc(_log), new FakeRequest(_log));
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        ceiling.Ceiling = 175_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+
+        Assert.Equal(GpuReapplyVerdict.NoIntent, store.ReapplyAtStartup().Verdict);
+        Assert.Empty(registry.Records);
+    }
+
+    [Fact]
+    public void Enabled_IsDerivedFromTheRecordsAndTheOriginals_NotTheMarker()
+    {
+        // Enabled is what the status row keys on, so it must not depend on a file a boot can
+        // lose: our records, matching the tier, plus our originals file are the intent.
+        var registry = new FakeRomRegistry(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), ceiling, new FakeEc(_log), new FakeRequest(_log), new FakeBudget(_log));
+
+        Assert.False(store.GetState().Enabled);   // virgin machine: no records, no originals
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        Assert.True(store.GetState().Enabled);
+        Assert.True(File.Exists(OriginalsPath));
+
+        File.Delete(MarkerPath);
+        Assert.True(store.GetState().Enabled);   // the marker is informational only
+
+        // The originals file goes: the records on the key are no longer ours to claim.
+        File.Delete(OriginalsPath);
+        Assert.False(store.GetState().Enabled);
+    }
+
+    [Fact]
+    public void Enabled_IsFalseForAKeyWeDoNotOwn_AndForAnEmptyKey()
+    {
+        // Another tool's records (or a foreign shape) are not an unlock of ours, whatever
+        // marker a previous install left behind.
+        SeedOriginalsAndMarker();
+
+        var registry = new FakeRomRegistry(_log);
+        registry.Records["romOverride00"] = RomOverrideRecord.Encode("98.03.5E.00.5E", 0x57C36, 250_000);
+
+        Assert.False(NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log), new FakeEc(_log), new FakeRequest(_log))
+            .GetState().Enabled);
+
+        Assert.False(NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log), new FakeEc(_log), new FakeRequest(_log))
+            .GetState().Enabled);
+    }
+
+    [Fact]
+    public void Restore_DeletesTheMarkerAndTheIntent_AndEnabledFollows()
     {
         var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
         GpuRomOverrideStore store = NewStore(
@@ -1471,9 +1599,11 @@ public sealed class GpuRomOverrideTests : IDisposable
 
     /// <summary>
     /// The runtime rail currents. The policy is what the staged records widen (the stock
-    /// maxima 210000/60000/11053 mA, the tier's 294000/84000/14026), the currents are what
-    /// the driver carries — and the measured point of this lever is that they are two
-    /// different things: the same records held the board at 175-179 W until the rails moved.
+    /// maxima 210000/60000/11053 mA, the tier's 294000/84000/17021 — the reference's board
+    /// input policy ceiling), the currents are what the driver carries (the tier applies
+    /// 14.026 A on the board input, inside that ceiling) — and the measured point of this
+    /// lever is that they are two different things: the same records held the board at
+    /// 175-179 W until the rails moved.
     /// </summary>
     private sealed class FakeRails : IGpuRailControl
     {
@@ -1485,7 +1615,7 @@ public sealed class GpuRomOverrideTests : IDisposable
 
         public (int Min, int Max) MsVddPolicy { get; set; } = (60_000, 84_000);
 
-        public (int Min, int Max)? BoardPolicy { get; set; } = (11_053, 14_026);
+        public (int Min, int Max)? BoardPolicy { get; set; } = (11_053, 17_021);
 
         public int? NvVddCurrent { get; set; } = 210_000;
 

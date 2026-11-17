@@ -57,10 +57,12 @@ namespace UCU.Hardware.Gpu
     /// own limit for this board), rails at MechControl-RE's measured values, i.e.
     /// ≈1.4× the ~200-210 W draw.
     ///
-    /// The board-input clamp is deliberately NOT MechControl's 17.021 A but 14.026 A:
-    /// 14.026 A × ~20 V + 130 W CPU stays inside the 420 W adapter whereas 17.021 A
-    /// does not. That is also the runtime rail current the board input is set to — the
-    /// clamp is the record maximum, the current is what the driver is told to use.
+    /// The board input carries two numbers on purpose: the record maximum is the
+    /// reference's 17.021 A (the policy ceiling the driver may offer, and therefore the
+    /// bound the sliders read), while the runtime rail current we apply stays 14.026 A —
+    /// 14.026 A × ~20 V + 130 W CPU stays inside the 420 W adapter where 17.021 A does
+    /// not. So a driver reset leaves the rails at 17.021 A until the re-apply lands,
+    /// which is why the start-up re-apply retries.
     /// </summary>
     public static class GpuPowerTiers
     {
@@ -71,7 +73,7 @@ namespace UCU.Hardware.Gpu
             TgpTargetMilliwatts: 225_000,
             NvVddMilliAmps: 294_000,
             MsVddMilliAmps: 84_000,
-            BoardInputMilliAmps: 14_026,
+            BoardInputMilliAmps: 17_021,
             NvVddCurrentMilliAmps: 250_000,
             MsVddCurrentMilliAmps: 70_000,
             BoardInputCurrentMilliAmps: 14_026);

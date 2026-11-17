@@ -16,6 +16,12 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
     /// <summary>How many times the engine's start-up re-apply reached this fake.</summary>
     public int ReapplyCalls { get; private set; }
 
+    /// <summary>The next start-up attempts' verdicts, in order; then <see cref="Verdict"/>.</summary>
+    public Queue<GpuReapplyVerdict> Verdicts { get; } = new();
+
+    /// <summary>What an attempt answers once the scripted ones are used up.</summary>
+    public GpuReapplyVerdict Verdict { get; set; } = GpuReapplyVerdict.NoIntent;
+
     public (int? Nvvdd, int? Msvdd, int? BoardInput)? LastRailSet { get; private set; }
 
     public GpuRomOverrideStateDto Answer { get; set; } = new()
@@ -56,10 +62,11 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
         return Answer;
     }
 
-    public GpuRomOverrideStateDto? ReapplyAtStartup()
+    public GpuReapplyResult ReapplyAtStartup()
     {
         ReapplyCalls++;
-        return Answer.Enabled ? Answer : null;
+        GpuReapplyVerdict verdict = Verdicts.Count > 0 ? Verdicts.Dequeue() : Verdict;
+        return new(verdict, verdict == GpuReapplyVerdict.NoIntent ? null : Answer);
     }
 
     public GpuRailLimitsDto GetRailLimits() => RailAnswer;

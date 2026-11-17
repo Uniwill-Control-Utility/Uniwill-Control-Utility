@@ -225,7 +225,7 @@ namespace Uniwill_Control_Utility.Services
             text.AppendLine("GPU power budget (F7): " +
                             (romOverride?.BudgetMilliwatts is int budget ? Watts(budget) : "unknown (engine unreachable)"));
 
-            // The intent marker and the live half: after a reboot the records are still
+            // The staged unlock and the live half: after a reboot the records are still
             // staged while the EC offset, the rails, the budget and the driver's request
             // are not, so "enabled" alone does not mean the card is drawing the watts.
             text.AppendLine("GPU power override: " + OverrideLine(romOverride));
@@ -276,7 +276,7 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// The override state the engine sees, read-only and best-effort: it carries both
-        /// the F7 budget and the intent marker, so the report can say the unlock is enabled
+        /// the F7 budget and the staged unlock, so the report can say the unlock is enabled
         /// while the live half is not in force. An unreachable engine renders "unknown".
         /// </summary>
         private GpuRomOverrideStateDto? ReadRomOverride()
@@ -316,7 +316,7 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        /// <summary>One line: the intent marker and whether the driver-side half is in force.</summary>
+        /// <summary>One line: whether an unlock is staged, and whether the driver-side half is in force.</summary>
         private static string OverrideLine(GpuRomOverrideStateDto? romOverride)
         {
             if (romOverride is null)

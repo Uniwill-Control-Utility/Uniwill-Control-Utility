@@ -1,12 +1,13 @@
 namespace Uniwill_Control_Utility.Tests.UI;
 
 /// <summary>
-/// The unlock's status row is keyed to the intent marker (<c>Enabled</c>), never to the
+/// The unlock's status row is keyed to the staged unlock (<c>Enabled</c>), never to the
 /// derived state. After a reboot the state reads Uncertain until the engine's start-up
 /// re-apply lands, so a row keyed to the state appeared for an owner who had not touched
-/// the feature since booting. With the marker, the row is absent until the unlock has been
-/// completed at least once, and once enabled it renders whatever the numbers are — including
-/// "Not read" / "Unverified" while the re-apply is still settling.
+/// the feature since booting. With the staged records and UCU's originals file, the row is
+/// absent until the unlock has been completed at least once, and once enabled it renders
+/// whatever the numbers are — including "Not read" / "Unverified" while the re-apply is
+/// still settling.
 /// </summary>
 public sealed class PresetsRomStatusRowVisibilityTests
 {
