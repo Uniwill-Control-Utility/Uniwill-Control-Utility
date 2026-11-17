@@ -885,6 +885,14 @@ namespace Uniwill_Control_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ApplyCpuCurveOptimizerOnStartup {
+            get { return ((bool)(this["ApplyCpuCurveOptimizerOnStartup"])); }
+            set { this["ApplyCpuCurveOptimizerOnStartup"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool EnableAdaptiveNavigation {
             get { return ((bool)(this["EnableAdaptiveNavigation"])); }
             set { this["EnableAdaptiveNavigation"] = value; }

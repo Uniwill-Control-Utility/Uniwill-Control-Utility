@@ -1168,6 +1168,8 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "مع فرق نواة +233 ميغاهرتز قسنا 214 واط طاقة اللوحة عند 0,975-0,985 فولت، مع PerfCap VRel — لم تعد الطاقة هي الحد الفعلي. الفرق خاص بكل بطاقة وتضبطه في هذه الصفحة، وقد تتحمل وحدة أخرى أكثر أو تنهار عند قيمة أقل بكثير، ولم نقس أي قدرة بالواط بدون فرق. نقطة السخونة 58-63 °C عند 215 واط مع توصيل التبريد السائل، و81,7 °C بدونه.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "يتجاوز سياسة الطاقة في برنامج التشغيل فقط: البرنامج الثابت لمعالج الرسوميات لا يتغيّر، و«استعادة الأصل» يلغيه.",
   "Range {0}-{1} A": "النطاق {0}-{1} A",
+  "Apply CPU Curve Optimizer at startup": "تطبيق مُحسِّن منحنى CPU عند بدء التشغيل",
+  "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "يطبّق إزاحات مُحسِّن المنحنى لكل نواة أو الموحّدة عند بدء التشغيل (تبقى حدود طاقة CPU ودرجات الحرارة وإعدادات المراوح مطبّقة)",
   "Apply GPU clock offsets at startup": "تطبيق إزاحات ساعة GPU عند بدء التشغيل",
   "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "يُطبِّق إزاحة ساعة GPU (أو منحنى V-F) وإزاحات ساعة الذاكرة عند بدء التشغيل (تُطبَّق إعدادات الإعداد المسبق الأخرى كما هي)"
 }

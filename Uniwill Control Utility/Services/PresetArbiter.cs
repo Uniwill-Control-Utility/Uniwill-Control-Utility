@@ -115,7 +115,8 @@ namespace Uniwill_Control_Utility.Services
                 try
                 {
                     // BootRestore is the startup apply: only that one may skip the GPU
-                    // clock offsets (Settings.ApplyGpuClocksOnStartup). Every other
+                    // clock offsets (Settings.ApplyGpuClocksOnStartup) and the CPU Curve
+                    // Optimizer (Settings.ApplyCpuCurveOptimizerOnStartup). Every other
                     // source is a live selection change or an automation edge.
                     await _apply(profile, null, source == PresetIntentSource.BootRestore).ConfigureAwait(false);
                 }

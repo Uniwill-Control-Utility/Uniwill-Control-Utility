@@ -1168,6 +1168,8 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "+233 MHz कोर ऑफ़सेट के साथ हमने 0.975-0.985 V पर 214 W बोर्ड पावर मापी, PerfCap VRel — पावर अब बाधा नहीं थी। ऑफ़सेट हर कार्ड का अपना होता है और इस पेज पर सेट होता है; कोई दूसरी यूनिट अधिक सह सकती है या इससे बहुत कम पर क्रैश कर सकती है, और बिना ऑफ़सेट हमने कोई वाट क्षमता नहीं मापी है। तरल कूलर जुड़ा होने पर 215 W पर हॉटस्पॉट 58-63 °C, बिना कूलर 81.7 °C।",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "केवल ड्राइवर की पावर नीति को ओवरराइड करता है: GPU का फ़र्मवेयर नहीं बदलता, और \"मूल स्थिति में लौटाएँ\" इसे वापस ले लेता है।",
   "Range {0}-{1} A": "सीमा {0}-{1} A",
+  "Apply CPU Curve Optimizer at startup": "स्टार्टअप पर CPU कर्व ऑप्टिमाइज़र लागू करें",
+  "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "स्टार्टअप पर प्रति-कोर या एकीकृत कर्व ऑप्टिमाइज़र ऑफ़सेट लागू करता है (CPU पावर सीमाएँ, तापमान और फ़ैन सेटिंग्स अभी भी लागू रहती हैं)",
   "Apply GPU clock offsets at startup": "स्टार्टअप पर GPU क्लॉक ऑफ़सेट लागू करें",
   "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "स्टार्टअप पर GPU क्लॉक ऑफ़सेट (या V-F कर्व) और मेमोरी क्लॉक ऑफ़सेट लागू करता है (अन्य प्रीसेट सेटिंग्स लागू रहती हैं)"
 }

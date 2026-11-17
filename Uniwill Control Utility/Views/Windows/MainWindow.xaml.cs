@@ -565,7 +565,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         }
                         else
                         {
-                            await RyzenAdj_To_UCU.TranslateAsync(StartupCommandWithoutGpuClocks(Settings.Default.CommandString));
+                            await RyzenAdj_To_UCU.TranslateAsync(StartupCommandWithoutGatedOffsets(Settings.Default.CommandString));
                             ToastNotification.ShowToastNotification("Settings Reapplied");
                         }
                     }
@@ -585,7 +585,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         }
                         else
                         {
-                            await RyzenAdj_To_UCU.TranslateAsync(StartupCommandWithoutGpuClocks(Settings.Default.CommandString));
+                            await RyzenAdj_To_UCU.TranslateAsync(StartupCommandWithoutGatedOffsets(Settings.Default.CommandString));
                             ToastNotification.ShowToastNotification("Settings Reapplied");
                         }
                     }
@@ -3349,31 +3349,60 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// startup" off, only its power fields survive (as --NVIDIA-Power); the clock
         /// fields are dropped rather than zeroed, because writing core/memory 0 resets
         /// the offsets to stock instead of leaving them alone.
+        ///
+        /// The same replay can carry Curve Optimizer tokens; with "Apply CPU Curve
+        /// Optimizer at startup" off they are dropped (not zeroed: a 0 offset is a real
+        /// write that resets the curve). Each switch strips only its own tokens, so the
+        /// two are independent.
         /// </summary>
-        private static string StartupCommandWithoutGpuClocks(string command)
+        private static string StartupCommandWithoutGatedOffsets(string command) =>
+            StripStartupGatedOffsets(
+                command,
+                stripClocks: !Settings.Default.ApplyGpuClocksOnStartup,
+                stripCurveOptimizer: !Settings.Default.ApplyCpuCurveOptimizerOnStartup);
+
+        internal static string StripStartupGatedOffsets(string command, bool stripClocks, bool stripCurveOptimizer)
         {
-            if (Settings.Default.ApplyGpuClocksOnStartup || string.IsNullOrWhiteSpace(command))
+            if (string.IsNullOrWhiteSpace(command) || (!stripClocks && !stripCurveOptimizer))
                 return command;
 
-            bool skipped = false;
+            bool skippedClocks = false;
+            bool skippedCurveOptimizer = false;
             var tokens = command.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(token =>
                 {
-                    if (!token.StartsWith("--NVIDIA-Clocks=", StringComparison.Ordinal))
-                        return token;
+                    if (stripClocks && token.StartsWith("--NVIDIA-Clocks=", StringComparison.Ordinal))
+                    {
+                        skippedClocks = true;
+                        string[] fields = token["--NVIDIA-Clocks=".Length..].Split('-');
+                        // 0-core-mem-watts-dbOffset; a negative offset leaves an empty field.
+                        return fields.Length >= 5 ? $"--NVIDIA-Power={string.Join('-', fields[^2..])}" : string.Empty;
+                    }
 
-                    skipped = true;
-                    string[] fields = token["--NVIDIA-Clocks=".Length..].Split('-');
-                    // 0-core-mem-watts-dbOffset; a negative offset leaves an empty field.
-                    return fields.Length >= 5 ? $"--NVIDIA-Power={string.Join('-', fields[^2..])}" : string.Empty;
+                    if (stripCurveOptimizer
+                        && (token.StartsWith("--set-coall=", StringComparison.Ordinal)
+                            || token.StartsWith("--set-coper=", StringComparison.Ordinal)
+                            || token.StartsWith("--set-coper-batch=", StringComparison.Ordinal)))
+                    {
+                        skippedCurveOptimizer = true;
+                        return string.Empty;
+                    }
+
+                    return token;
                 })
                 .Where(token => token.Length > 0);
 
             string stripped = string.Join(' ', tokens);
-            if (skipped)
+            if (skippedClocks)
             {
                 Log.Information(
                     "[Startup] GPU clocks skipped by 'Apply GPU clock offsets at startup': core clock offset, V-F curve and memory offset not applied (power limits and fans still applied)");
+            }
+
+            if (skippedCurveOptimizer)
+            {
+                Log.Information(
+                    "[Startup] CPU Curve Optimizer skipped by 'Apply CPU Curve Optimizer at startup': per-core and unified CO offsets not applied (power limits, temperatures and fans still applied)");
             }
 
             return stripped;
@@ -3394,6 +3423,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                 parts.Add($"--fast-limit={fastLimit}");
                 parts.Add($"--tctl-temp={p.CpuTjMax}");
                 parts.Add($"--cHTC-temp={p.CpuTjMax}");
+
+                // "Apply CPU Curve Optimizer at startup" off: no CO token at all (a 0
+                // offset is a real write that resets the curve, not "leave it alone").
+                if (Settings.Default.ApplyCpuCurveOptimizerOnStartup)
+                    PresetProfileApplier.AppendCoCommands(parts, p, CpuTopologyReader.Read());
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {

@@ -219,6 +219,33 @@
                                                  Unchecked="cbApplyGpuClocksOnStartup_Unchecked" />
                             </Grid>
 
+                            <!-- Divider (hidden with the Curve Optimizer row on Intel) -->
+                            <Border x:Name="CpuCurveOptimizerDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Apply CPU Curve Optimizer at startup -->
+                            <Grid x:Name="CpuCurveOptimizerRow">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Apply CPU Curve Optimizer at startup" TextWrapping="Wrap" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)"
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbApplyCpuCurveOptimizerOnStartup"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbApplyCpuCurveOptimizerOnStartup_Checked"
+                                                 Unchecked="cbApplyCpuCurveOptimizerOnStartup_Unchecked" />
+                            </Grid>
+
                             <!-- Divider -->
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />

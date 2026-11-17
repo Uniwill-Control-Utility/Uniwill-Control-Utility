@@ -616,6 +616,8 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.",
   "Range {0}-{1} A": "Range {0}-{1} A",
+  "Apply CPU Curve Optimizer at startup": "Apply CPU Curve Optimizer at startup",
+  "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)",
   "Apply GPU clock offsets at startup": "Apply GPU clock offsets at startup",
   "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "При запуске применяет смещение частоты GPU (или кривую V-F) и смещения частоты памяти (остальные настройки пресета по-прежнему применяются)"
 }

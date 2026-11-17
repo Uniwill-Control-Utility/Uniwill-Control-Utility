@@ -153,6 +153,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
             cbShowStartupProgress.IsChecked = Settings.Default.ShowStartupProgressOverlay;
             cbApplyGpuClocksOnStartup.IsChecked = Settings.Default.ApplyGpuClocksOnStartup;
+            cbApplyCpuCurveOptimizerOnStartup.IsChecked = Settings.Default.ApplyCpuCurveOptimizerOnStartup;
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbDisableMiniTray.IsChecked = Settings.Default.DisableMiniTrayWindow;
@@ -171,6 +172,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool cpuVoltageRowVisible = Family.TYPE != Family.ProcessorType.Intel;
             CpuVoltageControlDivider.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
             CpuVoltageControlRow.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
+            CpuCurveOptimizerDivider.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
+            CpuCurveOptimizerRow.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
             cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
             cbShowAdaptiveNavigation.IsChecked = Settings.Default.EnableAdaptiveNavigation;
             cbShowHydroUiNavigation.IsChecked = Settings.Default.EnableHydroUiNavigation;
@@ -492,6 +495,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbApplyGpuClocksOnStartup_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.ApplyGpuClocksOnStartup = false;
+            Settings.Default.Save();
+        }
+
+        private void cbApplyCpuCurveOptimizerOnStartup_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ApplyCpuCurveOptimizerOnStartup = true;
+            Settings.Default.Save();
+        }
+
+        private void cbApplyCpuCurveOptimizerOnStartup_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ApplyCpuCurveOptimizerOnStartup = false;
             Settings.Default.Save();
         }
 

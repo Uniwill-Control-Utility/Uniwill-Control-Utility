@@ -1168,6 +1168,8 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "在加 +233 MHz 核心偏移的情况下，我们实测板功耗 214 W，电压 0.975-0.985 V，PerfCap 为 VRel — 功耗已不再是限制因素。偏移因卡而异，在本页设置；另一台机器可能承受更多，也可能远低于此就崩溃，而我们没有在无偏移的情况下测过任何瓦数。热点温度：接水冷时 215 W 为 58-63 °C，不接水冷为 81.7 °C。",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "只覆盖驱动程序的功耗策略：GPU 固件不变，“恢复原始设置”可撤销。",
   "Range {0}-{1} A": "范围 {0}-{1} A",
+  "Apply CPU Curve Optimizer at startup": "启动时应用 CPU 曲线优化器",
+  "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "启动时应用每核心或统一的曲线优化器偏移（CPU 功率限制、温度和风扇设置仍会应用）",
   "Apply GPU clock offsets at startup": "启动时应用 GPU 时钟偏移",
   "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "启动时应用 GPU 时钟偏移 (或 V-F 曲线) 和显存时钟偏移 (其他预设设置仍会应用)"
 }

@@ -244,7 +244,9 @@ namespace Uniwill_Control_Utility.Services
         /// (power is applied separately through SetPowerLimit around the curve).
         /// <paramref name="startup"/> is the startup restore's flag: with
         /// "Apply GPU clock offsets at startup" off it emits the power limit without
-        /// any clock write, so core/memory/V-F stay as the user left them.
+        /// any clock write, so core/memory/V-F stay as the user left them; with
+        /// "Apply CPU Curve Optimizer at startup" off it emits no Curve Optimizer
+        /// token at all, so the CPU keeps the curve the user left it with.
         /// Returns empty string for "None" or unknown profiles.
         /// </summary>
         public static string BuildCommandString(string profileName, bool startup = false)
@@ -254,6 +256,7 @@ namespace Uniwill_Control_Utility.Services
 
             var parts = new List<string>();
             bool skipClocks = SkipsGpuClocks(startup);
+            bool skipCo = SkipsCurveOptimizer(startup);
 
             // Check if this is a custom preset (e.g. "Custom 1", "Custom 3", "Custom 1 (Boost)")
             var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
@@ -264,7 +267,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     var preset = presets[customSlot];
                     bool vfCurveActive = preset.VfCurveOffsets.Count > 0;
-                    BuildCustomCommandFromPreset(parts, preset, skipGpuPower: vfCurveActive && !skipClocks, skipClocks: skipClocks);
+                    BuildCustomCommandFromPreset(parts, preset, skipGpuPower: vfCurveActive && !skipClocks, skipClocks: skipClocks, skipCo: skipCo);
                 }
                 else
                 {
@@ -275,7 +278,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 // Legacy "Custom" (no slot number) — use Settings values.
                 bool vfCurveActive = HasActiveVfCurve();
-                BuildCustomCommand(parts, skipGpuPower: vfCurveActive && !skipClocks, skipClocks: skipClocks);
+                BuildCustomCommand(parts, skipGpuPower: vfCurveActive && !skipClocks, skipClocks: skipClocks, skipCo: skipCo);
             }
             else
             {
@@ -292,6 +295,7 @@ namespace Uniwill_Control_Utility.Services
         public static async Task ApplyProfileAsync(string profileName, string? displayName, bool startup = false)
         {
             bool skipClocks = SkipsGpuClocks(startup);
+            bool skipCo = SkipsCurveOptimizer(startup);
             string command = BuildCommandString(profileName, startup);
             if (string.IsNullOrWhiteSpace(command))
                 return;
@@ -344,6 +348,15 @@ namespace Uniwill_Control_Utility.Services
             else if (profileName.Equals("Custom", StringComparison.OrdinalIgnoreCase) && HasActiveVfCurve())
             {
                 ApplyVfCurve();
+            }
+
+            // The Curve Optimizer rides the command string (BuildCommandString), which
+            // already omitted it. Say so once, so a boot with "Apply CPU Curve Optimizer
+            // at startup" off does not look like a silently lost undervolt.
+            if (skipCo)
+            {
+                Scripts.Misc.DiagnosticLogger.LogInfo(
+                    "[Startup] CPU Curve Optimizer skipped by 'Apply CPU Curve Optimizer at startup': per-core and unified CO offsets not applied (power limits, temperatures and fans still applied)");
             }
 
             // 3. EC CPU power limits (AMD APU only, Custom presets only — stock
@@ -440,6 +453,17 @@ namespace Uniwill_Control_Utility.Services
         private static bool SkipsGpuClocks(bool startup) =>
             startup && !Settings.Default.ApplyGpuClocksOnStartup;
 
+        /// <summary>
+        /// True when a startup apply must leave the CPU Curve Optimizer alone: the user
+        /// unchecked "Apply CPU Curve Optimizer at startup". The power limits, the thermal
+        /// limits, the Intel PL path, the EC limits and the fans still apply; only the
+        /// --set-coall / --set-coper / --set-coper-batch writes are skipped. A zero offset
+        /// is a real value that resets the curve, so the tokens are omitted, never zeroed.
+        /// A manual apply passes startup=false and ignores the setting.
+        /// </summary>
+        private static bool SkipsCurveOptimizer(bool startup) =>
+            startup && !Settings.Default.ApplyCpuCurveOptimizerOnStartup;
+
         private static void ApplyVfCurve()
         {
             var presets = VfCurvePresetStore.Load();
@@ -498,7 +522,7 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Builds RyzenAdj command parts from a CustomPreset object.
         /// </summary>
-        private static void BuildCustomCommandFromPreset(List<string> parts, CustomPreset preset, bool skipGpuPower, bool skipClocks = false)
+        private static void BuildCustomCommandFromPreset(List<string> parts, CustomPreset preset, bool skipGpuPower, bool skipClocks = false, bool skipCo = false)
         {
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
@@ -511,7 +535,7 @@ namespace Uniwill_Control_Utility.Services
                 parts.Add($"--tctl-temp={tjMax}");
                 parts.Add($"--cHTC-temp={tjMax}");
 
-                AppendCoCommands(parts, preset, CpuTopologyReader.Read());
+                AppendCoCommands(parts, preset, CpuTopologyReader.Read(), skipCo);
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
@@ -580,7 +604,7 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        private static void BuildCustomCommand(List<string> parts, bool skipGpuPower, bool skipClocks = false)
+        private static void BuildCustomCommand(List<string> parts, bool skipGpuPower, bool skipClocks = false, bool skipCo = false)
         {
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
@@ -594,8 +618,11 @@ namespace Uniwill_Control_Utility.Services
                 parts.Add($"--cHTC-temp={tjMax}");
 
                 // Curve Optimizer — unified mode uses set-coall, per-CCD uses set-coper.
+                // Both branches are gated on skipCo: a startup apply with "Apply CPU Curve
+                // Optimizer at startup" off emits neither token (a 0 offset is a real write
+                // that resets the curve, so there is no "zero means skip" shortcut here).
                 bool coUnified = Settings.Default.customCoUnified;
-                if (coUnified)
+                if (!skipCo && coUnified)
                 {
                     int coValue = (int)Settings.Default.customCoUnifiedValue;
                     uint coEncoded = coValue < 0
@@ -603,7 +630,7 @@ namespace Uniwill_Control_Utility.Services
                         : (uint)coValue;
                     parts.Add($"--set-coall={coEncoded}");
                 }
-                else
+                else if (!skipCo)
                 {
                     // Per-CCD mode: use set-coper for each core.
                     // Encoding (Renoir+/AM5): ((ccd << 8) | core_in_ccd) << 20 | offset20
@@ -650,12 +677,18 @@ namespace Uniwill_Control_Utility.Services
         /// Per-core and per-CCD write one command per core the topology reports, so a
         /// BIOS-disabled CCD contributes no writes and no core keeps a value from an earlier
         /// preset. Unified stays one package-wide command.
+        ///
+        /// <paramref name="skip"/> is the startup gate: true emits nothing, which is how the
+        /// Curve Optimizer is left alone (a 0 offset would reset the curve).
         /// </summary>
-        internal static void AppendCoCommands(List<string> parts, CustomPreset preset, CpuTopology topology)
+        internal static void AppendCoCommands(List<string> parts, CustomPreset preset, CpuTopology topology, bool skip = false)
         {
             ArgumentNullException.ThrowIfNull(parts);
             ArgumentNullException.ThrowIfNull(preset);
             ArgumentNullException.ThrowIfNull(topology);
+
+            if (skip)
+                return;
 
             if (preset.CpuCoMode == CpuCoMode.Unified)
             {

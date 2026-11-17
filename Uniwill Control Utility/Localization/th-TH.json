@@ -1168,6 +1168,8 @@
   "With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it.": "ด้วยออฟเซตคอร์ +233 MHz เราวัดกำลังบอร์ดได้ 214 W ที่ 0.975-0.985 V พร้อม PerfCap VRel — กำลังไม่ใช่ตัวจำกัดอีกแล้ว ออฟเซตขึ้นกับแต่ละการ์ดและตั้งได้ในหน้านี้ อีกเครื่องอาจรับได้มากกว่าหรือล้มที่ค่าต่ำกว่านี้มาก และเรายังไม่เคยวัดกำลังไฟฟ้าโดยไม่มีออฟเซต จุดร้อน 58-63 °C ที่ 215 W เมื่อต่อชุดน้ำหล่อเย็น และ 81.7 °C เมื่อไม่ต่อ",
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "เขียนทับเฉพาะนโยบายพลังงานของไดรเวอร์ เฟิร์มแวร์ของ GPU ไม่เปลี่ยน และ “คืนค่าเดิม” จะย้อนกลับได้",
   "Range {0}-{1} A": "ช่วง {0}-{1} A",
+  "Apply CPU Curve Optimizer at startup": "ใช้ตัวปรับแต่งเส้นโค้ง CPU เมื่อเริ่มระบบ",
+  "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "ใช้ค่าออฟเซ็ตตัวปรับแต่งเส้นโค้งแบบต่อคอร์หรือแบบรวมเมื่อเริ่มระบบ (ขีดจำกัดพลังงาน CPU อุณหภูมิ และการตั้งค่าพัดลมยังคงถูกใช้)",
   "Apply GPU clock offsets at startup": "ใช้ค่าออฟเซ็ตคล็อก GPU เมื่อเริ่มระบบ",
   "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "เมื่อเริ่มระบบจะใช้ออฟเซ็ตคล็อก GPU (หรือเส้นโค้ง V-F) และออฟเซ็ตคล็อกหน่วยความจำ (การตั้งค่าพรีเซ็ตอื่นยังใช้ตามปกติ)"
 }
