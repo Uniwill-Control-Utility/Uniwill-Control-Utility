@@ -788,7 +788,9 @@
                                                         Width="140"
                                                         Maximum="1000"
                                                         Minimum="-1000"
-                                                        TickFrequency="50"
+                                                        TickFrequency="5"
+                                                        SmallChange="5"
+                                                        LargeChange="25"
                                                         IsSnapToTickEnabled="True"
                                                         TickPlacement="None"
                                                         VerticalAlignment="Center"
@@ -815,8 +817,9 @@
                                                     Orientation="Horizontal"
                                                     HorizontalAlignment="Right"
                                                     VerticalAlignment="Center">
+                                            <!-- Wider than the core row's 60: four digits plus the unit clip there. The slider is fixed at 140 and the column is Auto right-aligned, so the slider stays put and only the value box grows leftwards. -->
                                             <TextBlock x:Name="lblNvMem"
-                                                       Width="60"
+                                                       Width="76"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
                                                        Margin="0,0,8,0"
