@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Mae hyn yn diystyru polisi pŵer y gyrrwr yn unig: nid yw firmware'r GPU yn newid, ac mae «Adfer y gwreiddiol» yn ei ddadwneud.",
   "Range {0}-{1} A": "Amrediad {0}-{1} A",
   "Apply GPU clock offsets at startup": "Cymhwyso gwrthbwyso cloc GPU wrth gychwyn",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "I ffwrdd: mae gwrthbwyso'r cloc craidd, y gromlin V-F a gwrthbwyso'r cof yn cael eu hepgor wrth gychwyn, tra bod terfynau pŵer a gosodiadau'r gefnogwr yn dal i fod yn berthnasol"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Yn gosod gwrthbwyso cloc y GPU (neu'r gromlin V-F) a gwrthbwyso cloc y cof ar gychwyn (mae gosodiadau rhagosodiad eraill yn dal i fod yn berthnasol)"
 }

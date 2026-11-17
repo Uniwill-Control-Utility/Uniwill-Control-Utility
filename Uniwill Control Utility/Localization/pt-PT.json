@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Substitui apenas a política de energia do controlador: o firmware da GPU não muda e “Restaurar original” desfaz a alteração.",
   "Range {0}-{1} A": "Intervalo {0}-{1} A",
   "Apply GPU clock offsets at startup": "Aplicar desvios de relógio da GPU no arranque",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Desativado: o desvio do relógio do núcleo, a curva V-F e o desvio de memória são ignorados no arranque, enquanto os limites de potência e as definições de ventoinha continuam a aplicar-se"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "No arranque, aplica o desvio do relógio da GPU (ou a curva V-F) e os desvios do relógio de memória (as restantes definições da predefinição continuam a aplicar-se)"
 }

@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "केवल ड्राइवर की पावर नीति को ओवरराइड करता है: GPU का फ़र्मवेयर नहीं बदलता, और \"मूल स्थिति में लौटाएँ\" इसे वापस ले लेता है।",
   "Range {0}-{1} A": "सीमा {0}-{1} A",
   "Apply GPU clock offsets at startup": "स्टार्टअप पर GPU क्लॉक ऑफ़सेट लागू करें",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "बंद: स्टार्टअप पर कोर क्लॉक ऑफ़सेट, V-F कर्व और मेमोरी ऑफ़सेट छोड़ दिए जाते हैं, जबकि पावर सीमाएँ और फ़ैन सेटिंग्स लागू रहती हैं"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "स्टार्टअप पर GPU क्लॉक ऑफ़सेट (या V-F कर्व) और मेमोरी क्लॉक ऑफ़सेट लागू करता है (अन्य प्रीसेट सेटिंग्स लागू रहती हैं)"
 }

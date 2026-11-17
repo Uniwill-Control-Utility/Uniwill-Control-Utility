@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Hanya mengatasi dasar kuasa pemacu: firmware GPU tidak berubah, dan “Pulihkan asal” membatalkannya.",
   "Range {0}-{1} A": "Julat {0}-{1} A",
   "Apply GPU clock offsets at startup": "Guna offset jam GPU semasa permulaan",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Mati: offset jam teras, lengkung V-F dan offset memori dilangkau semasa permulaan, manakala had kuasa dan tetapan kipas masih digunakan"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Menggunakan offset jam GPU (atau lengkung V-F) dan offset jam memori semasa permulaan (tetapan pratetap lain masih digunakan)"
 }

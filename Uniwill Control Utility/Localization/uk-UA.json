@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Перевизначає лише політику живлення драйвера: прошивка GPU не змінюється, а «Відновити вихідне» скасовує зміну.",
   "Range {0}-{1} A": "Діапазон {0}-{1} A",
   "Apply GPU clock offsets at startup": "Застосовувати зміщення частоти GPU під час запуску",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Вимк.: під час запуску зміщення частоти ядра, крива V-F і зміщення пам'яті пропускаються, а обмеження потужності та налаштування вентиляторів усе одно застосовуються"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Під час запуску застосовує зміщення частоти GPU (або криву V-F) і зміщення частоти пам'яті (інші налаштування пресета усе одно застосовуються)"
 }

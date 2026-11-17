@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "上書きするのはドライバーの電力ポリシーだけです。GPU のファームウェアは変更せず、「元に戻す」で取り消せます。",
   "Range {0}-{1} A": "範囲 {0}-{1} A",
   "Apply GPU clock offsets at startup": "起動時に GPU クロックオフセットを適用する",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "オフ: 起動時にコアクロックオフセット、V-F カーブ、メモリオフセットをスキップします。電力制限とファン設定は引き続き適用されます"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "起動時に GPU クロックオフセット (または V-F カーブ) とメモリクロックオフセットを適用します (他のプリセット設定は引き続き適用されます)"
 }

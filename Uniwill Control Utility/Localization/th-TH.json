@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "เขียนทับเฉพาะนโยบายพลังงานของไดรเวอร์ เฟิร์มแวร์ของ GPU ไม่เปลี่ยน และ “คืนค่าเดิม” จะย้อนกลับได้",
   "Range {0}-{1} A": "ช่วง {0}-{1} A",
   "Apply GPU clock offsets at startup": "ใช้ค่าออฟเซ็ตคล็อก GPU เมื่อเริ่มระบบ",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "ปิด: จะข้ามออฟเซ็ตคล็อกคอร์ เส้นโค้ง V-F และออฟเซ็ตหน่วยความจำเมื่อเริ่มระบบ แต่ยังใช้ขีดจำกัดพลังงานและการตั้งค่าพัดลมตามปกติ"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "เมื่อเริ่มระบบจะใช้ออฟเซ็ตคล็อก GPU (หรือเส้นโค้ง V-F) และออฟเซ็ตคล็อกหน่วยความจำ (การตั้งค่าพรีเซ็ตอื่นยังใช้ตามปกติ)"
 }

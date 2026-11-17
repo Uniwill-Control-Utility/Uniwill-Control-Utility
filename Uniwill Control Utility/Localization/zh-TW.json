@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "只覆寫驅動程式的功耗原則：GPU 韌體不變，「還原原始設定」可復原。",
   "Range {0}-{1} A": "範圍 {0}-{1} A",
   "Apply GPU clock offsets at startup": "啟動時套用 GPU 時脈偏移",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "關閉：啟動時會略過核心時脈偏移、V-F 曲線和記憶體偏移，電源限制與風扇設定仍會套用"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "啟動時套用 GPU 時脈偏移 (或 V-F 曲線) 和記憶體時脈偏移 (其他預設設定仍會套用)"
 }

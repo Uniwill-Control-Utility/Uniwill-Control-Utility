@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "يتجاوز سياسة الطاقة في برنامج التشغيل فقط: البرنامج الثابت لمعالج الرسوميات لا يتغيّر، و«استعادة الأصل» يلغيه.",
   "Range {0}-{1} A": "النطاق {0}-{1} A",
   "Apply GPU clock offsets at startup": "تطبيق إزاحات ساعة GPU عند بدء التشغيل",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "إيقاف: يتم تخطي إزاحة ساعة النواة ومنحنى V-F وإزاحة الذاكرة عند بدء التشغيل، بينما تُطبَّق حدود الطاقة وإعدادات المراوح كما هي"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "يُطبِّق إزاحة ساعة GPU (أو منحنى V-F) وإزاحات ساعة الذاكرة عند بدء التشغيل (تُطبَّق إعدادات الإعداد المسبق الأخرى كما هي)"
 }

@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Zamjenjuje samo energetsku politiku upravljačkog programa: firmware GPU-a se ne mijenja, a “Vrati izvorno” to poništava.",
   "Range {0}-{1} A": "Raspon {0}-{1} A",
   "Apply GPU clock offsets at startup": "Primijeni pomake GPU takta pri pokretanju",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Isključeno: pomak takta jezgre, V-F krivulja i pomak memorije preskaču se pri pokretanju, dok se ograničenja snage i postavke ventilatora i dalje primjenjuju"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Pri pokretanju primjenjuje pomak takta GPU-a (ili V-F krivulju) i pomake takta memorije (ostale postavke predloška i dalje se primjenjuju)"
 }

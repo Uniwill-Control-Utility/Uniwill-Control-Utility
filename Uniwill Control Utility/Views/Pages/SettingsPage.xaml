@@ -207,7 +207,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply"
+                                                   Text="Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbApplyGpuClocksOnStartup"

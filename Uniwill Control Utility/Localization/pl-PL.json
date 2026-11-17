@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Zastępuje wyłącznie politykę zasilania sterownika: firmware GPU się nie zmienia, a „Przywróć oryginał” to cofa.",
   "Range {0}-{1} A": "Zakres {0}-{1} A",
   "Apply GPU clock offsets at startup": "Zastosuj przesunięcia zegara GPU przy uruchomieniu",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Wyłączone: przy uruchomieniu pomijane są przesunięcie zegara rdzenia, krzywa V-F i przesunięcie pamięci, a limity zasilania i ustawienia wentylatorów nadal obowiązują"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Przy uruchomieniu stosuje przesunięcie zegara GPU (lub krzywą V-F) oraz przesunięcia zegara pamięci (pozostałe ustawienia presetu nadal obowiązują)"
 }

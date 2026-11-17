@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Yalnızca sürücünün güç ilkesini geçersiz kılar: GPU ürün yazılımı değişmez ve “Özgün ayara dön” bunu geri alır.",
   "Range {0}-{1} A": "Aralık {0}-{1} A",
   "Apply GPU clock offsets at startup": "Başlangıçta GPU saat ofsetlerini uygula",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Kapalı: başlangıçta çekirdek saat ofseti, V-F eğrisi ve bellek ofseti atlanır; güç limitleri ve fan ayarları yine uygulanır"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Başlangıçta GPU saat ofsetini (veya V-F eğrisini) ve bellek saat ofsetlerini uygular (diğer önayar ayarları yine uygulanır)"
 }

@@ -1169,5 +1169,5 @@
   "Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it.": "Überschreibt nur die Energierichtlinie des Treibers: Die Firmware der GPU bleibt unverändert, und „Original wiederherstellen“ macht es rückgängig.",
   "Range {0}-{1} A": "Bereich {0}-{1} A",
   "Apply GPU clock offsets at startup": "GPU-Taktoffsets beim Start anwenden",
-  "Off: the core clock offset, the V-F curve and the memory offset are skipped at startup, while power limits and fan settings still apply": "Aus: Der Kerntakt-Offset, die V-F-Kurve und der Speicher-Offset werden beim Start übersprungen; Leistungsgrenzen und Lüftereinstellungen gelten weiterhin"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Wendet beim Start den GPU-Takt-Offset (oder die V-F-Kurve) und die Speichertakt-Offsets an (andere Profileinstellungen gelten weiterhin)"
 }
