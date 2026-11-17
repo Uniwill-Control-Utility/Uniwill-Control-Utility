@@ -165,6 +165,7 @@ namespace UCU.Hardware.Gpu
         private readonly IGpuPowerRequest _request;
         private readonly INvApiPowerBudget _budget;
         private readonly IGpuRailControl _rails;
+        private readonly IVbiosPolicyProbe _vbios;
         private readonly GpuPowerTier _tier;
         private readonly string _originalsPath;
         private readonly string _markerPath;
@@ -186,7 +187,8 @@ namespace UCU.Hardware.Gpu
             INvApiPowerBudget budget,
             IGpuRailControl rails,
             string? originalsPath = null,
-            GpuPowerTier? tier = null)
+            GpuPowerTier? tier = null,
+            IVbiosPolicyProbe? vbios = null)
         {
             _registry = registry;
             _restarter = restarter;
@@ -195,6 +197,7 @@ namespace UCU.Hardware.Gpu
             _request = request;
             _budget = budget;
             _rails = rails;
+            _vbios = vbios ?? new NvApiVbiosPolicyProbe();
             _tier = tier ?? GpuPowerTiers.ExtraGpuPower;
             _originalsPath = originalsPath ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
@@ -209,7 +212,48 @@ namespace UCU.Hardware.Gpu
             _markerPath = Path.Combine(Path.GetDirectoryName(_originalsPath) ?? string.Empty, "enabled");
         }
 
-        public GpuRomOverrideStateDto GetState()
+        /// <summary>
+        /// The state, plus the VBIOS policy report. The probe is read-only and runs on
+        /// demand (the diagnostics export asks for it), never on a write path.
+        /// </summary>
+        public GpuRomOverrideStateDto GetState() =>
+            ReadState() with { VbiosPolicy = VbiosPolicyDto(_vbios.Read()) };
+
+        private static GpuVbiosPolicyDto VbiosPolicyDto(VbiosPolicyState probe) => new()
+        {
+            Reason = probe.Reason,
+            VbiosVersion = probe.Version,
+            Pinned = RomOverrideLayout.IsPinned(probe.Version),
+            TableOffset = probe.Succeeded ? probe.TableOffset : (int?)null,
+            TableHeader = probe.TableHeader,
+            PciDevice = probe.PciDevice,
+            Power = LimitsDto(probe.Power),
+            NvVdd = LimitsDto(probe.NvVdd),
+            MsVdd = LimitsDto(probe.MsVdd),
+            BoardInput = LimitsDto(probe.BoardInput),
+            PinnedOffsets = probe.Pinned.Select(check => new GpuPinnedOffsetDto
+            {
+                Offset = check.Offset,
+                ImageValue = check.ImageValue,
+                Component = check.Component,
+                TableValueOffset = check.TableValueOffset,
+                TableValue = check.TableValue,
+                Match = check.Matches,
+            }).ToArray(),
+        };
+
+        private static GpuPolicyLimitsDto? LimitsDto(VbiosPolicyField? field) =>
+            field is VbiosPolicyField parsed
+                ? new GpuPolicyLimitsDto
+                {
+                    Min = parsed.Min,
+                    Default = parsed.Default,
+                    Max = parsed.Max,
+                    Offset = parsed.Offset,
+                }
+                : null;
+
+        private GpuRomOverrideStateDto ReadState()
         {
             GpuPowerLimits limits = _ceiling.Read();
             GpuPowerRequestState request = _request.Read();

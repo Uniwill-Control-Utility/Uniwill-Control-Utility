@@ -1470,6 +1470,59 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal(0, restarter.Calls);
     }
 
+    [Fact]
+    public void GetState_CarriesTheVbiosPolicyAndThePinnedOffsetVerdict()
+    {
+        // The diagnostics need the answer, not just the version: whether the seven record
+        // offsets the unlock patches still land on this image's policy fields.
+        var probe = new FakeVbiosProbe
+        {
+            State = new VbiosPolicyState(
+                null, RomOverrideLayout.PinnedVbiosVersion, 0x57B1D, "40 38 66 14", 0x2C18,
+                new VbiosPolicyField(0x57C2E, 5000, 95000, 220000),
+                new VbiosPolicyField(0x58090, 1, 120000, 120000),
+                new VbiosPolicyField(0x580F6, 1, 50000, 50000),
+                new VbiosPolicyField(0x57EF8, 1, 13500, 13500),
+                new[]
+                {
+                    new VbiosPinnedCheck("romOverride00", 0x57C36, 220000, 0x57C36, "max", 220000),
+                    new VbiosPinnedCheck("romOverride01", 0x57EFC, 13500, 0x57EFC, "default", 13500),
+                }),
+        };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log), new FakeEc(_log),
+            new FakeRequest(_log), vbios: probe).GetState();
+
+        Assert.NotNull(state.VbiosPolicy);
+        Assert.Equal(RomOverrideLayout.PinnedVbiosVersion, state.VbiosPolicy!.VbiosVersion);
+        Assert.True(state.VbiosPolicy.Pinned);
+        Assert.Equal(0x57B1D, state.VbiosPolicy.TableOffset);
+        Assert.Equal("40 38 66 14", state.VbiosPolicy.TableHeader);
+        Assert.Equal(0x2C18, state.VbiosPolicy.PciDevice);
+        Assert.Equal(220000u, state.VbiosPolicy.Power!.Max);
+        Assert.Equal(0x57EF8, state.VbiosPolicy.BoardInput!.Offset);
+        Assert.All(state.VbiosPolicy.PinnedOffsets, check => Assert.True(check.Match));
+    }
+
+    [Fact]
+    public void GetState_CarriesAProbeRefusalAsData()
+    {
+        var probe = new FakeVbiosProbe
+        {
+            State = VbiosPolicyState.Failed("the VBIOS dump call failed (status -1)"),
+        };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log), new FakeEc(_log),
+            new FakeRequest(_log), vbios: probe).GetState();
+
+        Assert.Equal("the VBIOS dump call failed (status -1)", state.VbiosPolicy!.Reason);
+        Assert.Null(state.VbiosPolicy.TableOffset);
+        Assert.False(state.VbiosPolicy.Pinned);
+        Assert.Empty(state.VbiosPolicy.PinnedOffsets);
+    }
+
     private GpuRomOverrideStore NewStore(
         FakeRomRegistry registry,
         FakeRestarter restarter,
@@ -1477,7 +1530,8 @@ public sealed class GpuRomOverrideTests : IDisposable
         FakeEc ec,
         FakeRequest request,
         FakeBudget? budget = null,
-        FakeRails? rails = null)
+        FakeRails? rails = null,
+        IVbiosPolicyProbe? vbios = null)
     {
         budget ??= new FakeBudget(_log);
         rails ??= new FakeRails(_log);
@@ -1487,7 +1541,8 @@ public sealed class GpuRomOverrideTests : IDisposable
             budget.Reset();
         };
 
-        return new(registry, restarter, ceiling, ec, request, budget, rails, OriginalsPath);
+        return new(registry, restarter, ceiling, ec, request, budget, rails, OriginalsPath,
+            vbios: vbios ?? new FakeVbiosProbe());
     }
 
     private static string Hex(byte[] data) => BitConverter.ToString(data).ToUpperInvariant();
@@ -1589,6 +1644,14 @@ public sealed class GpuRomOverrideTests : IDisposable
             _log.Add("ceiling");
             return new GpuPowerLimits(Ceiling, Current);
         }
+    }
+
+    /// <summary>The VBIOS probe without a driver: answers a scripted state.</summary>
+    private sealed class FakeVbiosProbe : IVbiosPolicyProbe
+    {
+        public VbiosPolicyState State { get; set; } = VbiosPolicyState.Failed("not scripted");
+
+        public VbiosPolicyState Read() => State;
     }
 
     /// <summary>The EC's GPU power-control slice: records what the store asked it to do.</summary>

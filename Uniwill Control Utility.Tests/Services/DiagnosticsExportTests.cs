@@ -185,6 +185,87 @@ public sealed class DiagnosticsExportTests
     }
 
     [Fact]
+    public void HardwareComposer_RendersTheVbiosPolicyAndThePinnedOffsetVerdict()
+    {
+        // The one question an unpinned VBIOS raises: do the record offsets the unlock
+        // patches still land on this image's policy fields? The block is the evidence.
+        var policy = new GpuVbiosPolicyDto
+        {
+            VbiosVersion = "98.03.5E.00.5D",
+            Pinned = true,
+            TableOffset = 0x57B1D,
+            TableHeader = "40 38 66 14",
+            PciDevice = 0x2C18,
+            Power = new GpuPolicyLimitsDto { Min = 5000, Default = 95000, Max = 220000, Offset = 0x57C2E },
+            NvVdd = new GpuPolicyLimitsDto { Min = 1, Default = 120000, Max = 120000, Offset = 0x58090 },
+            MsVdd = new GpuPolicyLimitsDto { Min = 1, Default = 50000, Max = 50000, Offset = 0x580F6 },
+            BoardInput = new GpuPolicyLimitsDto { Min = 1, Default = 13500, Max = 13500, Offset = 0x57EF8 },
+            PinnedOffsets = new[]
+            {
+                new GpuPinnedOffsetDto { Offset = 0x57C36, ImageValue = 220000, Component = "max", TableValueOffset = 0x57C36, TableValue = 220000, Match = true },
+                new GpuPinnedOffsetDto { Offset = 0x57EFC, ImageValue = 13500, Component = "default", TableValueOffset = 0x57EFC, TableValue = 13500, Match = true },
+            },
+        };
+
+        string text = DiagnosticsExportService.ComposeHardware(
+            Dump(), "collected", new GpuRomOverrideStateDto { VbiosPolicy = policy });
+
+        Assert.Contains(
+            "VBIOS power policy: 98.03.5E.00.5D, pinned yes, table 0x57B1D header 40 38 66 14, PCI device 0x2C18",
+            text);
+        Assert.Contains("  power min 5000 def 95000 max 220000 mW (at 0x57C2E)", text);
+        Assert.Contains("  NVVDD min 1 def 120000 max 120000 mA (at 0x58090)", text);
+        Assert.Contains("  MSVDD min 1 def 50000 max 50000 mA (at 0x580F6)", text);
+        Assert.Contains("  board input min 1 def 13500 max 13500 mA (at 0x57EF8)", text);
+        Assert.Contains("  pinned offsets: MATCH this image", text);
+    }
+
+    [Fact]
+    public void HardwareComposer_SaysWhichPinnedOffsetsDifferAndByWhat()
+    {
+        var policy = new GpuVbiosPolicyDto
+        {
+            VbiosVersion = "98.03.5E.00.1E",
+            Pinned = false,
+            TableOffset = 0x56B1D,
+            TableHeader = "40 38 66 14",
+            PciDevice = 0x2C18,
+            PinnedOffsets = new[]
+            {
+                new GpuPinnedOffsetDto { Offset = 0x57C36, ImageValue = 0, Component = "max", TableValueOffset = 0x56C2E, TableValue = 175000, Match = false },
+                new GpuPinnedOffsetDto { Offset = 0x57EFC, ImageValue = 11053, Component = "default", TableValueOffset = 0x56EF8, TableValue = 11053, Match = false },
+            },
+        };
+
+        string text = DiagnosticsExportService.ComposeHardware(
+            Dump(), "collected", new GpuRomOverrideStateDto { VbiosPolicy = policy });
+
+        Assert.Contains("98.03.5E.00.1E, pinned no", text);
+        Assert.Contains("  pinned offsets: DIFFER (0x57C36 image 0, table max 175000 at 0x56C2E;", text);
+        Assert.Contains("0x57EFC image 11053, table default 11053 at 0x56EF8)", text);
+    }
+
+    [Fact]
+    public void HardwareComposer_ExplainsAnUnreadableVbiosInOneLine()
+    {
+        string text = DiagnosticsExportService.ComposeHardware(
+            Dump(), "collected",
+            new GpuRomOverrideStateDto
+            {
+                VbiosPolicy = new GpuVbiosPolicyDto { Reason = "the driver reported a VBIOS image of 0 bytes" },
+            });
+
+        Assert.Contains("VBIOS power policy: unavailable (the driver reported a VBIOS image of 0 bytes)", text);
+        Assert.DoesNotContain("pinned offsets", text);
+        Assert.DoesNotContain("NVVDD min", text);
+
+        // Not read at all (an older engine, or an unreachable one) is its own line.
+        Assert.Contains(
+            "VBIOS power policy: unknown (engine unreachable)",
+            DiagnosticsExportService.ComposeHardware(Dump(), "collected"));
+    }
+
+    [Fact]
     public void HardwareComposer_RendersTheLaptopPowerBudget()
     {
         // The driver enforces min(request, budget): a report without this number cannot

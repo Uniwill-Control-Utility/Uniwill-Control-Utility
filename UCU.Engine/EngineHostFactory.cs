@@ -115,7 +115,8 @@ namespace UCU.Engine
                         new GatedEcGpuPower(sp.GetRequiredService<EcEngineGate>()),
                         new UCU.Hardware.Gpu.NvApiPowerRequest(),
                         new UCU.Hardware.Gpu.NvApiPowerBudget(),
-                        new UCU.Hardware.Gpu.NvApiRailControl()));
+                        new UCU.Hardware.Gpu.NvApiRailControl(),
+                        vbios: new UCU.Hardware.Gpu.NvApiVbiosPolicyProbe()));
 
                 // The reboot clears the driver-resident half of a completed unlock (the
                 // records survive); this re-applies it once, before the pipe server can

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -235,6 +236,11 @@ namespace Uniwill_Control_Utility.Services
             // board from 175-179 W to 205-214 W. The range is the driver's live policy.
             text.AppendLine("GPU rail currents: " + RailsLine(railLimits));
 
+            // The VBIOS image's own power-policy table: an unpinned ROM (a tester's VBIOS)
+            // can only be pinned on evidence, so the report says whether the seven record
+            // offsets the unlock patches still land on this image's policy fields.
+            AppendVbiosPolicy(text, romOverride?.VbiosPolicy);
+
             if (dump is null)
             {
                 text.AppendLine();
@@ -346,6 +352,62 @@ namespace Uniwill_Control_Utility.Services
         private static string Rail(int? milliamps, int? min, int? max) =>
             (milliamps is int value ? value + " mA" : "unknown") +
             (min is int low && max is int high ? " (policy " + low + "-" + high + " mA)" : string.Empty);
+
+        /// <summary>
+        /// The VBIOS policy block: a handful of lines, or the one reason the image could
+        /// not be read. When every pinned offset lands on its field the line says so;
+        /// otherwise each differing record carries both numbers.
+        /// </summary>
+        private static void AppendVbiosPolicy(StringBuilder text, GpuVbiosPolicyDto? policy)
+        {
+            if (policy is null)
+            {
+                text.AppendLine("VBIOS power policy: unknown (engine unreachable)");
+                return;
+            }
+
+            if (policy.Reason is string reason)
+            {
+                text.AppendLine("VBIOS power policy: unavailable (" + reason + ")");
+                return;
+            }
+
+            text.AppendLine("VBIOS power policy: " + policy.VbiosVersion +
+                            ", pinned " + (policy.Pinned ? "yes" : "no") +
+                            ", table 0x" + Hex(policy.TableOffset) + " header " + policy.TableHeader +
+                            ", PCI device 0x" + (policy.PciDevice is int device ? device.ToString("X4", CultureInfo.InvariantCulture) : "----"));
+            text.AppendLine("  power " + PolicyLine(policy.Power, "mW"));
+            text.AppendLine("  NVVDD " + PolicyLine(policy.NvVdd, "mA"));
+            text.AppendLine("  MSVDD " + PolicyLine(policy.MsVdd, "mA"));
+            text.AppendLine("  board input " + PolicyLine(policy.BoardInput, "mA"));
+            text.AppendLine("  pinned offsets: " + PinnedOffsetsLine(policy));
+        }
+
+        private static string PolicyLine(GpuPolicyLimitsDto? field, string unit) =>
+            field is GpuPolicyLimitsDto limits
+                ? "min " + limits.Min + " def " + limits.Default + " max " + limits.Max +
+                  " " + unit + " (at 0x" + Hex(limits.Offset) + ")"
+                : "absent";
+
+        private static string PinnedOffsetsLine(GpuVbiosPolicyDto policy)
+        {
+            if (policy.PinnedOffsets.Count == 0)
+                return "not checked";
+
+            GpuPinnedOffsetDto[] differing = policy.PinnedOffsets.Where(check => !check.Match).ToArray();
+            if (differing.Length == 0)
+                return "MATCH this image";
+
+            return "DIFFER (" + string.Join("; ", differing.Select(check =>
+                "0x" + Hex(check.Offset) + " image " + check.ImageValue +
+                ", table " + check.Component + " " + check.TableValue + " at 0x" + Hex(check.TableValueOffset))) + ")";
+        }
+
+        private static string Hex(int? offset) => offset is int value ? value.ToString("X", CultureInfo.InvariantCulture) : "----";
+
+        private static string Hex(int offset) => offset.ToString("X", CultureInfo.InvariantCulture);
+
+        private static string Hex(uint offset) => offset.ToString("X", CultureInfo.InvariantCulture);
 
         private static string Watts(int milliwatts) =>            (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W (" + milliwatts + " mW)";
 

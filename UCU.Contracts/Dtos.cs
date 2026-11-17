@@ -855,6 +855,86 @@ namespace UCU.Contracts
 
         /// <summary>The runtime board-input rail current (mA), as <see cref="NvvddCurrentMilliamps"/>.</summary>
         public int? BoardInputCurrentMilliamps { get; init; }
+
+        /// <summary>
+        /// The VBIOS power-policy report read from the adapter's ROM image. It answers the
+        /// one question an unpinned VBIOS raises: whether the seven record offsets the
+        /// unlock patches still land on this image's policy fields. Null when the engine
+        /// did not read it (an older engine, or an unreachable one).
+        /// </summary>
+        public GpuVbiosPolicyDto? VbiosPolicy { get; init; }
+    }
+
+    /// <summary>
+    /// The VBIOS image's power-policy table, read-only. <see cref="Reason"/> set means
+    /// nothing was parsed (no ROM answer, an unexpected image size, no table, an
+    /// implausible range): the numbers are then absent, never guessed.
+    /// </summary>
+    public sealed record GpuVbiosPolicyDto
+    {
+        public string? Reason { get; init; }
+
+        /// <summary>The VBIOS version the image carries ("98.03.5E.00.5D").</summary>
+        public string? VbiosVersion { get; init; }
+
+        /// <summary>True when this build pins this VBIOS version (its offsets are known).</summary>
+        public bool Pinned { get; init; }
+
+        /// <summary>The power-policy table's image offset.</summary>
+        public int? TableOffset { get; init; }
+
+        /// <summary>The table's four header bytes, as hex ("40 38 66 14").</summary>
+        public string? TableHeader { get; init; }
+
+        /// <summary>The PCI device id from the image's own PCI directory.</summary>
+        public int? PciDevice { get; init; }
+
+        public GpuPolicyLimitsDto? Power { get; init; }
+
+        public GpuPolicyLimitsDto? NvVdd { get; init; }
+
+        public GpuPolicyLimitsDto? MsVdd { get; init; }
+
+        public GpuPolicyLimitsDto? BoardInput { get; init; }
+
+        /// <summary>The seven pinned record offsets, each checked against the parsed table.</summary>
+        public IReadOnlyList<GpuPinnedOffsetDto> PinnedOffsets { get; init; } = Array.Empty<GpuPinnedOffsetDto>();
+    }
+
+    /// <summary>One policy's limits (mW, or mA for a rail) and the offset the minimum sits at.</summary>
+    public sealed record GpuPolicyLimitsDto
+    {
+        public uint Min { get; init; }
+
+        public uint Default { get; init; }
+
+        public uint Max { get; init; }
+
+        public int Offset { get; init; }
+    }
+
+    /// <summary>
+    /// One pinned record offset checked against the parsed table: MATCH needs both the
+    /// offset (the record patches the limit it is meant to) and the value.
+    /// </summary>
+    public sealed record GpuPinnedOffsetDto
+    {
+        /// <summary>The record offset the unlock patches.</summary>
+        public uint Offset { get; init; }
+
+        /// <summary>The value the image carries at <see cref="Offset"/>.</summary>
+        public uint ImageValue { get; init; }
+
+        /// <summary>Which limit of the policy field the record addresses: min, default or max.</summary>
+        public string Component { get; init; } = string.Empty;
+
+        /// <summary>Where the parsed table puts that limit.</summary>
+        public int TableValueOffset { get; init; }
+
+        /// <summary>The value the parsed table puts there.</summary>
+        public uint TableValue { get; init; }
+
+        public bool Match { get; init; }
     }
 
     /// <summary>
