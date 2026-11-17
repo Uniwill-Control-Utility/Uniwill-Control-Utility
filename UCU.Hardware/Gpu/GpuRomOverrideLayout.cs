@@ -71,7 +71,10 @@ namespace UCU.Hardware.Gpu
             Name: "Extra GPU power",
             PowerMilliwatts: 250_000,
             TgpTargetMilliwatts: 225_000,
-            NvVddMilliAmps: 294_000,
+            // 250 A for every image: the card draws ~67 A at this tier, the reference's 294 A was
+            // only ever stock x1.4 for its own ROM, and 250 A is what the tester's image already
+            // ships as its stock ceiling - one number that fits both rather than a per-maker table.
+            NvVddMilliAmps: 250_000,
             MsVddMilliAmps: 84_000,
             BoardInputMilliAmps: 17_021,
             NvVddCurrentMilliAmps: 250_000,
@@ -80,10 +83,11 @@ namespace UCU.Hardware.Gpu
     }
 
     /// <summary>
-    /// The version-pinned override table. The seven records, their addresses and their
-    /// stock values were measured on VBIOS 98.03.5E.00.5D (GB20x, PCI 0x2C18) and read
-    /// back from the driver key; a ROM image with any other version has unknown
-    /// offsets, so it is refused instead of guessed.
+    /// The measured override table. The seven records, their addresses and their stock
+    /// values were measured on VBIOS 98.03.5E.00.5D (GB20x, PCI 0x2C18) and read back from
+    /// the driver key. A different version is only pinned when its own parsed image puts
+    /// every record offset on the same policy field; its records are then the same tier
+    /// values, written above that image's stock caps on purpose (the unlock's whole point).
     /// </summary>
     public static class RomOverrideLayout
     {
@@ -113,8 +117,22 @@ namespace UCU.Hardware.Gpu
         /// <summary>The stock ceiling the pinned ROM enforces (romOverride00's value).</summary>
         public const int StockPowerMilliwatts = 175000;
 
+        /// <summary>
+        /// The known-good version, asserted without a probe: it is the only image this
+        /// build's offsets were read from.
+        /// </summary>
         public static bool IsPinned(string? vbiosVersion) =>
             string.Equals(vbiosVersion, PinnedVbiosVersion, StringComparison.Ordinal);
+
+        /// <summary>
+        /// True when this build may patch this adapter's image: the known-good version, or
+        /// any other version whose own parse puts all seven record offsets on the field
+        /// component the records are meant to patch. The version string is evidence for the
+        /// report, never the gate; a DIFFER verdict, no answer and an unparseable image all
+        /// stay refusals.
+        /// </summary>
+        public static bool IsPinned(string? vbiosVersion, VbiosPolicyState? image) =>
+            IsPinned(vbiosVersion) || image is { PinnedOffsetsMatch: true };
 
         /// <summary>
         /// The driver key's <c>HardwareInformation.BiosString</c> reads like

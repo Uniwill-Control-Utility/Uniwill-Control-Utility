@@ -877,7 +877,8 @@ namespace UCU.Contracts
         /// <summary>The VBIOS version the image carries ("98.03.5E.00.5D").</summary>
         public string? VbiosVersion { get; init; }
 
-        /// <summary>True when this build pins this VBIOS version (its offsets are known).</summary>
+        /// <summary>True when this build may patch this image (the version is known, or its
+        /// own parsed layout puts every record offset on the field it patches).</summary>
         public bool Pinned { get; init; }
 
         /// <summary>The power-policy table's image offset.</summary>
@@ -899,6 +900,23 @@ namespace UCU.Contracts
 
         /// <summary>The seven pinned record offsets, each checked against the parsed table.</summary>
         public IReadOnlyList<GpuPinnedOffsetDto> PinnedOffsets { get; init; } = Array.Empty<GpuPinnedOffsetDto>();
+
+        /// <summary>
+        /// The four policy values the unlock's records write (mW, or mA for a rail). They are
+        /// the tier's numbers written unchanged, so they deliberately exceed the stock caps
+        /// reported above; empty when this build may not patch the image (nothing is written).
+        /// </summary>
+        public IReadOnlyList<GpuRecordValueDto> Records { get; init; } = Array.Empty<GpuRecordValueDto>();
+    }
+
+    /// <summary>One record's effective value: the rail it patches, the unit and the number.</summary>
+    public sealed record GpuRecordValueDto
+    {
+        public string Rail { get; init; } = string.Empty;
+
+        public string Unit { get; init; } = string.Empty;
+
+        public uint Value { get; init; }
     }
 
     /// <summary>One policy's limits (mW, or mA for a rail) and the offset the minimum sits at.</summary>

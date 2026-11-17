@@ -381,6 +381,13 @@ namespace Uniwill_Control_Utility.Services
             text.AppendLine("  MSVDD " + PolicyLine(policy.MsVdd, "mA"));
             text.AppendLine("  board input " + PolicyLine(policy.BoardInput, "mA"));
             text.AppendLine("  pinned offsets: " + PinnedOffsetsLine(policy));
+
+            if (policy.Records.Count > 0)
+            {
+                text.AppendLine("  records written: " + string.Join(", ", policy.Records.Select(
+                    record => record.Rail + " " + record.Value + " " + record.Unit)) +
+                    " (the tier's values, so they exceed this image's own caps by design)");
+            }
         }
 
         private static string PolicyLine(GpuPolicyLimitsDto? field, string unit) =>

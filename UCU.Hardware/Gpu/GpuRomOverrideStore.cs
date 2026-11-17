@@ -216,30 +216,57 @@ namespace UCU.Hardware.Gpu
         /// The state, plus the VBIOS policy report. The probe is read-only and runs on
         /// demand (the diagnostics export asks for it), never on a write path.
         /// </summary>
-        public GpuRomOverrideStateDto GetState() =>
-            ReadState() with { VbiosPolicy = VbiosPolicyDto(_vbios.Read()) };
-
-        private static GpuVbiosPolicyDto VbiosPolicyDto(VbiosPolicyState probe) => new()
+        public GpuRomOverrideStateDto GetState()
         {
-            Reason = probe.Reason,
-            VbiosVersion = probe.Version,
-            Pinned = RomOverrideLayout.IsPinned(probe.Version),
-            TableOffset = probe.Succeeded ? probe.TableOffset : (int?)null,
-            TableHeader = probe.TableHeader,
-            PciDevice = probe.PciDevice,
-            Power = LimitsDto(probe.Power),
-            NvVdd = LimitsDto(probe.NvVdd),
-            MsVdd = LimitsDto(probe.MsVdd),
-            BoardInput = LimitsDto(probe.BoardInput),
-            PinnedOffsets = probe.Pinned.Select(check => new GpuPinnedOffsetDto
+            VbiosPolicyState image = _vbios.Read();
+            return ReadState(image) with { VbiosPolicy = VbiosPolicyDto(image) };
+        }
+
+        private GpuVbiosPolicyDto VbiosPolicyDto(VbiosPolicyState probe)
+        {
+            bool pinned = RomOverrideLayout.IsPinned(probe.Version, probe);
+
+            return new GpuVbiosPolicyDto
             {
-                Offset = check.Offset,
-                ImageValue = check.ImageValue,
-                Component = check.Component,
-                TableValueOffset = check.TableValueOffset,
-                TableValue = check.TableValue,
-                Match = check.Matches,
-            }).ToArray(),
+                Reason = probe.Reason,
+                VbiosVersion = probe.Version,
+                Pinned = pinned,
+                TableOffset = probe.Succeeded ? probe.TableOffset : (int?)null,
+                TableHeader = probe.TableHeader,
+                PciDevice = probe.PciDevice,
+                Power = LimitsDto(probe.Power),
+                NvVdd = LimitsDto(probe.NvVdd),
+                MsVdd = LimitsDto(probe.MsVdd),
+                BoardInput = LimitsDto(probe.BoardInput),
+                PinnedOffsets = probe.Pinned.Select(check => new GpuPinnedOffsetDto
+                {
+                    Offset = check.Offset,
+                    ImageValue = check.ImageValue,
+                    Component = check.Component,
+                    TableValueOffset = check.TableValueOffset,
+                    TableValue = check.TableValue,
+                    Match = check.Matches,
+                }).ToArray(),
+
+                // What an apply writes: the tier's values, unchanged — above the stock caps
+                // the lines above print, which is the unlock's point.
+                Records = pinned
+                    ? new[]
+                    {
+                        RecordDto(RomOverrideRail.Power, "power", "mW"),
+                        RecordDto(RomOverrideRail.NvVdd, "NVVDD", "mA"),
+                        RecordDto(RomOverrideRail.MsVdd, "MSVDD", "mA"),
+                        RecordDto(RomOverrideRail.BoardInput, "board input", "mA"),
+                    }
+                    : Array.Empty<GpuRecordValueDto>(),
+            };
+        }
+
+        private GpuRecordValueDto RecordDto(RomOverrideRail rail, string name, string unit) => new()
+        {
+            Rail = name,
+            Unit = unit,
+            Value = RomOverrideLayout.ValueFor(rail, _tier),
         };
 
         private static GpuPolicyLimitsDto? LimitsDto(VbiosPolicyField? field) =>
@@ -253,7 +280,7 @@ namespace UCU.Hardware.Gpu
                 }
                 : null;
 
-        private GpuRomOverrideStateDto ReadState()
+        private GpuRomOverrideStateDto ReadState(VbiosPolicyState image)
         {
             GpuPowerLimits limits = _ceiling.Read();
             GpuPowerRequestState request = _request.Read();
@@ -266,8 +293,8 @@ namespace UCU.Hardware.Gpu
                 if (version == null)
                     return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, limits, request, budget: budget, rails: rails);
 
-                if (!RomOverrideLayout.IsPinned(version))
-                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, limits, request, budget: budget, rails: rails);
+                if (!RomOverrideLayout.IsPinned(version, image))
+                    return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version, image), version, limits, request, budget: budget, rails: rails);
 
                 IReadOnlyDictionary<string, byte[]> records = _registry.ReadRecords();
                 if (records.Count == 0)
@@ -596,9 +623,9 @@ namespace UCU.Hardware.Gpu
                     return Attempt(GpuReapplyVerdict.Transient, State(
                         GpuRomOverrideStates.Uncertain, "the display driver key is not readable yet", null, none));
 
-                if (!RomOverrideLayout.IsPinned(version))
+                if (!Pinned(version, out VbiosPolicyState? image))
                     return Attempt(GpuReapplyVerdict.Refused, State(
-                        GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, none));
+                        GpuRomOverrideStates.Unsupported, UnpinnedReason(version, image), version, none));
 
                 // An empty key beside an originals file is the adapter or its class key not
                 // being there yet (a driver reinstall looks the same; the retry is bounded).
@@ -770,8 +797,8 @@ namespace UCU.Hardware.Gpu
             if (version == null)
                 return State(GpuRomOverrideStates.Unsupported, "the display driver key carries no VBIOS version", null, none);
 
-            if (!RomOverrideLayout.IsPinned(version))
-                return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version), version, none);
+            if (!Pinned(version, out VbiosPolicyState? image))
+                return State(GpuRomOverrideStates.Unsupported, UnpinnedReason(version, image), version, none);
 
             if (!TryReadOriginals(out originals, out string? fileError))
                 return State(GpuRomOverrideStates.Unsupported, fileError, version, none);
@@ -780,6 +807,28 @@ namespace UCU.Hardware.Gpu
                 return State(GpuRomOverrideStates.Unsupported, foreign, version, none);
 
             return null;
+        }
+
+        /// <summary>
+        /// Whether this build may patch this adapter's image: the known-good version without
+        /// asking, or any other version whose own parsed image puts all seven record offsets
+        /// on the field they patch. The version string is evidence for the log, never the
+        /// gate; a DIFFER verdict, no answer and an unparseable image all stay refusals.
+        /// </summary>
+        private bool Pinned(string? version, out VbiosPolicyState? image)
+        {
+            image = null;
+            if (RomOverrideLayout.IsPinned(version))
+                return true;
+
+            image = _vbios.Read();
+            if (!RomOverrideLayout.IsPinned(version, image))
+                return false;
+
+            Log.Information(
+                "gpu.set_rom_override: VBIOS {Version} is accepted by its parsed layout (MATCH): the record offsets land on this build's policy fields",
+                version);
+            return true;
         }
 
         private GpuRomOverrideStateDto Restore()
@@ -980,7 +1029,7 @@ namespace UCU.Hardware.Gpu
             try
             {
                 string? version = _registry.ReadVbiosVersion();
-                if (version == null || !RomOverrideLayout.IsPinned(version))
+                if (version == null || !Pinned(version, out _))
                     return false;
 
                 if (!TryReadOriginals(out Originals? originals, out _) || originals == null)
@@ -1096,8 +1145,14 @@ namespace UCU.Hardware.Gpu
         private static string Watts(int milliwatts) =>
             (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W";
 
-        private static string UnpinnedReason(string version) =>
-            $"VBIOS {version} is not pinned; the ROM offsets are only known for {RomOverrideLayout.PinnedVbiosVersion}";
+        /// <summary>
+        /// Why this image is refused: the version is named, and so is what the probe found —
+        /// no answer, or a layout whose offsets land on other fields than this build's.
+        /// </summary>
+        private static string UnpinnedReason(string version, VbiosPolicyState? image) =>
+            image is { Succeeded: true }
+                ? $"VBIOS {version} is not pinned; the image's parsed policy does not match this build's record offsets (DIFFER), and they are only known for {RomOverrideLayout.PinnedVbiosVersion} or an image that matches"
+                : $"VBIOS {version} is not pinned; the VBIOS image could not be checked ({image?.Reason ?? "the probe was not read"}), and the offsets are only known for {RomOverrideLayout.PinnedVbiosVersion} or an image that matches";
 
         /// <summary>
         /// Why the key carries a record we do not own, or null when every record is ours.

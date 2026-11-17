@@ -34,7 +34,7 @@ public sealed class GpuRomOverrideTests : IDisposable
     public void Encode_MatchesTheRecordsTheDriverKeyCarried()
     {
         // Read back from HKLM\...\Class\{4d36e968-...}\0004 on 2026-11-15: these are
-        // MechControl's unlock (250 W / 17.021 A / 294 A / 84 A), pinned byte for byte.
+        // MechControl's unlock (250 W / 17.021 A / 250 A / 84 A), pinned byte for byte.
         Assert.Equal("98-03-5E-00-5D-36-7C-05-00-04-90-D0-03-00", Hex(RomOverrideRecord.Encode("98.03.5E.00.5D", 0x57C36, 250000)));
         Assert.Equal("98-03-5E-00-5D-FC-7E-05-00-04-7D-42-00-00", Hex(RomOverrideRecord.Encode("98.03.5E.00.5D", 0x57EFC, 17021)));
         Assert.Equal("98-03-5E-00-5D-00-7F-05-00-04-7D-42-00-00", Hex(RomOverrideRecord.Encode("98.03.5E.00.5D", 0x57F00, 17021)));
@@ -65,8 +65,8 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal("98-03-5E-00-5D-36-7C-05-00-04-90-D0-03-00", Hex(records[0].Data));
         Assert.Equal("98-03-5E-00-5D-FC-7E-05-00-04-7D-42-00-00", Hex(records[1].Data));
         Assert.Equal("98-03-5E-00-5D-00-7F-05-00-04-7D-42-00-00", Hex(records[2].Data));
-        Assert.Equal("98-03-5E-00-5D-94-80-05-00-04-70-7C-04-00", Hex(records[3].Data));
-        Assert.Equal("98-03-5E-00-5D-98-80-05-00-04-70-7C-04-00", Hex(records[4].Data));
+        Assert.Equal("98-03-5E-00-5D-94-80-05-00-04-90-D0-03-00", Hex(records[3].Data));
+        Assert.Equal("98-03-5E-00-5D-98-80-05-00-04-90-D0-03-00", Hex(records[4].Data));
         Assert.Equal("98-03-5E-00-5D-FA-80-05-00-04-20-48-01-00", Hex(records[5].Data));
         Assert.Equal("98-03-5E-00-5D-FE-80-05-00-04-20-48-01-00", Hex(records[6].Data));
 
@@ -81,7 +81,7 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal(250_000, GpuPowerTiers.ExtraGpuPower.PowerMilliwatts);
         Assert.Equal(225_000, GpuPowerTiers.ExtraGpuPower.TgpTargetMilliwatts);
         Assert.Equal(225, GpuPowerTiers.ExtraGpuPower.TgpTargetWatts);
-        Assert.Equal(294_000, GpuPowerTiers.ExtraGpuPower.NvVddMilliAmps);
+        Assert.Equal(250_000, GpuPowerTiers.ExtraGpuPower.NvVddMilliAmps);
         Assert.Equal(84_000, GpuPowerTiers.ExtraGpuPower.MsVddMilliAmps);
         Assert.Equal(17_021, GpuPowerTiers.ExtraGpuPower.BoardInputMilliAmps);
         Assert.Equal(14_026, GpuPowerTiers.ExtraGpuPower.BoardInputCurrentMilliAmps);
@@ -271,6 +271,53 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Contains("98.03.5E.00.5E", state.Reason!, StringComparison.Ordinal);
         Assert.Empty(registry.Records);
         Assert.Empty(ec.Activations);
+        Assert.Equal(0, restarter.Calls);
+        Assert.False(File.Exists(OriginalsPath));
+    }
+
+    [Fact]
+    public void Apply_OnANonPinnedVersionWhoseParsedLayoutMatches_WritesTheTierValuesUnchanged()
+    {
+        // A tester's ROM: another version string, its own (broader) policy maxima, and the
+        // seven record offsets still landing on the field each record patches. The unlock
+        // exists to write above the vendor's caps, so the tier's numbers go in unchanged —
+        // never clamped to the image's own maxima.
+        const string version = "98.03.5E.00.1E";
+        var registry = new FakeRomRegistry(_log) { Version = version };
+        var probe = new FakeVbiosProbe { State = TesterImage(version, matches: true) };
+        var restarter = new FakeRestarter(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            registry, restarter, new FakeCeiling(_log) { Ceiling = 250_000 }, new FakeEc(_log),
+            new FakeRequest(_log), vbios: probe).SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Equal(1, restarter.Calls);
+
+        // The same ceiling / rails as on the known-good image (250 W / 17.021 A / 250 A /
+        // 84 A), carried with this image's own version bytes. Board input 17.021 A
+        // deliberately exceeds the image's 17 A cap; NVVDD 250 A matches it.
+        AssertRecord(registry.Records["romOverride00"], version, 0x57C36, 250_000);
+        AssertRecord(registry.Records["romOverride01"], version, 0x57EFC, 17_021);
+        AssertRecord(registry.Records["romOverride03"], version, 0x58094, 250_000);
+        AssertRecord(registry.Records["romOverride05"], version, 0x580FA, 84_000);
+    }
+
+    [Fact]
+    public void Apply_OnANonPinnedVersionWhoseParsedLayoutDiffers_RefusesWithoutWriting()
+    {
+        var registry = new FakeRomRegistry(_log) { Version = "98.03.5E.00.1E" };
+        var restarter = new FakeRestarter(_log);
+        var probe = new FakeVbiosProbe { State = TesterImage("98.03.5E.00.1E", matches: false) };
+
+        GpuRomOverrideStateDto state = NewStore(
+            registry, restarter, new FakeCeiling(_log), new FakeEc(_log),
+            new FakeRequest(_log), vbios: probe).SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Unsupported, state.State);
+        Assert.Contains("DIFFER", state.Reason!, StringComparison.Ordinal);
+        Assert.Empty(registry.Records);
+        Assert.Empty(registry.Writes);
         Assert.Equal(0, restarter.Calls);
         Assert.False(File.Exists(OriginalsPath));
     }
@@ -1503,6 +1550,15 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal(220000u, state.VbiosPolicy.Power!.Max);
         Assert.Equal(0x57EF8, state.VbiosPolicy.BoardInput!.Offset);
         Assert.All(state.VbiosPolicy.PinnedOffsets, check => Assert.True(check.Match));
+
+        // What an apply writes on this image: the tier's numbers, unchanged (250 W / 250 A /
+        // 84 A / 17.021 A), so a report shows them next to the stock caps they exceed.
+        Assert.Equal(
+            new[] { "power", "NVVDD", "MSVDD", "board input" },
+            state.VbiosPolicy.Records.Select(record => record.Rail));
+        Assert.Equal(
+            new uint[] { 250_000, 250_000, 84_000, 17_021 },
+            state.VbiosPolicy.Records.Select(record => record.Value));
     }
 
     [Fact]
@@ -1521,6 +1577,7 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Null(state.VbiosPolicy.TableOffset);
         Assert.False(state.VbiosPolicy.Pinned);
         Assert.Empty(state.VbiosPolicy.PinnedOffsets);
+        Assert.Empty(state.VbiosPolicy.Records);
     }
 
     private GpuRomOverrideStore NewStore(
@@ -1543,6 +1600,42 @@ public sealed class GpuRomOverrideTests : IDisposable
 
         return new(registry, restarter, ceiling, ec, request, budget, rails, OriginalsPath,
             vbios: vbios ?? new FakeVbiosProbe());
+    }
+
+    /// <summary>
+    /// A tester's ROM as the probe would read it: the same table layout, stock caps above
+    /// the known-good image's (250 W / 250 A / 100 A / 11.053-17 A). <paramref name="matches"/>
+    /// decides whether the seven record offsets land on the field each record patches.
+    /// </summary>
+    private static VbiosPolicyState TesterImage(string version, bool matches)
+    {
+        VbiosPinnedCheck Check(string name, uint offset, uint value, string component) => new(
+            name, offset, matches ? value : 0, (int)(matches ? offset : offset - 0x1000), component, value);
+
+        return new VbiosPolicyState(
+            null, version, 0x57B1D, "40 38 66 14", 0x2C18,
+            new VbiosPolicyField(0x57C2E, 5000, 225000, 250000),
+            new VbiosPolicyField(0x58090, 1, 250000, 250000),
+            new VbiosPolicyField(0x580F6, 1, 100000, 100000),
+            new VbiosPolicyField(0x57EF8, 1, 11053, 17000),
+            new[]
+            {
+                Check("romOverride00", 0x57C36, 250000, "max"),
+                Check("romOverride01", 0x57EFC, 11053, "default"),
+                Check("romOverride02", 0x57F00, 17000, "max"),
+                Check("romOverride03", 0x58094, 250000, "default"),
+                Check("romOverride04", 0x58098, 250000, "max"),
+                Check("romOverride05", 0x580FA, 100000, "default"),
+                Check("romOverride06", 0x580FE, 100000, "max"),
+            });
+    }
+
+    private static void AssertRecord(byte[]? data, string version, uint offset, uint value)
+    {
+        Assert.True(RomOverrideRecord.TryDecode(data, out string actualVersion, out uint actualOffset, out uint actualValue));
+        Assert.Equal(version, actualVersion);
+        Assert.Equal(offset, actualOffset);
+        Assert.Equal(value, actualValue);
     }
 
     private static string Hex(byte[] data) => BitConverter.ToString(data).ToUpperInvariant();

@@ -205,6 +205,13 @@ public sealed class DiagnosticsExportTests
                 new GpuPinnedOffsetDto { Offset = 0x57C36, ImageValue = 220000, Component = "max", TableValueOffset = 0x57C36, TableValue = 220000, Match = true },
                 new GpuPinnedOffsetDto { Offset = 0x57EFC, ImageValue = 13500, Component = "default", TableValueOffset = 0x57EFC, TableValue = 13500, Match = true },
             },
+            Records = new[]
+            {
+                new GpuRecordValueDto { Rail = "power", Unit = "mW", Value = 250_000 },
+                new GpuRecordValueDto { Rail = "NVVDD", Unit = "mA", Value = 294_000 },
+                new GpuRecordValueDto { Rail = "MSVDD", Unit = "mA", Value = 84_000 },
+                new GpuRecordValueDto { Rail = "board input", Unit = "mA", Value = 17_021 },
+            },
         };
 
         string text = DiagnosticsExportService.ComposeHardware(
@@ -218,6 +225,12 @@ public sealed class DiagnosticsExportTests
         Assert.Contains("  MSVDD min 1 def 50000 max 50000 mA (at 0x580F6)", text);
         Assert.Contains("  board input min 1 def 13500 max 13500 mA (at 0x57EF8)", text);
         Assert.Contains("  pinned offsets: MATCH this image", text);
+
+        // The values an apply writes, right beside the stock caps: above them on purpose.
+        Assert.Contains(
+            "  records written: power 250000 mW, NVVDD 294000 mA, MSVDD 84000 mA, board input 17021 mA " +
+            "(the tier's values, so they exceed this image's own caps by design)",
+            text);
     }
 
     [Fact]
@@ -243,6 +256,9 @@ public sealed class DiagnosticsExportTests
         Assert.Contains("98.03.5E.00.1E, pinned no", text);
         Assert.Contains("  pinned offsets: DIFFER (0x57C36 image 0, table max 175000 at 0x56C2E;", text);
         Assert.Contains("0x57EFC image 11053, table default 11053 at 0x56EF8)", text);
+
+        // Nothing is written on a DIFFER image, so no record line claims otherwise.
+        Assert.DoesNotContain("records written", text);
     }
 
     [Fact]
