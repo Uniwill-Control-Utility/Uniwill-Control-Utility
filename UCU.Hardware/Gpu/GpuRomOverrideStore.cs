@@ -79,6 +79,28 @@ namespace UCU.Hardware.Gpu
     /// <summary>One start-up attempt: the verdict and the state it read back (null for NoIntent).</summary>
     public sealed record GpuReapplyResult(GpuReapplyVerdict Verdict, GpuRomOverrideStateDto? State);
 
+    /// <summary>What one settle-phase verification pass settled, for the engine's schedule.</summary>
+    public enum GpuSettleVerdict
+    {
+        /// <summary>Every live witness still matches the tier: nothing was written.</summary>
+        Settled,
+
+        /// <summary>Something had drifted and was re-applied, and the tier holds again.</summary>
+        Reapplied,
+
+        /// <summary>Something drifted and the pass ends short; <see cref="GpuSettleResult.Reason"/> names the numbers.</summary>
+        Drifted,
+
+        /// <summary>The unlock is no longer staged (a restore ran): the settle phase must end.</summary>
+        Stopped,
+    }
+
+    /// <summary>
+    /// One settle pass: <see cref="Drift"/> lists what did not match, <see cref="Reason"/> why
+    /// the pass still ends short (null when the tier holds at the end of it).
+    /// </summary>
+    public sealed record GpuSettleResult(GpuSettleVerdict Verdict, string? Drift, string? Reason);
+
     /// <summary>The four gpu.* ROM/rail verbs' target.</summary>
     public interface IGpuRomOverrideService
     {
@@ -95,6 +117,13 @@ namespace UCU.Hardware.Gpu
         /// before the display driver and NVAPI are necessarily ready.
         /// </summary>
         GpuReapplyResult ReapplyAtStartup();
+
+        /// <summary>
+        /// One verification pass after a re-apply reported Applied: the EC publishes its own
+        /// F7 budget asynchronously after a boot, so a raise that read back exactly can be
+        /// back at the EC's value seconds later. Only the parts that drifted are written.
+        /// </summary>
+        GpuSettleResult SettleAtStartup();
 
         /// <summary>The three runtime rail currents and the live policy ranges the sliders are bounded by.</summary>
         GpuRailLimitsDto GetRailLimits();
@@ -573,6 +602,99 @@ namespace UCU.Hardware.Gpu
                 // Unknown, so it is given the benefit of the retry: the driver, NVAPI or the
                 // EC may simply not be up yet, and the attempt is bounded by the caller.
                 return Attempt(GpuReapplyVerdict.Transient, State(GpuRomOverrideStates.Uncertain, ex.Message, version, none));
+            }
+        }
+
+        /// <summary>
+        /// One settle pass, after a start-up re-apply reported Applied. The reference documents
+        /// the hazard (MechControl-RE Power::apply): the EC/ACPI publishes its own F7 budget
+        /// asynchronously after a mode switch or EC initialisation, so the raise can read back
+        /// exactly and still be gone seconds later (measured 2026-11-17: 225 W at +0 s, the
+        /// EC's 150 W a few seconds after). This reads the four live witnesses and writes only
+        /// the ones that drifted, reusing the same store moves an apply makes.
+        ///
+        /// A restore during the settle phase removes the records and the originals file, so
+        /// the intent is gone and the pass stops instead of putting an unlock back that the
+        /// owner has just undone. A short pass leaves the start-up verdict Uncertain, which
+        /// the state verb already reports.
+        /// </summary>
+        public GpuSettleResult SettleAtStartup()
+        {
+            try
+            {
+                if (!IntentHolds())
+                    return new(GpuSettleVerdict.Stopped, null, null);
+
+                string version = _registry.ReadVbiosVersion()!;
+                var drift = new List<string>();
+
+                // The rails: a driver reload leaves the policy maxima, so the tier's currents
+                // are rewritten only when the card does not carry them.
+                GpuRailLimits rails = _rails.Read();
+                if (RailsReason(rails) is not null)
+                {
+                    drift.Add("rails");
+                    rails = _rails.Set(
+                        _tier.NvVddCurrentMilliAmps, _tier.MsVddCurrentMilliAmps, _tier.BoardInputCurrentMilliAmps);
+                }
+
+                // The laptop budget: the measured drift.
+                GpuPowerBudgetState budget = _budget.Read();
+                if (budget.Budget is GpuPowerBudget current)
+                {
+                    if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
+                    {
+                        drift.Add($"budget {current.F7Milliwatts} mW");
+                        if (current.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised))
+                            budget = _budget.Set(raised);
+                    }
+                }
+                else
+                {
+                    drift.Add("budget unreadable");
+                }
+
+                // The driver's own request: cleared by a driver reload.
+                GpuPowerRequestState request = _request.Read();
+                if (RequestReason(request) is not null)
+                {
+                    drift.Add("request");
+                    request = _request.Request(_tier.TgpTargetMilliwatts);
+                }
+
+                // The ceiling is the records' witness, so it is read but never written here:
+                // only a restart makes the driver re-read the records.
+                GpuPowerLimits limits = _ceiling.Read();
+                if (CeilingReason(limits) is not null)
+                    drift.Add("ceiling");
+
+                if (drift.Count == 0)
+                {
+                    _startup = null;
+                    return new(GpuSettleVerdict.Settled, null, null);
+                }
+
+                string what = string.Join(", ", drift);
+                string? shortfall =
+                    BudgetReason(budget) ?? RequestReason(request) ?? CeilingReason(limits) ?? RailsReason(rails);
+
+                if (shortfall is null)
+                {
+                    _startup = null;
+                    Log.Information("gpu.settle: {Drift} - re-applied", what);
+                    return new(GpuSettleVerdict.Reapplied, what, null);
+                }
+
+                // Still short: the state verb must not read Unlocked over it.
+                _startup = State(
+                    GpuRomOverrideStates.Uncertain, shortfall, version, limits, request, false, budget, rails);
+                Log.Information("gpu.settle: {Drift} - {Reason}", what, shortfall);
+                return new(GpuSettleVerdict.Drifted, what, shortfall);
+            }
+            catch (Exception ex)
+            {
+                Log.Information("gpu.settle: {Type} {Message}", ex.GetType().Name, ex.Message);
+                return new(GpuSettleVerdict.Drifted, null, ex.Message);
             }
         }
 

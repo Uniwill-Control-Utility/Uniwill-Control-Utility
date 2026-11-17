@@ -20,6 +20,10 @@ namespace UCU.Engine
     /// stops at the first success, at the first definitive refusal, and when no unlock is
     /// staged at all — a Restore in the meantime leaves nothing to re-apply, which the store
     /// reports as <see cref="GpuReapplyVerdict.NoIntent"/>.
+    ///
+    /// An Applied attempt is followed by a bounded settle phase (see <see cref="SettleSchedule"/>):
+    /// the EC publishes its own F7 budget asynchronously after a boot, so the raise can be
+    /// rewritten seconds after it read back exactly.
     /// </summary>
     public sealed class GpuRomOverrideStartup : IHostedService
     {
@@ -32,6 +36,20 @@ namespace UCU.Engine
             TimeSpan.Zero,
             TimeSpan.FromSeconds(10),
             TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(60),
+            TimeSpan.FromSeconds(120),
+        };
+
+        /// <summary>
+        /// The settle passes, seconds after the re-apply settled as Applied. The EC publishes
+        /// its own F7 budget asynchronously after a boot, so the raise can read back exactly
+        /// and be rewritten seconds later (measured 2026-11-17); the passes re-check and
+        /// re-apply only what drifted, and two consecutive passes that end holding the tier
+        /// stop them early.
+        /// </summary>
+        internal static readonly TimeSpan[] SettleSchedule =
+        {
+            TimeSpan.FromSeconds(20),
             TimeSpan.FromSeconds(60),
             TimeSpan.FromSeconds(120),
         };
@@ -58,12 +76,18 @@ namespace UCU.Engine
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            if (Attempt() != GpuReapplyVerdict.Transient)
-                return Task.CompletedTask;
+            GpuReapplyVerdict verdict = Attempt();
 
-            _ = Task.Run(() => RetryAsync(_stopping.Token));
+            if (verdict == GpuReapplyVerdict.Applied)
+                Background = Task.Run(() => SettleAsync(_stopping.Token));
+            else if (verdict == GpuReapplyVerdict.Transient)
+                Background = Task.Run(() => RetryAsync(_stopping.Token));
+
             return Task.CompletedTask;
         }
+
+        /// <summary>The background phase (retry, then settle): what <see cref="StopAsync"/> stops.</summary>
+        internal Task? Background { get; private set; }
 
         /// <summary>The retries, in order, from the second scheduled attempt on.</summary>
         internal async Task RetryAsync(CancellationToken cancellationToken)
@@ -83,6 +107,12 @@ namespace UCU.Engine
                         "GPU ROM override start-up attempt {Attempt}/{Total} at +{Seconds} s: {Verdict}",
                         i + 1, Schedule.Length, (int)Schedule[i].TotalSeconds, verdict);
 
+                    if (verdict == GpuReapplyVerdict.Applied)
+                    {
+                        await SettleAsync(cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
+
                     if (verdict != GpuReapplyVerdict.Transient)
                         return;
                 }
@@ -98,6 +128,84 @@ namespace UCU.Engine
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "GPU ROM override start-up retry failed");
+            }
+        }
+
+        /// <summary>
+        /// The settle passes after an Applied re-apply: each one reads the live machine and
+        /// re-applies only the parts that drifted. Bounded twice over — the schedule is three
+        /// passes, and two consecutive passes that end holding the tier stop it early. A
+        /// restore (the store answers <see cref="GpuSettleVerdict.Stopped"/>) ends it at once:
+        /// the settle must never fight the owner's own Unlock/Restore.
+        /// </summary>
+        internal async Task SettleAsync(CancellationToken cancellationToken)
+        {
+            var started = Stopwatch.StartNew();
+            GpuSettleResult? last = null;
+            int clean = 0;
+
+            try
+            {
+                for (int i = 0; i < SettleSchedule.Length; i++)
+                {
+                    TimeSpan wait = SettleSchedule[i] - started.Elapsed;
+                    if (wait > TimeSpan.Zero)
+                        await _delay(wait, cancellationToken).ConfigureAwait(false);
+
+                    GpuSettleResult result = Settle();
+                    if (result.Verdict == GpuSettleVerdict.Stopped)
+                    {
+                        _log.LogInformation(
+                            "GPU unlock settle: the unlock is no longer staged (a restore ran); the settle phase ends");
+                        return;
+                    }
+
+                    _log.LogInformation(
+                        "gpu.settle: attempt {Attempt} at +{Seconds} s: {What}",
+                        i + 1, (int)SettleSchedule[i].TotalSeconds,
+                        result.Verdict switch
+                        {
+                            GpuSettleVerdict.Settled => "clean",
+                            GpuSettleVerdict.Reapplied => $"{result.Drift} - re-applied",
+                            _ => $"{result.Drift ?? "the pass failed"} - {result.Reason}",
+                        });
+
+                    // A pass that ends with the tier holding is clean, whether it re-applied or not.
+                    clean = result.Verdict == GpuSettleVerdict.Drifted ? 0 : clean + 1;
+                    if (clean == 2)
+                        return;
+
+                    last = result;
+                }
+
+                if (last?.Verdict == GpuSettleVerdict.Drifted)
+                {
+                    _log.LogWarning(
+                        "GPU unlock settle: still short after {Passes} passes (+{Seconds} s): {Drift} - {Reason}; the state verb reports it",
+                        SettleSchedule.Length, (int)SettleSchedule[^1].TotalSeconds, last.Drift, last.Reason);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // The engine is stopping: no line, the host is going down.
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "GPU unlock settle failed");
+            }
+        }
+
+        /// <summary>One settle pass. An exception is a short pass: never Unlocked, never a re-apply loop.</summary>
+        private GpuSettleResult Settle()
+        {
+            try
+            {
+                return _overrides.SettleAtStartup();
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "GPU ROM override settle pass failed");
+                return new(GpuSettleVerdict.Drifted, null, ex.Message);
             }
         }
 

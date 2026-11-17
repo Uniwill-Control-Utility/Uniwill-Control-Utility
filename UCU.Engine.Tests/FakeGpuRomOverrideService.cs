@@ -69,7 +69,22 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
         return new(verdict, verdict == GpuReapplyVerdict.NoIntent ? null : Answer);
     }
 
+    /// <summary>How many settle passes reached this fake.</summary>
+    public int SettleCalls { get; private set; }
+
+    /// <summary>The next settle passes, in order; then <see cref="SettleAnswer"/>.</summary>
+    public Queue<GpuSettleResult> Settles { get; } = new();
+
+    /// <summary>What a settle pass answers once the scripted ones are used up.</summary>
+    public GpuSettleResult SettleAnswer { get; set; } = new(GpuSettleVerdict.Settled, null, null);
+
     public GpuRailLimitsDto GetRailLimits() => RailAnswer;
+
+    public GpuSettleResult SettleAtStartup()
+    {
+        SettleCalls++;
+        return Settles.Count > 0 ? Settles.Dequeue() : SettleAnswer;
+    }
 
     public GpuRailLimitsDto SetRailLimits(int? nvvddMilliamps, int? msvddMilliamps, int? boardInputMilliamps)
     {

@@ -1279,6 +1279,158 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.False(store.GetState().Enabled);
     }
 
+    [Fact]
+    public void Settle_WhenTheEcRewritesTheBudget_ReappliesOnlyThat()
+    {
+        // The measured post-boot drift (2026-11-17): the start-up re-apply read the budget
+        // back exactly and a few seconds later the EC republished its own 150 W F7. The
+        // settle pass writes the budget back and touches nothing else.
+        var registry = new FakeRomRegistry(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        budget.Reset();   // the EC publishes its own F7 after the boot settles
+        int writes = registry.Writes.Count;
+        int railSets = rails.Sets.Count;
+        int requests = request.Requests.Count;
+        int budgetSets = budget.Sets.Count;
+        _log.Clear();
+
+        GpuSettleResult result = store.SettleAtStartup();
+
+        Assert.Equal(GpuSettleVerdict.Reapplied, result.Verdict);
+        Assert.Equal("budget 150000 mW", result.Drift);
+        Assert.Null(result.Reason);
+        Assert.Equal(budgetSets + 1, budget.Sets.Count);
+        Assert.Equal((225_000, 500_000), (budget.Sets[^1].F7Milliwatts, budget.Sets[^1].PlatformMilliwatts));
+        Assert.Equal(railSets, rails.Sets.Count);   // only the drifted part is written
+        Assert.Equal(requests, request.Requests.Count);
+        Assert.Equal(writes, registry.Writes.Count);
+        Assert.Contains("budget.set:225000,500000", _log);
+        Assert.DoesNotContain(_log, line => line.StartsWith("rails.set", StringComparison.Ordinal));
+
+        Assert.Equal(225_000, store.GetState().BudgetMilliwatts);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.GetState().State);
+    }
+
+    [Fact]
+    public void Settle_WhenEverythingStillHolds_WritesNothing()
+    {
+        var registry = new FakeRomRegistry(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        int writes = registry.Writes.Count;
+        int railSets = rails.Sets.Count;
+        int requests = request.Requests.Count;
+        int budgetSets = budget.Sets.Count;
+
+        GpuSettleResult result = store.SettleAtStartup();
+
+        Assert.Equal(GpuSettleVerdict.Settled, result.Verdict);
+        Assert.Null(result.Drift);
+        Assert.Equal(writes, registry.Writes.Count);
+        Assert.Equal(railSets, rails.Sets.Count);
+        Assert.Equal(requests, request.Requests.Count);
+        Assert.Equal(budgetSets, budget.Sets.Count);
+    }
+
+    [Fact]
+    public void Settle_WhenTheBudgetNeverComesBack_ReportsTheNumbersAndStaysUncertain()
+    {
+        var budget = new FakeBudget(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        budget.Refused = "the EC refused the F7 write";
+        budget.Reset();
+
+        GpuSettleResult result = store.SettleAtStartup();
+
+        Assert.Equal(GpuSettleVerdict.Drifted, result.Verdict);
+        Assert.Equal("budget 150000 mW", result.Drift);   // the number the warning names
+        Assert.Contains("the EC refused the F7 write", result.Reason!, StringComparison.Ordinal);
+
+        // The pass ends short, so the state verb must not read Unlocked over it — and its
+        // own live reason names both numbers.
+        Assert.Equal(GpuRomOverrideStates.Uncertain, store.GetState().State);
+        Assert.Contains("150 W", store.GetState().Reason!, StringComparison.Ordinal);
+        Assert.Contains("225 W", store.GetState().Reason!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Settle_WhenTheDriverReloadTookTheRequestAndTheRails_ReappliesThem()
+    {
+        var request = new FakeRequest(_log);
+        var rails = new FakeRails(_log);
+        var budget = new FakeBudget(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        request.Forget();   // what a driver reload does
+        rails.NvVddCurrent = RomOverrideLayout.StockNvVddMilliAmps;
+        int budgetSets = budget.Sets.Count;
+
+        GpuSettleResult result = store.SettleAtStartup();
+
+        Assert.Equal(GpuSettleVerdict.Reapplied, result.Verdict);
+        Assert.Contains("rails", result.Drift!, StringComparison.Ordinal);
+        Assert.Contains("request", result.Drift!, StringComparison.Ordinal);
+        Assert.Equal(225_000, request.Requests[^1]);
+        Assert.Equal(250_000, rails.Sets[^1].Nvvdd);
+        Assert.Equal(budgetSets, budget.Sets.Count);   // the budget held, so it is not written
+    }
+
+    [Fact]
+    public void Settle_AfterARestore_StopsInsteadOfReapplying()
+    {
+        // The owner restores the unlock while the settle phase is live: the records and the
+        // originals file are gone, so the pass stops and writes nothing.
+        var registry = new FakeRomRegistry(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        var rails = new FakeRails(_log);
+        var budget = new FakeBudget(_log);
+        var request = new FakeRequest(_log);
+        GpuRomOverrideStore store = NewStore(registry, new FakeRestarter(_log), ceiling, new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        ceiling.Ceiling = 175_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+
+        int writes = registry.Writes.Count;
+        int railSets = rails.Sets.Count;
+        int budgetSets = budget.Sets.Count;
+        int requests = request.Requests.Count;
+
+        GpuSettleResult result = store.SettleAtStartup();
+
+        Assert.Equal(GpuSettleVerdict.Stopped, result.Verdict);
+        Assert.Null(result.Drift);
+        Assert.Equal(writes, registry.Writes.Count);
+        Assert.Equal(railSets, rails.Sets.Count);
+        Assert.Equal(budgetSets, budget.Sets.Count);
+        Assert.Equal(requests, request.Requests.Count);
+        Assert.False(store.GetState().Enabled);
+    }
+
     private string MarkerPath => Path.Combine(Path.GetDirectoryName(OriginalsPath)!, "enabled");
 
     /// <summary>The state a completed unlock leaves on disk, without touching the driver key.</summary>
