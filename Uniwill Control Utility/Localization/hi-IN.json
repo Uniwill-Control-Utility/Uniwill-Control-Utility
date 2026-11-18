@@ -1182,5 +1182,21 @@
   "Keep Power boost mode on": "पावर बूस्ट मोड चालू रखें",
   "Extra GPU power could not be restored": "अतिरिक्त GPU पावर बहाल नहीं की जा सकी",
   "The extra GPU power override is still applied.": "अतिरिक्त GPU पावर का ओवरराइड अभी भी लागू है।",
-  "The card enforces {0}, not the requested {1}.": "कार्ड {0} लागू करता है, अनुरोधित {1} नहीं।"
+  "The card enforces {0}, not the requested {1}.": "कार्ड {0} लागू करता है, अनुरोधित {1} नहीं।",
+  "Apply 200 W": "200 W लागू करें",
+  "Apply 225 W (tested)": "225 W लागू करें (परीक्षित)",
+  "Apply 250 W (measured on our unit)": "250 W लागू करें (हमारी यूनिट पर मापा गया)",
+  "Quick configurations": "त्वरित कॉन्फ़िगरेशन",
+  "For an unlocked card: one click sets the target, the three rail currents, and for 250 W this unit's clock offsets. Unlock and Restore stock stay below.": "पहले से अनलॉक कार्ड के लिए: एक क्लिक लक्ष्य, तीन रेल धाराएँ और 250 W के लिए इस यूनिट के क्लॉक ऑफ़सेट सेट करता है। अनलॉक और मूल स्थिति में लौटाएँ नीचे रहते हैं।",
+  "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "लक्ष्य के रूप में नहीं मापा गया: यह परीक्षित 225 W रेल धाराएँ उपयोग करता है, जिनकी सीमाएँ 200 W की ज़रूरत से काफ़ी ऊपर हैं। क्लॉक को छुआ नहीं जाता।",
+  "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.": "परीक्षित स्तर: 214 W बोर्ड पावर, लिक्विड कूलर जुड़ा होने पर हॉटस्पॉट 58-63 °C। क्लॉक को छुआ नहीं जाता।",
+  "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.": "हमारी यूनिट ने 248.5 W शिखर और 236 W औसत, 0.985-0.995 V पर 183 W चिप और 2947 MHz मापा, +245 MHz कोर और +1500 MHz मेमोरी के साथ। ये क्लॉक ऑफ़सेट इस नमूने का परिणाम हैं और किसी अन्य कार्ड पर अस्थिर हो सकते हैं।",
+  "The 250 W set writes this unit's clock offsets, so it needs GPU clock control on in Settings. The other two leave the clocks alone.": "250 W सेट इस यूनिट के क्लॉक ऑफ़सेट लिखता है, इसलिए इसे सेटिंग्स में GPU क्लॉक नियंत्रण चालू चाहिए। बाकी दो क्लॉक को छूते नहीं।",
+  "Apply the 200 W configuration?": "200 W कॉन्फ़िगरेशन लागू करें?",
+  "Apply the tested 225 W configuration?": "परीक्षित 225 W कॉन्फ़िगरेशन लागू करें?",
+  "Apply the 250 W configuration measured on our unit?": "हमारी यूनिट पर मापा गया 250 W कॉन्फ़िगरेशन लागू करें?",
+  "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "यह ड्राइवर का लक्ष्य {0} और रेल धाराएँ {1} A GPU कोर, {2} A मेमोरी और {3} A बोर्ड इनपुट सेट करता है। क्लॉक को छुआ नहीं जाता।",
+  "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "यह ड्राइवर का लक्ष्य {0}, रेल धाराएँ {1} A GPU कोर, {2} A मेमोरी और {3} A बोर्ड इनपुट, और क्लॉक ऑफ़सेट {4} MHz कोर और {5} MHz मेमोरी सेट करता है।",
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "लागू हुआ, क्लॉक ऑफ़सेट को छोड़कर: ड्राइवर ने उन्हें पुष्ट नहीं किया। लक्ष्य और रेल धाराएँ लागू हैं।",
+  "follows the preset": "प्रीसेट के अनुसार"
 }

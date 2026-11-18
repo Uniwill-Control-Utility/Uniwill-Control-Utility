@@ -904,8 +904,9 @@
                                               Visibility="Collapsed"
                                               Text="Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on." />
 
-                                <!-- The statement is only asked for when there is something to
-                                     unlock, so its divider lives in the row and goes with it. -->
+                                <!-- The statement is asked for when there is something to unlock, and
+                                     while the quick configurations need it on an already-unlocked
+                                     card, so its divider lives in the row and goes with it. -->
                                 <StackPanel x:Name="spRomConsentRow" Visibility="Collapsed">
                                     <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
@@ -918,6 +919,90 @@
 
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- Three measured configurations, one click each, for a card that is
+                                     already unlocked: they set the target and that tier's three rail
+                                     currents, and 250 W also sets this unit's clock offsets. They are
+                                     not a replacement for Unlock/Restore below, which stay the manual
+                                     pair. The two sets that leave the clocks alone say so, and the
+                                     250 W set carries the rails block's adapter caution beside it. -->
+                                <StackPanel x:Name="spQuickApply">
+                                    <ui:TextBlock FontTypography="BodyStrong" Text="Quick configurations" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Text="For an unlocked card: one click sets the target, the three rail currents, and for 250 W this unit's clock offsets. Unlock and Restore stock stay below." />
+
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                            <ui:Button x:Name="btnApply200"
+                                                       HorizontalAlignment="Left"
+                                                       Padding="16,6"
+                                                       Appearance="Secondary"
+                                                       Click="btnApply200_Click"
+                                                       Content="Apply 200 W" />
+                                            <TextBlock Margin="0,6,0,0"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone." />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                            <ui:Button x:Name="btnApply225"
+                                                       HorizontalAlignment="Left"
+                                                       Padding="16,6"
+                                                       Appearance="Secondary"
+                                                       Click="btnApply225_Click"
+                                                       Content="Apply 225 W (tested)" />
+                                            <TextBlock Margin="0,6,0,0"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone." />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2">
+                                            <ui:Button x:Name="btnApply250"
+                                                       HorizontalAlignment="Left"
+                                                       Padding="16,6"
+                                                       Appearance="Secondary"
+                                                       Click="btnApply250_Click"
+                                                       Content="Apply 250 W (measured on our unit)" />
+                                            <TextBlock Margin="0,6,0,0"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card." />
+                                            <!-- The same caution the rails block carries: this set ends at
+                                                 16.971 A of board input, above 14 A. -->
+                                            <TextBlock Margin="0,6,0,0"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                                       Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Why the three are dimmed, when they are: the same one line the
+                                         card uses for its own actions. -->
+                                    <TextBlock x:Name="tbQuickApplyReason"
+                                               Margin="0,8,0,0"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               Visibility="Collapsed"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                                    <!-- Divider -->
+                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                </StackPanel>
 
                                 <!-- Both actions stay on the card: the irrelevant one is disabled
                                      and explained, never hidden and never a silent no-op. -->

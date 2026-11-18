@@ -1182,5 +1182,21 @@
   "Keep Power boost mode on": "Mantieni attiva la modalità power boost",
   "Extra GPU power could not be restored": "Non è stato possibile ripristinare la potenza GPU aggiuntiva",
   "The extra GPU power override is still applied.": "L'override della potenza GPU aggiuntiva è ancora applicato.",
-  "The card enforces {0}, not the requested {1}.": "La scheda applica {0}, non i {1} richiesti."
+  "The card enforces {0}, not the requested {1}.": "La scheda applica {0}, non i {1} richiesti.",
+  "Apply 200 W": "Applica 200 W",
+  "Apply 225 W (tested)": "Applica 225 W (testato)",
+  "Apply 250 W (measured on our unit)": "Applica 250 W (misurato sulla nostra unità)",
+  "Quick configurations": "Configurazioni rapide",
+  "For an unlocked card: one click sets the target, the three rail currents, and for 250 W this unit's clock offsets. Unlock and Restore stock stay below.": "Per una scheda già sbloccata: un clic imposta l'obiettivo, le tre correnti di rail e, per 250 W, gli offset di clock di questa unità. Sblocca e Ripristina originale restano sotto.",
+  "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Non misurato come obiettivo: usa le correnti di rail testate da 225 W, i cui limiti superano di molto ciò che servono 200 W. I clock non vengono toccati.",
+  "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.": "Il livello testato: 214 W sulla scheda, hotspot 58-63 °C con il raffreddamento a liquido collegato. I clock non vengono toccati.",
+  "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.": "La nostra unità ha misurato 248,5 W di picco e 236 W di media, 183 W di chip a 0,985-0,995 V e 2947 MHz, con +245 MHz core e +1500 MHz memoria. Quegli offset di clock sono il risultato di questo esemplare e potrebbero essere instabili su un'altra scheda.",
+  "The 250 W set writes this unit's clock offsets, so it needs GPU clock control on in Settings. The other two leave the clocks alone.": "Il set da 250 W scrive gli offset di clock di questa unità, quindi richiede il controllo frequenza GPU attivo nelle Impostazioni. Gli altri due non toccano i clock.",
+  "Apply the 200 W configuration?": "Applicare la configurazione da 200 W?",
+  "Apply the tested 225 W configuration?": "Applicare la configurazione testata da 225 W?",
+  "Apply the 250 W configuration measured on our unit?": "Applicare la configurazione da 250 W misurata sulla nostra unità?",
+  "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "Questo imposta l'obiettivo del driver a {0} e le correnti di rail a {1} A core GPU, {2} A memoria e {3} A ingresso scheda. I clock non vengono toccati.",
+  "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Questo imposta l'obiettivo del driver a {0}, le correnti di rail a {1} A core GPU, {2} A memoria e {3} A ingresso scheda e gli offset di clock a {4} MHz core e {5} MHz memoria.",
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Applicato, tranne gli offset di clock: il driver non li ha confermati. L'obiettivo e le correnti di rail sono attivi.",
+  "follows the preset": "segue il profilo"
 }

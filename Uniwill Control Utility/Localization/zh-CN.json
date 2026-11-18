@@ -1182,5 +1182,21 @@
   "Keep Power boost mode on": "保持电源增强模式开启",
   "Extra GPU power could not be restored": "无法恢复额外 GPU 功耗",
   "The extra GPU power override is still applied.": "额外 GPU 功耗的覆盖设置仍然生效。",
-  "The card enforces {0}, not the requested {1}.": "显卡实际执行 {0}，而非请求的 {1}。"
+  "The card enforces {0}, not the requested {1}.": "显卡实际执行 {0}，而非请求的 {1}。",
+  "Apply 200 W": "应用 200 W",
+  "Apply 225 W (tested)": "应用 225 W（已测试）",
+  "Apply 250 W (measured on our unit)": "应用 250 W（在我们机器上测得）",
+  "Quick configurations": "快捷配置",
+  "For an unlocked card: one click sets the target, the three rail currents, and for 250 W this unit's clock offsets. Unlock and Restore stock stay below.": "针对已解锁的显卡：一次点击设置目标、三路供电电流，250 W 还会设置本机的时钟偏移。解锁和恢复原始设置仍在下方。",
+  "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "未作为目标实测：它沿用已测试的 225 W 供电电流，其上限远高于 200 W 所需。时钟不做改动。",
+  "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.": "已测试档位：板载功率 214 W，连接水冷时热点 58-63 °C。时钟不做改动。",
+  "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.": "我们的机器实测峰值 248.5 W、平均 236 W，芯片 183 W（0.985-0.995 V、2947 MHz），并带 +245 MHz 核心与 +1500 MHz 显存偏移。这些时钟偏移是本机的测试结果，换到别的显卡上可能不稳定。",
+  "The 250 W set writes this unit's clock offsets, so it needs GPU clock control on in Settings. The other two leave the clocks alone.": "250 W 档会写入本机的时钟偏移，因此需要在设置中开启 GPU 时钟控制。另外两档不改动时钟。",
+  "Apply the 200 W configuration?": "应用 200 W 配置？",
+  "Apply the tested 225 W configuration?": "应用已测试的 225 W 配置？",
+  "Apply the 250 W configuration measured on our unit?": "应用在我们机器上测得的 250 W 配置？",
+  "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "这会将驱动目标设为 {0}，供电电流设为 {1} A GPU 核心、{2} A 显存和 {3} A 板输入。时钟不做改动。",
+  "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "这会将驱动目标设为 {0}，供电电流设为 {1} A GPU 核心、{2} A 显存和 {3} A 板输入，时钟偏移设为核心 {4} MHz、显存 {5} MHz。",
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "已应用，但时钟偏移除外：驱动未确认。目标与供电电流已生效。",
+  "follows the preset": "跟随预设"
 }

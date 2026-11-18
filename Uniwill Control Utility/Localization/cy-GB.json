@@ -1182,5 +1182,21 @@
   "Keep Power boost mode on": "Cadw'r modd hwb pŵer ymlaen",
   "Extra GPU power could not be restored": "Nid oedd modd adfer y pŵer GPU ychwanegol",
   "The extra GPU power override is still applied.": "Mae gorddadiad pŵer GPU ychwanegol yn dal i fod wedi'i osod.",
-  "The card enforces {0}, not the requested {1}.": "Mae'r cerdyn yn gorfodi {0}, nid y {1} y gofynnwyd amdano."
+  "The card enforces {0}, not the requested {1}.": "Mae'r cerdyn yn gorfodi {0}, nid y {1} y gofynnwyd amdano.",
+  "Apply 200 W": "Cymhwyso 200 W",
+  "Apply 225 W (tested)": "Cymhwyso 225 W (wedi'i brofi)",
+  "Apply 250 W (measured on our unit)": "Cymhwyso 250 W (wedi'i fesur ar ein huned)",
+  "Quick configurations": "Ffurfweddiadau cyflym",
+  "For an unlocked card: one click sets the target, the three rail currents, and for 250 W this unit's clock offsets. Unlock and Restore stock stay below.": "Ar gyfer cerdyn sydd eisoes wedi'i ddatgloi: mae un clic yn gosod y targed, y tri cherrynt rheilffordd, ac ar gyfer 250 W gwrthbwyso cloc yr uned hon. Mae Datgloi ac Adfer y gwreiddiol yn aros isod.",
+  "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Heb ei fesur fel targed: mae'n defnyddio'r cerrynt rheilffordd 225 W profedig, y mae ei derfynau ymhell uwchlaw'r hyn y mae 200 W ei angen. Ni chyffyrddir â'r clociau.",
+  "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.": "Y lefel brofedig: 214 W pŵer bwrdd, man poeth 58-63 °C gyda'r oerydd hylifol wedi'i gysylltu. Ni chyffyrddir â'r clociau.",
+  "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.": "Mesurodd ein huned 248.5 W brig a 236 W cyfartaledd, 183 W sglodyn ar 0.985-0.995 V a 2947 MHz, gyda +245 MHz craidd a +1500 MHz cof. Canlyniad y sampl hwn yw'r gwrthbwyso cloc hynny a gall fod yn ansefydlog ar gerdyn arall.",
+  "The 250 W set writes this unit's clock offsets, so it needs GPU clock control on in Settings. The other two leave the clocks alone.": "Mae'r set 250 W yn ysgrifennu gwrthbwyso cloc yr uned hon, felly mae angen rheolaeth cloc GPU ymlaen yn y Gosodiadau. Nid yw'r ddwy arall yn cyffwrdd â'r clociau.",
+  "Apply the 200 W configuration?": "Cymhwyso'r ffurfweddiad 200 W?",
+  "Apply the tested 225 W configuration?": "Cymhwyso'r ffurfweddiad 225 W profedig?",
+  "Apply the 250 W configuration measured on our unit?": "Cymhwyso'r ffurfweddiad 250 W a fesurwyd ar ein huned?",
+  "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "Mae hyn yn gosod targed y gyrrwr i {0} a'r cerrynt rheilffordd i {1} A craidd GPU, {2} A cof a {3} A mewnbwn bwrdd. Ni chyffyrddir â'r clociau.",
+  "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Mae hyn yn gosod targed y gyrrwr i {0}, y cerrynt rheilffordd i {1} A craidd GPU, {2} A cof a {3} A mewnbwn bwrdd, a'r gwrthbwyso cloc i {4} MHz craidd a {5} MHz cof.",
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Wedi'i gymhwyso, ac eithrio'r gwrthbwyso cloc: ni wnaeth y gyrrwr eu cadarnhau. Mae'r targed a'r cerrynt rheilffordd mewn grym.",
+  "follows the preset": "yn dilyn y rhagosodiad"
 }
