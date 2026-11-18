@@ -6,8 +6,8 @@ namespace Uniwill_Control_Utility.Tests.UI;
 /// re-apply lands, so a row keyed to the state appeared for an owner who had not touched
 /// the feature since booting. With the staged records and UCU's originals file, the row is
 /// absent until the unlock has been completed at least once, and once enabled it renders
-/// whatever the numbers are — including "Not read" / "Unverified" while the re-apply is
-/// still settling.
+/// whatever the numbers are — a number the driver could not be asked for stays a dash pair
+/// and is painted critical while the re-apply is still settling.
 /// </summary>
 public sealed class PresetsRomStatusRowVisibilityTests
 {

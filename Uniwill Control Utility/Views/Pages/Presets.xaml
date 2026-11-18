@@ -192,8 +192,9 @@
 
                             <!-- The unlock's numbers, read back from the driver. It exists only
                                  while the unlock is applied; with it off the card already says
-                                 what the GPU is running on. Every coloured number carries its
-                                 own word, so nothing here is colour alone. -->
+                                 what the GPU is running on. The colour carries the verdict; a
+                                 number the driver could not be asked for stays a dash pair,
+                                 and the card's reason line says why. -->
                             <StackPanel x:Name="spRomStatusRow" Visibility="Collapsed">
                                 <Border Height="1"
                                         Margin="0,12,0,10"
@@ -220,27 +221,22 @@
                                         <StackPanel Margin="0,0,16,0">
                                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="TGP" />
                                             <TextBlock x:Name="tbRomStatRequest" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
-                                            <TextBlock x:Name="tbRomStatRequestWord" Margin="0,1,0,0" FontSize="12" />
                                         </StackPanel>
                                         <StackPanel Margin="0,0,16,0">
                                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Budget" />
                                             <TextBlock x:Name="tbRomStatBudget" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
-                                            <TextBlock x:Name="tbRomStatBudgetWord" Margin="0,1,0,0" FontSize="12" />
                                         </StackPanel>
                                         <StackPanel Margin="0,0,16,0">
                                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="NVVDD" />
                                             <TextBlock x:Name="tbRomStatNvvdd" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- A" />
-                                            <TextBlock x:Name="tbRomStatNvvddWord" Margin="0,1,0,0" FontSize="12" />
                                         </StackPanel>
                                         <StackPanel Margin="0,0,16,0">
                                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="MSVDD" />
                                             <TextBlock x:Name="tbRomStatMsvdd" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- A" />
-                                            <TextBlock x:Name="tbRomStatMsvddWord" Margin="0,1,0,0" FontSize="12" />
                                         </StackPanel>
                                         <StackPanel>
                                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Board input" />
                                             <TextBlock x:Name="tbRomStatBoard" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- A" />
-                                            <TextBlock x:Name="tbRomStatBoardWord" Margin="0,1,0,0" FontSize="12" />
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>

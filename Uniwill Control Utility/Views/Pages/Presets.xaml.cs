@@ -2427,22 +2427,21 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// rails, each the driver's own read-back rather than the tier's request. The row is keyed to
         /// <see cref="UCU.Contracts.GpuRomOverrideStateDto.Enabled"/>, not to the derived state: it is
         /// absent until the owner has unlocked at least once, and once enabled it renders whatever the
-        /// numbers are — including "Not read"/"Unverified" while a start-up re-apply is settling. With
-        /// it off, the card above already says what the GPU runs on. It is named in the slider's own
-        /// vocabulary - TGP - while the driver's 250 W ceiling is permission, not a target, and is
-        /// explained in the section's tooltip instead.
+        /// numbers are — a number the driver could not be asked for stays "--" while the start-up
+        /// re-apply settles. With it off, the card above already says what the GPU runs on. It is
+        /// named in the slider's own vocabulary - TGP - while the driver's 250 W ceiling is
+        /// permission, not a target, and is explained in the section's tooltip instead.
         ///
-        /// What the colours mean, stated once here — and every colour is rendered next to its
-        /// own word, so no state depends on colour alone:
-        ///   Tested (success)   — applied and inside the measured configuration: request at or
-        ///                        above the 225 W target, budget at or above the request, and
-        ///                        every rail at or below 250 / 70 / 14.026 A.
-        ///   Untested (caution) — applied but outside it: budget below the request, request below
-        ///                        the target, or a rail above the tested value. Above 14.026 A on
-        ///                        the board input that is also the adapter-overload case.
-        ///   Unverified         — critical: refused or unverified (Unsupported / Uncertain).
-        ///   Not read           — critical: the driver could not be asked for that number, which
-        ///                        is not the same as a number that is fine.
+        /// The colour is the verdict, stated once here; the words that used to sit beside it are
+        /// gone, so the card's reason line carries the failure text:
+        ///   success   — applied and inside the measured configuration: request at or above the
+        ///               225 W target, budget at or above the request, and every rail at or below
+        ///               250 / 70 / 14.026 A.
+        ///   caution   — applied but outside it: budget below the request, request below the
+        ///               target, or a rail above the tested value. Above 14.026 A on the board
+        ///               input that is also the adapter-overload case.
+        ///   critical  — refused or unverified (Unsupported / Uncertain), or a number that could
+        ///               not be read, which is not the same as a number that is fine.
         /// </summary>
         private void RenderRomStatusRow()
         {
@@ -2471,39 +2470,33 @@ namespace Uniwill_Control_Utility.Views.Pages
             int? msvdd = state.MsvddCurrentMilliamps;
             int? board = state.BoardInputCurrentMilliamps;
 
-            SetRomValue(tbRomStatRequest, tbRomStatRequestWord, Watts(request),
+            SetRomValue(tbRomStatRequest, Watts(request),
                 request is not null, unverified, GpuUnlockVerdict.IsTested(request));
 
             // The driver enforces min(request, budget), so a budget under the request is the
             // laptop's own cap holding the GPU back, not a fault.
-            SetRomValue(tbRomStatBudget, tbRomStatBudgetWord, Watts(budget),
+            SetRomValue(tbRomStatBudget, Watts(budget),
                 budget is not null, unverified, budget is int b && b >= (request ?? GpuUnlockVerdict.TestedTargetMilliwatts));
 
-            SetRomValue(tbRomStatNvvdd, tbRomStatNvvddWord, Amps(nvvdd, 0) + " A",
+            SetRomValue(tbRomStatNvvdd, Amps(nvvdd, 0) + " A",
                 nvvdd is not null, unverified, nvvdd is int n && n <= TestedNvvddMilliamps);
-            SetRomValue(tbRomStatMsvdd, tbRomStatMsvddWord, Amps(msvdd, 0) + " A",
+            SetRomValue(tbRomStatMsvdd, Amps(msvdd, 0) + " A",
                 msvdd is not null, unverified, msvdd is int m && m <= TestedMsvddMilliamps);
-            SetRomValue(tbRomStatBoard, tbRomStatBoardWord, Amps(board, 3) + " A",
+            SetRomValue(tbRomStatBoard, Amps(board, 3) + " A",
                 board is not null, unverified, board is int i && i <= TestedBoardInputMilliamps);
         }
 
-        private void SetRomValue(
-            TextBlock valueText, TextBlock wordText, string text, bool read, bool unverified, bool tested)
+        private void SetRomValue(TextBlock valueText, string text, bool read, bool unverified, bool tested)
         {
             valueText.Text = text;
 
-            (string word, string brush) = !read
-                ? ("Not read", "SystemFillColorCriticalBrush")
-                : unverified
-                    ? ("Unverified", "SystemFillColorCriticalBrush")
-                    : tested
-                        ? ("Tested", "SystemFillColorSuccessBrush")
-                        : ("Untested", "SystemFillColorCautionBrush");
+            string brush = !read || unverified
+                ? "SystemFillColorCriticalBrush"
+                : tested
+                    ? "SystemFillColorSuccessBrush"
+                    : "SystemFillColorCautionBrush";
 
-            wordText.Text = LocalizationService.Get(word);
-            System.Windows.Media.Brush colour = (System.Windows.Media.Brush)FindResource(brush);
-            valueText.Foreground = colour;
-            wordText.Foreground = colour;
+            valueText.Foreground = (System.Windows.Media.Brush)FindResource(brush);
         }
 
         private static string Watts(int? milliwatts) =>
@@ -2614,8 +2607,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // The unlock aims at the TGP the page would apply: a Custom preset's slider
                 // is the owner's intention, while a stock preset hands its TGP to the
                 // firmware, so the engine's measured target stands there. A slider below the
-                // measured 225 W is not the unlock's target either — the unlock is a 225 W
-                // configuration, and the store refuses anything lower rather than promoting it.
+                // measured 225 W is not carried as the target here — the quieter 200 W
+                // configuration has its own button, and this path must not quietly re-aim a
+                // manual unlock at whatever the preset rail happens to hold.
                 int? targetTgp = _currentProfile == "Custom"
                     ? (int)Math.Round(sdNvPower.Value * 1000)
                     : null;

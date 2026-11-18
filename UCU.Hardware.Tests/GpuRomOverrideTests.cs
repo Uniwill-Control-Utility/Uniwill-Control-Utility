@@ -1828,10 +1828,11 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
-    public void Apply_RefusesATargetBelowTheTestedOne_WithoutWritingAnything()
+    public void Apply_RefusesATargetBelowTheStockCeiling_WithoutWritingAnything()
     {
-        // Refused, not promoted: a preset quieter than the measured target is not the
-        // unlock's configuration, and silently raising it would change what was asked for.
+        // Refused, not promoted: the accepted range starts at the stock ceiling (175 W), so a
+        // quieter request is not the unlock's configuration, and silently raising it would
+        // change what was asked for.
         var registry = new FakeRomRegistry(_log);
         var ec = new FakeEc(_log);
         var request = new FakeRequest(_log);
@@ -1839,11 +1840,12 @@ public sealed class GpuRomOverrideTests : IDisposable
 
         GpuRomOverrideStateDto state = NewStore(
             registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, request, budget)
-            .SetEnabled(true, 200_000);
+            .SetEnabled(true, 174_000);
 
         Assert.Equal(GpuRomOverrideStates.Unsupported, state.State);
-        Assert.Contains("200 W", state.Reason!, StringComparison.Ordinal);
-        Assert.Contains("225 W", state.Reason!, StringComparison.Ordinal);
+        Assert.Contains("174 W", state.Reason!, StringComparison.Ordinal);
+        Assert.Contains("175 W", state.Reason!, StringComparison.Ordinal);
+        Assert.Contains("250 W", state.Reason!, StringComparison.Ordinal);
         Assert.Empty(registry.Writes);
         Assert.Empty(ec.Activations);
         Assert.Empty(request.Requests);
@@ -1852,14 +1854,57 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
-    public void Apply_ClampsATargetAboveTheRomCeiling()
+    public void Apply_AcceptsThe200WConfiguration_EndToEnd()
+    {
+        // The quick-apply button's 200 W set: the request, the F7 raise (from the captured
+        // baseline, platform = baseline + delta) and the EC's cTGP offset all aim at 200 W.
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log),
+            new FakeCeiling(_log) { Ceiling = 250_000, Current = 200_000 }, ec, request, budget)
+            .SetEnabled(true, 200_000);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Equal(200_000, state.TargetTgpMilliwatts);
+        Assert.Equal(200_000, state.RequestedLimitMilliwatts);
+        Assert.Equal(200_000, request.Requests[^1]);
+        Assert.Equal(new GpuPowerBudget(200_000, 475_000), budget.Current);
+        Assert.Equal(200_000, state.BudgetMilliwatts);
+        Assert.Equal((105, 0), ec.Activations[^1]);   // 200 W - the board's 95 W DefaultTGP
+        Assert.Equal("200000", File.ReadAllText(TargetPath));
+    }
+
+    [Fact]
+    public void Apply_AcceptsTheStockCeilingItself()
+    {
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log),
+            new FakeCeiling(_log) { Ceiling = 250_000, Current = 175_000 }, ec, request)
+            .SetEnabled(true, 175_000);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Equal(175_000, request.Requests[^1]);
+        Assert.Equal((80, 0), ec.Activations[^1]);   // 175 W - 95 W, never negative
+        Assert.Equal("175000", File.ReadAllText(TargetPath));
+    }
+
+    [Theory]
+    [InlineData(251_000)]
+    [InlineData(300_000)]
+    public void Apply_ClampsATargetAboveTheRomCeiling(int asked)
     {
         var request = new FakeRequest(_log);
         var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 250_000 };
 
         GpuRomOverrideStateDto state = NewStore(
             new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), request)
-            .SetEnabled(true, 300_000);
+            .SetEnabled(true, asked);
 
         Assert.Equal(250_000, state.TargetTgpMilliwatts);
         Assert.Equal(250_000, request.Requests[^1]);

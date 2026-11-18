@@ -459,15 +459,17 @@ namespace UCU.Hardware.Gpu
                 }
 
                 // The target: the preset's slider when one was passed, otherwise what the
-                // last apply saved. Below the tested target it is refused (nothing is
-                // written, so the refusal is clean); above the ROM record's ceiling it is
-                // clamped, because no request can be honoured there.
+                // last apply saved. The accepted range is the stock ceiling up to the tier's
+                // ceiling — 200 W is a supported configuration, so the measured target is no
+                // longer the floor. Outside the range a target is refused (nothing is written,
+                // so the refusal is clean); above the ROM record's ceiling it is clamped,
+                // because no request can be honoured there.
                 int target = targetMilliwatts ?? TargetMilliwatts;
-                if (target < _tier.TgpTargetMilliwatts)
+                if (target < RomOverrideLayout.StockPowerMilliwatts)
                 {
                     return State(
                         GpuRomOverrideStates.Unsupported,
-                        $"the requested TGP {Watts(target)} is below the {Watts(_tier.TgpTargetMilliwatts)} this unlock was measured at, so nothing was applied",
+                        $"the requested TGP {Watts(target)} is outside the {Watts(RomOverrideLayout.StockPowerMilliwatts)} to {Watts(_tier.PowerMilliwatts)} range this unlock accepts, so nothing was applied",
                         version, limits);
                 }
 
@@ -1543,8 +1545,8 @@ namespace UCU.Hardware.Gpu
         /// The TGP this unlock aims at: the target the last apply was given, saved beside
         /// the originals so a boot re-apply, the settle pass and the drift watch all aim at
         /// it, or the tier's tested target when none was ever saved. A stored value outside
-        /// the tier's range is clamped and logged — the range belongs to the tier, not to
-        /// the file.
+        /// the accepted range (the stock ceiling up to the tier's) is clamped and logged —
+        /// the range belongs to the store, not to the file.
         /// </summary>
         private int TargetMilliwatts
         {
@@ -1561,12 +1563,12 @@ namespace UCU.Hardware.Gpu
                         CultureInfo.InvariantCulture,
                         out int stored))
                     {
-                        int clamped = Math.Clamp(stored, _tier.TgpTargetMilliwatts, _tier.PowerMilliwatts);
+                        int clamped = Math.Clamp(stored, RomOverrideLayout.StockPowerMilliwatts, _tier.PowerMilliwatts);
                         if (clamped != stored)
                         {
                             Log.Warning(
                                 "gpu: the saved unlock target {Stored} mW is outside {Floor}-{Ceiling} mW; using {Clamped} mW",
-                                stored, _tier.TgpTargetMilliwatts, _tier.PowerMilliwatts, clamped);
+                                stored, RomOverrideLayout.StockPowerMilliwatts, _tier.PowerMilliwatts, clamped);
                         }
 
                         return clamped;
