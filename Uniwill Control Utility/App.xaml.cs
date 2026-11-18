@@ -8,6 +8,7 @@ using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Configuration;
 using System.Linq;
 using System.Text;
@@ -278,6 +279,9 @@ namespace Uniwill_Control_Utility
                 Log.Logger = loggerConfiguration.CreateLogger();
 
                 Log.Information("Logger initialized");
+
+                foreach (string line in _settingsCarryOverLog)
+                    Log.Information("{SettingsCarryOver}", line);
 
                 Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
 
@@ -907,6 +911,10 @@ namespace Uniwill_Control_Utility
             }
         }
 
+        // Filled by PrepareUserSettings, which runs before the logger exists; flushed into
+        // Serilog once it does. Losing these lines would hide a silent settings reset.
+        private static readonly List<string> _settingsCarryOverLog = new();
+
         private static void PrepareUserSettings()
         {
             try
@@ -914,7 +922,40 @@ namespace Uniwill_Control_Utility
                 if (!Settings.Default.SettingsUpgradeRequired)
                     return;
 
+                // Presence must be sampled before Upgrade() or any Save: both make every
+                // user setting present in this version's config, which erases the only
+                // evidence of what this version had actually stored.
+                string currentConfigPath = System.Configuration.ConfigurationManager
+                    .OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath;
+                Dictionary<string, string>? present = SettingsCarryOver.Read(currentConfigPath);
+
                 Settings.Default.Upgrade();
+
+                // Upgrade() splits on its own choice of predecessor; this fills whatever
+                // that choice missed from the newest older config that does carry it.
+                List<(Version Version, string Path)> history = SettingsCarryOver.History(currentConfigPath);
+                if (history.Count == 0)
+                    _settingsCarryOverLog.Add("settings carry-over: Upgrade() found no earlier user.config");
+
+                int adopted = 0;
+                foreach ((string setting, string version, string value) in SettingsCarryOver.Plan(
+                             history,
+                             present is null ? Array.Empty<string>() : present.Keys,
+                             UserSettingNames(),
+                             line => _settingsCarryOverLog.Add(line)))
+                {
+                    if (!TryCarryOverSetting(setting, value, out string reason))
+                    {
+                        _settingsCarryOverLog.Add($"settings carry-over: {setting} not adopted ({reason})");
+                        continue;
+                    }
+
+                    _settingsCarryOverLog.Add($"settings carry-over: {setting} = {value} adopted from {version}");
+                    adopted++;
+                }
+
+                _settingsCarryOverLog.Add(SettingsCarryOver.Summary(adopted, history.Count));
+
                 Settings.Default.SettingsUpgradeRequired = false;
                 Settings.Default.Save();
             }
@@ -932,6 +973,50 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to update settings on startup: {ex}");
+            }
+        }
+
+        /// <summary>User-scoped settings this build knows about, by name.</summary>
+        private static IEnumerable<string> UserSettingNames() =>
+            Settings.Default.Properties
+                .Cast<SettingsProperty>()
+                .Where(property => property.Attributes.Contains(typeof(UserScopedSettingAttribute)))
+                // This method owns that flag; carrying it over would only log noise.
+                .Where(property => property.Name != nameof(Settings.SettingsUpgradeRequired))
+                .Select(property => property.Name);
+
+        /// <summary>
+        /// Stores one carried-over value through the same type conversion the settings
+        /// serializer uses. Returns false (with a reason) rather than throwing when the
+        /// value does not convert to the setting's type.
+        /// </summary>
+        private static bool TryCarryOverSetting(string name, string raw, out string reason)
+        {
+            reason = "";
+            SettingsProperty? property = Settings.Default.Properties[name];
+            if (property is null)
+            {
+                reason = "unknown setting";
+                return false;
+            }
+
+            try
+            {
+                TypeConverter converter = TypeDescriptor.GetConverter(property.PropertyType);
+                object? converted = converter.ConvertFromInvariantString(raw);
+                if (converted is null)
+                {
+                    reason = "value did not convert";
+                    return false;
+                }
+
+                Settings.Default[name] = converted;
+                return true;
+            }
+            catch (Exception)
+            {
+                reason = $"value '{raw}' is not a valid {property.PropertyType.Name}";
+                return false;
             }
         }
 
