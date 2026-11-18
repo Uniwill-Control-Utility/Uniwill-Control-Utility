@@ -585,7 +585,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await applyGpuPowerGateAsync().ConfigureAwait(true);
 
             // The power-ceiling override is an NVIDIA driver key: no card without one.
-            cardRomOverride.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
+            // The rest of the gate (Power boost mode) is applied on every render, because
+            // the owner can switch it in Settings while this page lives on.
+            _hasNvidia = hasNvidia;
 
             // Hide GPU clock controls when EnableGpuClockControl is OFF
             bool gpuClockEnabled = Settings.Default.EnableGpuClockControl;
@@ -2156,6 +2158,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _romOverrideBusy;
         private string? _romOverrideError;
 
+        // The platform gate (an NVIDIA driver key has no card without a card), set by the
+        // visibility pass and combined with Power boost mode on every render.
+        private bool _hasNvidia;
+
         // The rail currents are a separate, live NVAPI write: their own read, their own
         // apply, their own failure line. Nothing here restarts the GPU.
         private UCU.Contracts.GpuRailLimitsDto? _railLimits;
@@ -2219,15 +2225,27 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Both actions stay visible; each is gated separately and dimmed when off.
             bool consent = chkRomConsent.IsChecked == true;
             bool powerBoost = Settings.Default.EnablePowerBoostMode;
+
+            // The card belongs to Power boost mode. With it off the card is gone - except while
+            // an override is still live, where hiding it would hide the only way to remove a
+            // driver-level change: then it shows one line and Restore stock, and no sliders.
+            bool appliedWhileOff = !powerBoost && state?.Enabled == true;
+            cardRomOverride.Visibility =
+                _hasNvidia && (powerBoost || appliedWhileOff) ? Visibility.Visible : Visibility.Collapsed;
+            tbRomPbmOffLine.Visibility = appliedWhileOff ? Visibility.Visible : Visibility.Collapsed;
+            btnRomUnlock.Visibility = appliedWhileOff ? Visibility.Collapsed : Visibility.Visible;
+            brRailDivider.Visibility = appliedWhileOff ? Visibility.Collapsed : Visibility.Visible;
+            spRailSection.Visibility = appliedWhileOff ? Visibility.Collapsed : Visibility.Visible;
+
             bool unlockEnabled = !busy && canUnlock && powerBoost && consent;
-            bool restoreEnabled = !busy && (unlocked || uncertain);
+            bool restoreEnabled = !busy && (unlocked || uncertain || appliedWhileOff);
 
             btnRomUnlock.IsEnabled = unlockEnabled;
             btnRomUnlock.Opacity = unlockEnabled ? 1.0 : 0.5;
             btnRomRestore.IsEnabled = restoreEnabled;
             btnRomRestore.Opacity = restoreEnabled ? 1.0 : 0.5;
 
-            spRomConsentRow.Visibility = canUnlock ? Visibility.Visible : Visibility.Collapsed;
+            spRomConsentRow.Visibility = canUnlock && !appliedWhileOff ? Visibility.Visible : Visibility.Collapsed;
             chkRomConsent.IsEnabled = !busy;
 
             spRomBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
@@ -2235,8 +2253,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             // One line, and only where there is something to explain: a refusal, a partial
             // apply, a failed read, or the reason an action is dimmed. A clean unlock needs no
             // sentence — the values row on the status card is the state, and the buttons moved
-            // when it changed.
-            string? line = busy
+            // when it changed. The "still applied with the feature off" state has its own line.
+            string? line = busy || appliedWhileOff
                 ? null
                 : _romOverrideError != null
                     ? WithReason(LocalizationService.Get("The state could not be read back"), _romOverrideError)
@@ -2304,6 +2322,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             spRomStatusRow.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
             if (!enabled)
+                return;
+
+            // The numbers are the unlock's own report, and they belong to the feature that owns
+            // it: with Power boost mode off the row says why they are gone and what removes the
+            // override, instead of measuring a feature the owner has switched off.
+            bool powerBoost = Settings.Default.EnablePowerBoostMode;
+            spRomStatusValues.Visibility = powerBoost ? Visibility.Visible : Visibility.Collapsed;
+            tbRomStatusPbmOff.Visibility = powerBoost ? Visibility.Collapsed : Visibility.Visible;
+            if (!powerBoost)
                 return;
 
             // A partial apply is not a verdict: the numbers can read right and still be unverified.
@@ -2396,7 +2423,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // The buttons are already gated visually; re-check so a stale frame cannot
             // fire an act the card was showing as unavailable.
             if (restore
-                ? !(unlocked || uncertain)
+                ? !(unlocked || uncertain || _romOverride.Enabled)
                 : !(Settings.Default.EnablePowerBoostMode && chkRomConsent.IsChecked == true))
             {
                 return;

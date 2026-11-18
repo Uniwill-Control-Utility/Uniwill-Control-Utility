@@ -1171,5 +1171,15 @@
   "Apply CPU Curve Optimizer at startup": "स्टार्टअप पर CPU कर्व ऑप्टिमाइज़र लागू करें",
   "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "स्टार्टअप पर प्रति-कोर या एकीकृत कर्व ऑप्टिमाइज़र ऑफ़सेट लागू करता है (CPU पावर सीमाएँ, तापमान और फ़ैन सेटिंग्स अभी भी लागू रहती हैं)",
   "Apply GPU clock offsets at startup": "स्टार्टअप पर GPU क्लॉक ऑफ़सेट लागू करें",
-  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "स्टार्टअप पर GPU क्लॉक ऑफ़सेट (या V-F कर्व) और मेमोरी क्लॉक ऑफ़सेट लागू करता है (अन्य प्रीसेट सेटिंग्स लागू रहती हैं)"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "स्टार्टअप पर GPU क्लॉक ऑफ़सेट (या V-F कर्व) और मेमोरी क्लॉक ऑफ़सेट लागू करता है (अन्य प्रीसेट सेटिंग्स लागू रहती हैं)",
+  "Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on.": "अतिरिक्त GPU पावर लागू है लेकिन पावर बूस्ट मोड बंद है। इसे हटाने के लिए मूल स्थिति में लौटाएँ, या पावर बूस्ट मोड चालू करें।",
+  "Turn on Power boost mode?": "पावर बूस्ट मोड चालू करें?",
+  "Power boost mode raises the CPU and GPU power limits beyond the stock ones, so this machine can draw more power than it was designed to sustain. The power adapter can be overloaded, the GPU and CPU can hold sustained high current, and hardware can degrade or fail.\n\nAnything beyond this point is your own responsibility, not the developers'. Unlocking the extra GPU power is a separate step and asks for its own confirmation.": "पावर बूस्ट मोड CPU और GPU की पावर सीमाएँ मूल सीमाओं से ऊपर उठाता है, इसलिए यह मशीन उससे अधिक पावर खींच सकती है जितना लगातार सहने के लिए इसे बनाया गया है। पावर अडैप्टर पर अधिक भार पड़ सकता है, GPU और CPU लगातार उच्च करंट ले सकते हैं, और हार्डवेयर खराब या विफल हो सकता है।\n\nइसके आगे कुछ भी होने की ज़िम्मेदारी आपकी है, डेवलपर्स की नहीं। अतिरिक्त GPU पावर को अनलॉक करना एक अलग चरण है और उसकी अपनी पुष्टि मांगता है।",
+  "I understand, continue": "मैं समझता हूँ, जारी रखें",
+  "Restore stock before turning off Power boost mode": "पावर बूस्ट मोड बंद करने से पहले मूल स्थिति में लौटाएँ",
+  "Extra GPU power is still applied as a driver-level override, so Power boost mode cannot be turned off yet: that would hide the controls and leave the override running.\n\nRestore stock to turn it off. This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "अतिरिक्त GPU पावर अभी भी ड्राइवर-स्तरीय ओवरराइड के रूप में लागू है, इसलिए पावर बूस्ट मोड अभी बंद नहीं किया जा सकता: इससे नियंत्रण छिप जाएँगे और ओवरराइड चलता रहेगा।\n\nइसे हटाने के लिए मूल स्थिति में लौटाएँ। यह ड्राइवर-स्तर का ओवरराइड हटाता है और GPU को पुनः चालू करता है। स्क्रीन खाली हो जाएगी और चल रहा कोई भी गेम या GPU कार्य बंद हो जाएगा।",
+  "Restore stock now": "अभी मूल स्थिति में लौटाएँ",
+  "Keep Power boost mode on": "पावर बूस्ट मोड चालू रखें",
+  "Extra GPU power could not be restored": "अतिरिक्त GPU पावर बहाल नहीं की जा सकी",
+  "The extra GPU power override is still applied.": "अतिरिक्त GPU पावर का ओवरराइड अभी भी लागू है।"
 }

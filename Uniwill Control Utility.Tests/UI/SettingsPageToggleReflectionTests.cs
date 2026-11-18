@@ -58,7 +58,7 @@ public sealed class SettingsPageToggleReflectionTests
     public void ActuatingHandlers_ActuateOnlyOnUserIntent(
         string handler, string actuation, string toggle, string belief)
     {
-        string body = MethodBody(ReadSettingsPage(), $"private void {handler}");
+        string body = HandlerBody(ReadSettingsPage(), handler);
 
         int guard = body.IndexOf($"if (!UserIntent({toggle}, ref {belief},", StringComparison.Ordinal);
         int acts = body.IndexOf(actuation, StringComparison.Ordinal);
@@ -260,6 +260,27 @@ public sealed class SettingsPageToggleReflectionTests
 
         int end = source.IndexOf("\n        }", start, StringComparison.Ordinal);
         Assert.True(end > start, $"Could not find the end of {signature}.");
+
+        return source.Substring(start, end - start);
+    }
+
+    /// <summary>
+    /// A handler's body, whichever way it is declared. The Power boost mode rows await a modal
+    /// (the risk notice, the restore-first notice), so those two are <c>async void</c>; every
+    /// other row is a plain <c>void</c> handler and the shape pin must not care which.
+    /// </summary>
+    private static string HandlerBody(string source, string handler)
+    {
+        int start = source.IndexOf($"private void {handler}", StringComparison.Ordinal);
+        if (start < 0)
+        {
+            start = source.IndexOf($"private async void {handler}", StringComparison.Ordinal);
+        }
+
+        Assert.True(start >= 0, $"Could not find the {handler} handler.");
+
+        int end = source.IndexOf("\n        }", start, StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find the end of {handler}.");
 
         return source.Substring(start, end - start);
     }

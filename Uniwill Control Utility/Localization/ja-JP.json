@@ -1171,5 +1171,15 @@
   "Apply CPU Curve Optimizer at startup": "起動時に CPU カーブオプティマイザーを適用する",
   "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "起動時にコアごとまたは統合のカーブオプティマイザーオフセットを適用します（CPU 電力制限、温度、ファン設定は引き続き適用されます）",
   "Apply GPU clock offsets at startup": "起動時に GPU クロックオフセットを適用する",
-  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "起動時に GPU クロックオフセット (または V-F カーブ) とメモリクロックオフセットを適用します (他のプリセット設定は引き続き適用されます)"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "起動時に GPU クロックオフセット (または V-F カーブ) とメモリクロックオフセットを適用します (他のプリセット設定は引き続き適用されます)",
+  "Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on.": "GPU の追加電力が適用されていますが、パワーブーストモードはオフです。元に戻すと解除できます。またはパワーブーストモードをオンにしてください。",
+  "Turn on Power boost mode?": "パワーブーストモードをオンにしますか?",
+  "Power boost mode raises the CPU and GPU power limits beyond the stock ones, so this machine can draw more power than it was designed to sustain. The power adapter can be overloaded, the GPU and CPU can hold sustained high current, and hardware can degrade or fail.\n\nAnything beyond this point is your own responsibility, not the developers'. Unlocking the extra GPU power is a separate step and asks for its own confirmation.": "パワーブーストモードは CPU と GPU の電力上限を元の値より引き上げるため、このマシンは継続的に耐えられる以上の電力を消費する可能性があります。電源アダプターが過負荷になり、GPU と CPU が高い電流を長時間流し続け、ハードウェアが劣化したり故障したりするおそれがあります。\n\nここから先の結果は開発者ではなく、すべてお客様ご自身の責任です。GPU の追加電力の解除は別の手順で、独自の確認を求めます。",
+  "I understand, continue": "理解しました、続行",
+  "Restore stock before turning off Power boost mode": "パワーブーストモードをオフにする前に元に戻してください",
+  "Extra GPU power is still applied as a driver-level override, so Power boost mode cannot be turned off yet: that would hide the controls and leave the override running.\n\nRestore stock to turn it off. This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "GPU の追加電力がドライバーレベルの上書きとして適用されたままなので、パワーブーストモードはまだオフにできません。オフにするとコントロールが隠れ、上書きが動き続けます。\n\n元に戻すと解除できます。ドライバーレベルの上書きを削除し、GPU を再起動します。画面が暗くなり、実行中のゲームや GPU 処理は終了します。",
+  "Restore stock now": "今すぐ元に戻す",
+  "Keep Power boost mode on": "パワーブーストモードをオンのままにする",
+  "Extra GPU power could not be restored": "GPU の追加電力を元に戻せませんでした",
+  "The extra GPU power override is still applied.": "GPU の追加電力の上書きは適用されたままです。"
 }

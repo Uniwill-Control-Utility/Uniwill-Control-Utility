@@ -1171,5 +1171,15 @@
   "Apply CPU Curve Optimizer at startup": "Başlangıçta CPU Eğri İyileştiricisini uygula",
   "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "Başlangıçta çekirdek başına veya birleşik Eğri İyileştirici ofsetlerini uygular (CPU güç limitleri, sıcaklıklar ve fan ayarları yine de uygulanır)",
   "Apply GPU clock offsets at startup": "Başlangıçta GPU saat ofsetlerini uygula",
-  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Başlangıçta GPU saat ofsetini (veya V-F eğrisini) ve bellek saat ofsetlerini uygular (diğer önayar ayarları yine uygulanır)"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "Başlangıçta GPU saat ofsetini (veya V-F eğrisini) ve bellek saat ofsetlerini uygular (diğer önayar ayarları yine uygulanır)",
+  "Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on.": "Ek GPU gücü uygulanmış, ancak güç artışı modu kapalı. Kaldırmak için özgün ayara dönün veya güç artışı modunu açın.",
+  "Turn on Power boost mode?": "Güç artışı modu açılsın mı?",
+  "Power boost mode raises the CPU and GPU power limits beyond the stock ones, so this machine can draw more power than it was designed to sustain. The power adapter can be overloaded, the GPU and CPU can hold sustained high current, and hardware can degrade or fail.\n\nAnything beyond this point is your own responsibility, not the developers'. Unlocking the extra GPU power is a separate step and asks for its own confirmation.": "Güç artışı modu CPU ve GPU güç limitlerini özgün değerlerin üzerine çıkarır, bu yüzden bu makine sürekli kaldırmak için tasarlandığından daha fazla güç çekebilir. Güç adaptörü aşırı yüklenebilir, GPU ve CPU uzun süre yüksek akım çekebilir, donanım yıpranabilir veya arızalanabilir.\n\nBu noktadan sonrası geliştiricilerin değil, sizin sorumluluğunuzdadır. Ek GPU gücünün kilidini açmak ayrı bir adımdır ve kendi onayını ister.",
+  "I understand, continue": "Anladım, devam et",
+  "Restore stock before turning off Power boost mode": "Güç artışı modunu kapatmadan önce özgün ayara dönün",
+  "Extra GPU power is still applied as a driver-level override, so Power boost mode cannot be turned off yet: that would hide the controls and leave the override running.\n\nRestore stock to turn it off. This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "Ek GPU gücü hâlâ sürücü düzeyinde geçersiz kılma olarak uygulanmış durumda, bu yüzden güç artışı modu henüz kapatılamaz: kapatmak denetimleri gizler ve geçersiz kılma çalışmaya devam eder.\n\nKaldırmak için özgün ayara dönün. Bu, sürücü düzeyindeki geçersiz kılmayı kaldırır ve GPU'yu yeniden başlatır. Ekran kararır ve çalışan oyun veya GPU işleri kapanır.",
+  "Restore stock now": "Şimdi özgün ayara dön",
+  "Keep Power boost mode on": "Güç artışı modunu açık bırak",
+  "Extra GPU power could not be restored": "Ek GPU gücü geri alınamadı",
+  "The extra GPU power override is still applied.": "Ek GPU gücü geçersiz kılması hâlâ uygulanmış durumda."
 }

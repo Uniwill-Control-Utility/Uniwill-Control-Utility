@@ -203,7 +203,20 @@
                                                   VerticalAlignment="Center"
                                                   Text="Extra GPU power" />
 
-                                    <StackPanel Orientation="Horizontal" Margin="24,0,0,0">
+                                    <!-- The one state with nothing to measure: the unlock is
+                                         live while the feature that owns it is off. One line,
+                                         and the two ways out of it. -->
+                                    <ui:TextBlock x:Name="tbRomStatusPbmOff"
+                                                  MaxWidth="480"
+                                                  Margin="24,0,0,0"
+                                                  VerticalAlignment="Center"
+                                                  FontTypography="Caption"
+                                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                  TextWrapping="Wrap"
+                                                  Visibility="Collapsed"
+                                                  Text="Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on." />
+
+                                    <StackPanel x:Name="spRomStatusValues" Orientation="Horizontal" Margin="24,0,0,0">
                                         <StackPanel Margin="0,0,16,0">
                                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="TGP" />
                                             <TextBlock x:Name="tbRomStatRequest" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
@@ -880,6 +893,17 @@
                                     </ui:FontIcon>
                                 </StackPanel>
 
+                                <!-- Power boost mode off while an override is live: the card is
+                                     shown for one reason only - removing the override. The line
+                                     says why, and Restore stock is the act. -->
+                                <ui:TextBlock x:Name="tbRomPbmOffLine"
+                                              Margin="0,8,0,0"
+                                              FontTypography="Caption"
+                                              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                              TextWrapping="Wrap"
+                                              Visibility="Collapsed"
+                                              Text="Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on." />
+
                                 <!-- The statement is only asked for when there is something to
                                      unlock, so its divider lives in the row and goes with it. -->
                                 <StackPanel x:Name="spRomConsentRow" Visibility="Collapsed">
@@ -933,12 +957,14 @@
                                 </StackPanel>
 
                                 <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <Border x:Name="brRailDivider" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                                 <!-- The runtime rail currents. A separate, live NVAPI write (no
                                      restart, no blank screen, no consent), so it follows the
-                                     unlock's state: inert and explained until it is applied. -->
-                                <StackPanel>
+                                     unlock's state: inert and explained until it is applied.
+                                     One block with its divider, because the card's "override is
+                                     still live" state shows no sliders at all. -->
+                                <StackPanel x:Name="spRailSection">
                                     <ui:TextBlock FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    TextWrapping="Wrap"

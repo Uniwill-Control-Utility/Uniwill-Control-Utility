@@ -1171,5 +1171,15 @@
   "Apply CPU Curve Optimizer at startup": "啟動時套用 CPU 曲線最佳化器",
   "Applies the per-core or unified Curve Optimizer offsets on startup (CPU power limits, temperatures and fan settings still apply)": "啟動時套用每核心或統一的曲線最佳化器偏移（CPU 功率限制、溫度及風扇設定仍會套用）",
   "Apply GPU clock offsets at startup": "啟動時套用 GPU 時脈偏移",
-  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "啟動時套用 GPU 時脈偏移 (或 V-F 曲線) 和記憶體時脈偏移 (其他預設設置仍會套用)"
+  "Applies the GPU clock offset (or V-F curve) and the memory clock offsets on startup (other preset settings still apply)": "啟動時套用 GPU 時脈偏移 (或 V-F 曲線) 和記憶體時脈偏移 (其他預設設置仍會套用)",
+  "Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on.": "額外 GPU 功耗已套用，但電源增強模式已關閉。還原原始設定可將其關閉，或開啟電源增強模式。",
+  "Turn on Power boost mode?": "要開啟電源增強模式嗎？",
+  "Power boost mode raises the CPU and GPU power limits beyond the stock ones, so this machine can draw more power than it was designed to sustain. The power adapter can be overloaded, the GPU and CPU can hold sustained high current, and hardware can degrade or fail.\n\nAnything beyond this point is your own responsibility, not the developers'. Unlocking the extra GPU power is a separate step and asks for its own confirmation.": "電源增強模式會將 CPU 和 GPU 的功耗上限提高到原始值之上，因此這台機器可能消耗超過其持續承受能力的電力。電源轉換器可能過載，GPU 和 CPU 可能持續通過大電流，硬件可能老化或損壞。\n\n此後的任何後果由您自行承擔，與開發者無關。解鎖額外 GPU 功耗是另一個獨立步驟，需要其自身的確認。",
+  "I understand, continue": "我明白，繼續",
+  "Restore stock before turning off Power boost mode": "關閉電源增強模式前請先還原原始設定",
+  "Extra GPU power is still applied as a driver-level override, so Power boost mode cannot be turned off yet: that would hide the controls and leave the override running.\n\nRestore stock to turn it off. This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close.": "額外 GPU 功耗仍以驅動程式層級的覆寫設定生效，因此現在還無法關閉電源增強模式：關閉會隱藏這些控制項，而覆寫設定會繼續運作。\n\n還原原始設定可將其關閉。這會移除驅動程式層級的覆寫設定並重新啟動 GPU。畫面會黑屏，正在執行的遊戲或 GPU 工作會被關閉。",
+  "Restore stock now": "立即還原原始設定",
+  "Keep Power boost mode on": "保持電源增強模式開啟",
+  "Extra GPU power could not be restored": "無法還原額外 GPU 功耗",
+  "The extra GPU power override is still applied.": "額外 GPU 功耗的覆寫設定仍然生效。"
 }

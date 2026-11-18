@@ -593,10 +593,25 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-      private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
+        private async void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
         {
             if (!UserIntent(cbPowerBoostMode, ref _powerBoost, "PowerBoost mode"))
                 return;
+
+            // The risk notice is asked once this session, and only here: a preset or an
+            // automation that turns the mode on is the owner's own saved configuration, not a
+            // decision taken now. A later session asks again - see _powerBoostRiskAcknowledged.
+            if (!_powerBoostRiskAcknowledged)
+            {
+                if (!await AcknowledgePowerBoostRiskAsync())
+                {
+                    _logger.LogInformation("[Settings] PowerBoost mode stays off: the risk notice was declined");
+                    ReflectToggleState(cbPowerBoostMode, false, ref _powerBoost);
+                    return;
+                }
+
+                _powerBoostRiskAcknowledged = true;
+            }
 
             Settings.Default.EnablePowerBoostMode = true;
             Settings.Default.Save();
@@ -607,16 +622,176 @@ namespace Uniwill_Control_Utility.Views.Pages
             pageService?.InvalidateBoostDependentPages();
         }
 
-        private void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
+        private async void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
         {
             if (!UserIntent(cbPowerBoostMode, ref _powerBoost, "PowerBoost mode"))
                 return;
+
+            // A live driver-level override must not go off behind a hidden feature: the restore
+            // is offered first, and the mode only goes off once nothing is applied any more.
+            if (!await RestoreUnlockBeforePowerBoostOffAsync())
+            {
+                _logger.LogInformation("[Settings] PowerBoost mode stays on: the extra GPU power override is still applied");
+                ReflectToggleState(cbPowerBoostMode, true, ref _powerBoost);
+                return;
+            }
 
             Settings.Default.EnablePowerBoostMode = false;
             Settings.Default.Save();
 
             var pageService = App.GetService<Wpf.Ui.Abstractions.INavigationViewPageProvider>() as PageService;
             pageService?.InvalidateBoostDependentPages();
+        }
+
+        /// <summary>
+        /// The one-time risk notice for turning Power boost mode on by hand: raising the CPU and
+        /// GPU power limits is what can hurt the machine, and the owner is asked to say so once
+        /// per session. Returns true only when they chose to continue; every other way out of the
+        /// dialog (cancel, close) leaves the mode off.
+        /// </summary>
+        private async Task<bool> AcknowledgePowerBoostRiskAsync()
+        {
+            var dialog = new Wpf.Ui.Controls.MessageBox
+            {
+                Title = LocalizationService.Get("Turn on Power boost mode?"),
+                Content = LocalizationService.Get(
+                    "Power boost mode raises the CPU and GPU power limits beyond the stock ones, so this machine can draw more power than it was designed to sustain. The power adapter can be overloaded, the GPU and CPU can hold sustained high current, and hardware can degrade or fail.\n\nAnything beyond this point is your own responsibility, not the developers'. Unlocking the extra GPU power is a separate step and asks for its own confirmation."),
+                PrimaryButtonText = LocalizationService.Get("I understand, continue"),
+                CloseButtonText = LocalizationService.Get("Cancel")
+            };
+            dialog.Owner = Window.GetWindow(this);
+
+            try
+            {
+                return await dialog.ShowDialogAsync() == Wpf.Ui.Controls.MessageBoxResult.Primary;
+            }
+            catch (Exception ex)
+            {
+                // A dialog that cannot be shown is not an acknowledgement: the mode stays off,
+                // and the refusal is written down rather than swallowed.
+                _logger.LogWarning(ex, "[Settings] the Power boost mode risk notice could not be shown; the mode stays off");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Turning Power boost mode off must not leave the extra GPU power override running with
+        /// its controls hidden. When the unlock is staged, the owner is offered the restore the
+        /// Presets card performs (with the same warning about the GPU restart) and the mode stays
+        /// on unless that restore reports the override gone. True means nothing is applied any
+        /// more. Called from the toggle's own handler, so this dialog is the consent - the card's
+        /// confirm question is not asked a second time.
+        /// </summary>
+        private async Task<bool> RestoreUnlockBeforePowerBoostOffAsync()
+        {
+            UCU.Contracts.Capabilities.IGpuTuningCapability? tuning = App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
+            if (tuning is null)
+                return true;   // without the engine nothing could have staged an override
+
+            UCU.Contracts.GpuRomOverrideStateDto? state;
+            try
+            {
+                state = await tuning.GetRomOverrideStateAsync();
+            }
+            catch (Exception ex)
+            {
+                // An unanswered read is not evidence of an override, and it must not trap the
+                // setting: the Presets card reports an unreachable engine on its own.
+                _logger.LogWarning(ex, "[Settings] the extra GPU power state could not be read before turning Power boost mode off");
+                return true;
+            }
+
+            if (state?.Enabled != true)
+                return true;
+
+            var dialog = new Wpf.Ui.Controls.MessageBox
+            {
+                Title = LocalizationService.Get("Restore stock before turning off Power boost mode"),
+                Content = LocalizationService.Get(
+                    "Extra GPU power is still applied as a driver-level override, so Power boost mode cannot be turned off yet: that would hide the controls and leave the override running.\n\nRestore stock to turn it off. This removes the driver-level override and restarts the GPU. The screen goes blank, and any running game or GPU workload will close."),
+                PrimaryButtonText = LocalizationService.Get("Restore stock now"),
+                CloseButtonText = LocalizationService.Get("Keep Power boost mode on")
+            };
+            dialog.Owner = Window.GetWindow(this);
+
+            bool restore;
+            try
+            {
+                restore = await dialog.ShowDialogAsync() == Wpf.Ui.Controls.MessageBoxResult.Primary;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] the restore notice could not be shown; Power boost mode stays on");
+                return false;
+            }
+
+            if (!restore)
+                return false;
+
+            return await RestoreGpuRomOverrideAsync(tuning);
+        }
+
+        /// <summary>
+        /// The restore itself, behind the same GPU-restart guard the Presets card uses (the verb
+        /// ends in the engine's adapter restart, and a monitoring poll on a stale NVML handle is
+        /// an access violation no catch can stop). A refused or failed restore keeps the mode on
+        /// and says why: the reason is never dropped on the floor.
+        /// </summary>
+        private async Task<bool> RestoreGpuRomOverrideAsync(UCU.Contracts.Capabilities.IGpuTuningCapability tuning)
+        {
+            UCU.Contracts.GpuRomOverrideStateDto? restored = null;
+            string? failure = null;
+
+            try
+            {
+                restored = await GpuDeviceRestartGuard.RunAsync(
+                    App.GetService<IHardwareMonitoringService>(),
+                    () => tuning.SetRomOverrideAsync(false));
+            }
+            catch (Exception ex)
+            {
+                // The adapter restart alone may take 60 s, so a transport failure is not a
+                // verdict: report it, then read the real state back.
+                _logger.LogWarning(ex, "[Settings] the extra GPU power override could not be restored");
+                failure = ex.Message;
+
+                try
+                {
+                    restored = await tuning.GetRomOverrideStateAsync();
+                }
+                catch (Exception reread)
+                {
+                    _logger.LogWarning(reread, "[Settings] the extra GPU power state could not be read back");
+                }
+            }
+
+            if (restored?.Enabled == false)
+            {
+                _logger.LogInformation("[Settings] the extra GPU power override was restored before turning PowerBoost mode off");
+                return true;
+            }
+
+            var dialog = new Wpf.Ui.Controls.MessageBox
+            {
+                Title = LocalizationService.Get("Extra GPU power could not be restored"),
+                Content = restored?.Reason
+                          ?? failure
+                          ?? LocalizationService.Get("The extra GPU power override is still applied."),
+                PrimaryButtonText = LocalizationService.Get("OK"),
+                IsCloseButtonEnabled = false
+            };
+            dialog.Owner = Window.GetWindow(this);
+
+            try
+            {
+                await dialog.ShowDialogAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] the restore failure notice could not be shown");
+            }
+
+            return false;
         }
 
         private void cbQKeyIntercept_Checked(object sender, RoutedEventArgs e)
@@ -687,6 +862,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool? _apMenuUnlocked;
         private bool? _powerBoost;
         private bool? _flydigiEnabled;
+
+        /// <summary>
+        /// Whether the Power boost mode risk notice was answered in this session. Once per
+        /// process is the contract: the toggle must not nag on every flip, and a later session
+        /// asks again because the previous answer belonged to that run.
+        /// </summary>
+        private static bool _powerBoostRiskAcknowledged;
 
         // Hardware-management EC truth rows (U-108). Same belief discipline:
         // the belief starts from the EC's READ truth (never from the XAML
