@@ -144,7 +144,9 @@ namespace UCU.Contracts
             /// <summary>
             /// Moves the runtime rail currents (null = leave that rail alone). Live: no GPU
             /// restart and no screen blank. Machine-wide values, so they are never part of a
-            /// preset; a value outside the driver's live policy is refused with a reason.
+            /// preset; a value outside the driver's live policy is refused with a reason. A
+            /// successful write is saved beside the originals, so the next boot re-applies the
+            /// owner's numbers instead of the tier's.
             /// </summary>
             public const string SetRailLimits = "gpu.set_rail_limits";
         }

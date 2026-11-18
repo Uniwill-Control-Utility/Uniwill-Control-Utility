@@ -1,3 +1,6 @@
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 using UCU.Contracts;
 using UCU.Hardware.Ec;
 using UCU.Hardware.Gpu;
@@ -874,7 +877,7 @@ public sealed class GpuRomOverrideTests : IDisposable
 
         Assert.Equal(GpuRomOverrideStates.Uncertain, state.State);
         Assert.Equal(
-            "the records are staged and the EC is offset, but the runtime rails could not be set to the tier: " +
+            "the records are staged and the EC is offset, but the runtime rails could not be set: " +
             "the NVVDD rail 250000 mA is outside the live rail policy 210000-210000 mA",
             state.Reason);
 
@@ -895,7 +898,7 @@ public sealed class GpuRomOverrideTests : IDisposable
             .SetEnabled(true);
 
         Assert.Equal(GpuRomOverrideStates.Uncertain, state.State);
-        Assert.Equal("the NVVDD rail reads 210000 mA, not the tier's 250000 mA", state.Reason);
+        Assert.Equal("the NVVDD rail reads 210000 mA, not the requested 250000 mA", state.Reason);
         Assert.Equal(210_000, state.NvvddCurrentMilliamps);
     }
 
@@ -1512,7 +1515,170 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.False(store.GetState().Enabled);
     }
 
+    [Fact]
+    public void StartupReapply_UsesTheSavedRailSelection_NotTheTier()
+    {
+        // Field 0.9.12: every boot put the tier's 250000/70000/14026 mA over the owner's
+        // 210000/84000/17000. What the sliders saved is what a boot now applies.
+        var registry = new FakeRomRegistry(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        File.WriteAllText(RailsPath, "nvvdd=210000\nmsvdd=84000\nboard=17000\n");
+
+        request.Forget();
+        budget.Reset();
+        rails.NvVddCurrent = RomOverrideLayout.StockNvVddMilliAmps;
+        rails.MsVddCurrent = RomOverrideLayout.StockMsVddMilliAmps;
+        rails.BoardCurrent = RomOverrideLayout.StockBoardInputMilliAmps;
+
+        GpuReapplyResult result = store.ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, result.State!.State);
+        Assert.Equal((210_000, 84_000, 17_000), rails.Sets[^1]);
+        Assert.Equal(210_000, result.State.NvvddCurrentMilliamps);
+        Assert.Equal(84_000, result.State.MsvddCurrentMilliamps);
+        Assert.Equal(17_000, result.State.BoardInputCurrentMilliamps);
+    }
+
+    [Fact]
+    public void StartupReapply_WithoutASavedSelection_UsesTheTier_AndSaysSo()
+    {
+        var registry = new FakeRomRegistry(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        File.Delete(RailsPath);   // a machine whose owner never saved a selection
+
+        request.Forget();
+        budget.Reset();
+        rails.NvVddCurrent = RomOverrideLayout.StockNvVddMilliAmps;
+
+        using var capture = new LogCapture();
+        GpuReapplyResult result = store.ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        Assert.Equal((250_000, 70_000, 14_026), rails.Sets[^1]);
+        Assert.Contains(capture.Lines, line =>
+            line.Contains("rails from the tier defaults (no saved selection)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void StartupReapply_ClampsASavedValueThePolicyNoLongerAllows_WithAWarning()
+    {
+        // A driver update can narrow the policy under a saved selection: the nearest allowed
+        // value is written, the warning names both, and the verdict compares against what was
+        // actually requested — not against the saved number, which would read short forever.
+        var rails = new FakeRails(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        File.WriteAllText(RailsPath, "nvvdd=294000\nmsvdd=84000\nboard=17000\n");
+
+        rails.NvVddPolicy = (210_000, 260_000);
+        rails.NvVddCurrent = 210_000;
+        request.Forget();
+        budget.Reset();
+
+        using var capture = new LogCapture();
+        GpuReapplyResult result = store.ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, result.State!.State);
+        Assert.Equal(260_000, rails.Sets[^1].Nvvdd);
+        Assert.Equal(260_000, result.State.NvvddCurrentMilliamps);
+        Assert.Contains(capture.Lines, line =>
+            line.StartsWith("Warning: ", StringComparison.Ordinal) &&
+            line.Contains(
+                "the saved NVVDD rail 294000 mA is outside the live rail policy 210000-260000 mA; using 260000 mA",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Settle_ComparesAgainstTheSavedSelection_SoATunedSelectionStaysUnlocked()
+    {
+        // The settle pass used to compare the live rails against the tier, so an owner-tuned
+        // selection drifted on every pass. It compares against the saved values now, and the
+        // state verb (which makes the same comparison) reads Unlocked over them.
+        var rails = new FakeRails(_log);
+        var budget = new FakeBudget(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        Assert.Equal(210_000, store.SetRailLimits(210_000, 84_000, 17_000).NvvddMilliamps);
+
+        int railSets = rails.Sets.Count;
+        GpuSettleResult result = store.SettleAtStartup();
+
+        Assert.Equal(GpuSettleVerdict.Settled, result.Verdict);
+        Assert.Null(result.Drift);
+        Assert.Equal(railSets, rails.Sets.Count);   // the saved values hold, so nothing is written
+
+        GpuRomOverrideStateDto state = store.GetState();
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Null(state.Reason);
+    }
+
+    [Fact]
+    public void Restore_DeletesTheSavedRailSelection()
+    {
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), new FakeRequest(_log));
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        store.SetRailLimits(210_000, 84_000, 17_000);
+        Assert.True(File.Exists(RailsPath));
+
+        ceiling.Ceiling = 175_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+
+        Assert.False(File.Exists(RailsPath));
+        Assert.False(File.Exists(MarkerPath));
+        Assert.False(File.Exists(OriginalsPath));
+    }
+
+    [Fact]
+    public void ReUnlock_DoesNotOverwriteASavedRailSelection()
+    {
+        // The first completed unlock establishes the defaults; a later one must not discard
+        // what the owner tuned in between (and it applies the saved values, not the tier's).
+        var rails = new FakeRails(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), rails: rails);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        store.SetRailLimits(210_000, 84_000, 17_000);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        Assert.Equal(
+            new[] { "nvvdd=210000", "msvdd=84000", "board=17000" },
+            File.ReadAllLines(RailsPath).Where(line => line.Length > 0));
+        Assert.Equal((210_000, 84_000, 17_000), rails.Sets[^1]);
+    }
+
     private string MarkerPath => Path.Combine(Path.GetDirectoryName(OriginalsPath)!, "enabled");
+
+    private string RailsPath => Path.Combine(Path.GetDirectoryName(OriginalsPath)!, "rails.txt");
 
     /// <summary>The state a completed unlock leaves on disk, without touching the driver key.</summary>
     private void SeedOriginalsAndMarker(string? tier = null)
@@ -1937,6 +2103,29 @@ public sealed class GpuRomOverrideTests : IDisposable
             LastRestored = desired;
             return new GpuPowerBudgetState(Current.F7Milliwatts, Current.PlatformMilliwatts, null);
         }
+    }
+
+    /// <summary>
+    /// Serilog's static sink, for the decisions that are only visible in the log: which source
+    /// the rails came from, and the clamp warning.
+    /// </summary>
+    private sealed class LogCapture : ILogEventSink, IDisposable
+    {
+        private readonly ILogger _previous = Log.Logger;
+
+        public LogCapture() =>
+            Log.Logger = new LoggerConfiguration().MinimumLevel.Verbose().WriteTo.Sink(this).CreateLogger();
+
+        public List<string> Lines { get; } = new();
+
+        public void Emit(LogEvent logEvent)
+        {
+            // RenderMessage quotes string properties; the sink output does not.
+            lock (Lines)
+                Lines.Add($"{logEvent.Level}: {logEvent.RenderMessage().Replace("\"", string.Empty)}");
+        }
+
+        public void Dispose() => Log.Logger = _previous;
     }
 
     /// <summary>

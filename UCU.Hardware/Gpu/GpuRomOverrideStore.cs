@@ -169,6 +169,7 @@ namespace UCU.Hardware.Gpu
         private readonly GpuPowerTier _tier;
         private readonly string _originalsPath;
         private readonly string _markerPath;
+        private readonly string _railsPath;
 
         /// <summary>
         /// The last attempt's state (null before one ran, cleared by a completed apply or
@@ -211,6 +212,10 @@ namespace UCU.Hardware.Gpu
             // because a boot can lose it (measured 2026-11-17 — the file was gone while the
             // records and originals survived, and the unlock stopped re-applying).
             _markerPath = Path.Combine(Path.GetDirectoryName(_originalsPath) ?? string.Empty, "enabled");
+
+            // The owner's rail currents, beside the originals: the sliders' Apply writes it, and
+            // every path that sets the rails reads it instead of the tier's numbers.
+            _railsPath = Path.Combine(Path.GetDirectoryName(_originalsPath) ?? string.Empty, "rails.txt");
         }
 
         /// <summary>
@@ -353,10 +358,27 @@ namespace UCU.Hardware.Gpu
 
         /// <summary>
         /// The sliders' write: live, no restart and no screen blank. The rail values are
-        /// machine-wide, so they are never part of a preset.
+        /// machine-wide, so they are never part of a preset — a successful write is saved
+        /// beside the originals, which is what the next boot applies.
         /// </summary>
-        public GpuRailLimitsDto SetRailLimits(int? nvvddMilliamps, int? msvddMilliamps, int? boardInputMilliamps) =>
-            RailLimitsDto(_rails.Set(nvvddMilliamps, msvddMilliamps, boardInputMilliamps));
+        public GpuRailLimitsDto SetRailLimits(int? nvvddMilliamps, int? msvddMilliamps, int? boardInputMilliamps)
+        {
+            GpuRailLimits rails = _rails.Set(nvvddMilliamps, msvddMilliamps, boardInputMilliamps);
+
+            // The read-back is what the owner chose; a rail the driver does not report keeps
+            // this tier's value so the saved file always names all three.
+            if (rails.Succeeded)
+            {
+                RailSelection applied = new(
+                    rails.NvVdd.CurrentMilliamps ?? _tier.NvVddCurrentMilliAmps,
+                    rails.MsVdd.CurrentMilliamps ?? _tier.MsVddCurrentMilliAmps,
+                    rails.BoardInput.CurrentMilliamps ?? _tier.BoardInputCurrentMilliAmps);
+
+                WriteRailSelection(applied);
+            }
+
+            return RailLimitsDto(rails);
+        }
 
         private static GpuRailLimitsDto RailLimitsDto(GpuRailLimits rails) => new()
         {
@@ -448,6 +470,7 @@ namespace UCU.Hardware.Gpu
                     "gpu.set_rom_override",
                     staged ? "the records were already staged; the GPU was not restarted" : null,
                     pinned, restarted, limits, request, budget, rails,
+                    out RailSelection appliedRails,
                     captureBudgetFor: originals?.Budget == null ? pinned : null);
 
                 // The marker is an informational copy of the intent (the records and the
@@ -455,6 +478,11 @@ namespace UCU.Hardware.Gpu
                 // nothing may depend on it.
                 if (state.State != GpuRomOverrideStates.Unlocked)
                     return Partial(state);
+
+                // The first completed unlock establishes the tested defaults as the selection.
+                // A re-unlock must not overwrite values the owner tuned afterwards.
+                if (!File.Exists(_railsPath))
+                    WriteRailSelection(appliedRails);
 
                 _startup = null;
                 WriteMarker();
@@ -474,7 +502,8 @@ namespace UCU.Hardware.Gpu
         /// this with the records just staged; the start-up re-apply reaches it with them
         /// staged by a previous boot, so the same steps and the same witnesses prove both.
         /// <paramref name="verb"/> is the log prefix, <paramref name="note"/> rides the
-        /// Unlocked answer, and <paramref name="captureBudgetFor"/> is the version to
+        /// Unlocked answer, <paramref name="requestedRails"/> is the selection the rails
+        /// were moved to, and <paramref name="captureBudgetFor"/> is the version to
         /// capture the stock budget into the originals file for (null: never — the
         /// start-up re-apply must not rewrite the recovery file).
         /// </summary>
@@ -487,21 +516,24 @@ namespace UCU.Hardware.Gpu
             GpuPowerRequestState request,
             GpuPowerBudgetState budget,
             GpuRailLimits rails,
+            out RailSelection requestedRails,
             string? captureBudgetFor = null)
         {
             // (d) The runtime rail currents: a separate NVAPI call from the records,
             // and the lever that moves the board power itself (measured 2026-11-15:
             // same records, budget and request, stock rails 175-179 W, tier rails
             // 205-214 W). Written after the restart, which reloads the driver's own
-            // defaults.
+            // defaults. The numbers are the owner's saved selection, or this tier's
+            // when nothing was saved.
+            requestedRails = RequestedRails(verb);
             rails = _rails.Set(
-                _tier.NvVddCurrentMilliAmps, _tier.MsVddCurrentMilliAmps, _tier.BoardInputCurrentMilliAmps);
+                requestedRails.NvVdd, requestedRails.MsVdd, requestedRails.BoardInput);
             if (rails.Reason is string railed)
             {
                 return State(
                     GpuRomOverrideStates.Uncertain,
                     "the records are staged and the EC is offset, but the runtime rails could not be " +
-                    $"set to the tier: {railed}",
+                    $"set: {railed}",
                     version, limits, request, restarted, budget, rails);
             }
 
@@ -671,7 +703,7 @@ namespace UCU.Hardware.Gpu
                 GpuRomOverrideStateDto state = ApplyLive(
                     "gpu.startup", null, version, restarted: false,
                     none, new GpuPowerRequestState(null, null, null, null),
-                    new GpuPowerBudgetState(null, null, null), GpuRailLimits.None);
+                    new GpuPowerBudgetState(null, null, null), GpuRailLimits.None, out _);
 
                 return Attempt(state.State == GpuRomOverrideStates.Unlocked
                     ? GpuReapplyVerdict.Applied
@@ -708,14 +740,14 @@ namespace UCU.Hardware.Gpu
                 string version = _registry.ReadVbiosVersion()!;
                 var drift = new List<string>();
 
-                // The rails: a driver reload leaves the policy maxima, so the tier's currents
+                // The rails: a driver reload leaves the policy maxima, so the requested currents
                 // are rewritten only when the card does not carry them.
                 GpuRailLimits rails = _rails.Read();
                 if (RailsReason(rails) is not null)
                 {
-                    drift.Add("rails");
-                    rails = _rails.Set(
-                        _tier.NvVddCurrentMilliAmps, _tier.MsVddCurrentMilliAmps, _tier.BoardInputCurrentMilliAmps);
+                    RailSelection requested = RequestedRails(null);
+                    drift.Add($"rails {requested.NvVdd}/{requested.MsVdd}/{requested.BoardInput} mA");
+                    rails = _rails.Set(requested.NvVdd, requested.MsVdd, requested.BoardInput);
                 }
 
                 // The laptop budget: the measured drift.
@@ -1110,25 +1142,29 @@ namespace UCU.Hardware.Gpu
                     : $"the driver reports a {Watts(current.F7Milliwatts)} laptop power budget, not {Watts(_tier.TgpTargetMilliwatts)}";
 
         /// <summary>
-        /// Why the rails are not the tier's, or null when they are. Named here rather than
-        /// left to the DTO's numbers: a rail that did not take is the difference between
-        /// an unlock and a 175 W card.
+        /// Why the rails are not the requested ones, or null when they are. The comparison is
+        /// against the owner's saved selection (this tier's numbers only when none was saved),
+        /// clamped by the live policy, so a value the policy no longer allows does not read as
+        /// a permanent mismatch. Named here rather than left to the DTO's numbers: a rail that
+        /// did not take is the difference between an unlock and a 175 W card.
         /// </summary>
         private string? RailsReason(GpuRailLimits rails)
         {
             if (rails.Reason is string refused)
                 return $"the runtime rails could not be read back: {refused}";
 
-            return RailsMismatch(GpuRail.NvVdd, rails.NvVdd, _tier.NvVddCurrentMilliAmps)
-                ?? RailsMismatch(GpuRail.MsVdd, rails.MsVdd, _tier.MsVddCurrentMilliAmps)
-                ?? RailsMismatch(GpuRail.BoardInput, rails.BoardInput, _tier.BoardInputCurrentMilliAmps);
+            RailSelection expected = SavedOrDefault();
+
+            return RailsMismatch(GpuRail.NvVdd, rails.NvVdd, ClampRail(GpuRail.NvVdd, expected.NvVdd, rails.NvVdd, warn: false))
+                ?? RailsMismatch(GpuRail.MsVdd, rails.MsVdd, ClampRail(GpuRail.MsVdd, expected.MsVdd, rails.MsVdd, warn: false))
+                ?? RailsMismatch(GpuRail.BoardInput, rails.BoardInput, ClampRail(GpuRail.BoardInput, expected.BoardInput, rails.BoardInput, warn: false));
         }
 
         private static string? RailsMismatch(GpuRail rail, GpuRailValue value, int expected) =>
             value.CurrentMilliamps == expected
                 ? null
                 : $"the {RailName(rail)} rail reads " +
-                  $"{(value.CurrentMilliamps is int current ? $"{current} mA" : "nothing")}, not the tier's {expected} mA";
+                  $"{(value.CurrentMilliamps is int current ? $"{current} mA" : "nothing")}, not the requested {expected} mA";
 
         /// <summary>
         /// True when any rail still carries more than the VBIOS's own current. A read that
@@ -1163,6 +1199,179 @@ namespace UCU.Hardware.Gpu
             GpuRail.MsVdd => "MSVDD",
             _ => "board input",
         };
+
+        /// <summary>
+        /// The rail currents to set: the owner's saved selection, validated against the live
+        /// policy (a driver update can narrow it), or this tier's numbers when nothing was
+        /// ever saved — which the log line says, one per call that asks for rails.
+        /// </summary>
+        private RailSelection RequestedRails(string? verb)
+        {
+            if (TryReadRailSelection(out string? error) is not RailSelection saved)
+            {
+                if (verb != null)
+                {
+                    Log.Information(
+                        error is null
+                            ? "{Verb}: rails from the tier defaults (no saved selection)"
+                            : "{Verb}: rails from the tier defaults (the saved selection could not be read: {Error})",
+                        verb, error);
+                }
+
+                return TierRails;
+            }
+
+            GpuRailLimits live = _rails.Read();
+            RailSelection requested = new(
+                ClampRail(GpuRail.NvVdd, saved.NvVdd, live.NvVdd, warn: true),
+                ClampRail(GpuRail.MsVdd, saved.MsVdd, live.MsVdd, warn: true),
+                ClampRail(GpuRail.BoardInput, saved.BoardInput, live.BoardInput, warn: true));
+
+            if (verb != null)
+            {
+                Log.Information(
+                    "{Verb}: rails from the saved selection: {Nv}/{Ms}/{Input} mA",
+                    verb, requested.NvVdd, requested.MsVdd, requested.BoardInput);
+            }
+
+            return requested;
+        }
+
+        private RailSelection SavedOrDefault() =>
+            TryReadRailSelection(out _) ?? TierRails;
+
+        private RailSelection TierRails => new(
+            _tier.NvVddCurrentMilliAmps, _tier.MsVddCurrentMilliAmps, _tier.BoardInputCurrentMilliAmps);
+
+        /// <summary>
+        /// A saved value the live policy no longer allows is clamped to the nearest bound; the
+        /// write path warns, the read-only comparison stays quiet.
+        /// </summary>
+        private static int ClampRail(GpuRail rail, int milliamps, GpuRailValue live, bool warn)
+        {
+            if (live.MinMilliamps is not int min || live.MaxMilliamps is not int max)
+                return milliamps;
+
+            int clamped = Math.Clamp(milliamps, min, max);
+            if (clamped != milliamps && warn)
+            {
+                Log.Warning(
+                    "gpu: the saved {Rail} rail {Saved} mA is outside the live rail policy {Min}-{Max} mA; using {Clamped} mA",
+                    RailName(rail), milliamps, min, max, clamped);
+            }
+
+            return clamped;
+        }
+
+        /// <summary>
+        /// The saved rail selection, or null with a reason when it is unreadable. Absent is
+        /// null with no reason: that is a machine whose owner never chose one.
+        /// </summary>
+        private RailSelection? TryReadRailSelection(out string? error)
+        {
+            error = null;
+            if (!File.Exists(_railsPath))
+                return null;
+
+            string[] lines;
+            try
+            {
+                lines = File.ReadAllLines(_railsPath);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return null;
+            }
+
+            int? nvvdd = null, msvdd = null, board = null;
+
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                if (line.Length == 0)
+                    continue;
+
+                int equal = line.IndexOf('=');
+                if (equal <= 0 ||
+                    !int.TryParse(line.AsSpan(equal + 1), NumberStyles.None, CultureInfo.InvariantCulture, out int milliamps) ||
+                    milliamps <= 0)
+                {
+                    error = "the UCU saved rail selection file is malformed";
+                    return null;
+                }
+
+                string name = line.Substring(0, equal).Trim();
+                if (name.Equals("nvvdd", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (nvvdd != null)
+                        return Malformed(out error);
+                    nvvdd = milliamps;
+                }
+                else if (name.Equals("msvdd", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (msvdd != null)
+                        return Malformed(out error);
+                    msvdd = milliamps;
+                }
+                else if (name.Equals("board", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (board != null)
+                        return Malformed(out error);
+                    board = milliamps;
+                }
+                else
+                {
+                    error = $"the UCU saved rail selection file names the unexpected rail '{name}'";
+                    return null;
+                }
+            }
+
+            if (nvvdd is not int nv || msvdd is not int ms || board is not int input)
+                return Malformed(out error);
+
+            return new RailSelection(nv, ms, input);
+        }
+
+        private static RailSelection? Malformed(out string? error)
+        {
+            error = "the UCU saved rail selection file is malformed";
+            return null;
+        }
+
+        /// <summary>
+        /// The owner's choice, written whole (three lines, tmp → move): the file is either the
+        /// previous selection or this one, never a half-written mix.
+        /// </summary>
+        private void WriteRailSelection(RailSelection selection)
+        {
+            string? directory = Path.GetDirectoryName(_railsPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            string temporary = _railsPath + ".tmp";
+            File.WriteAllText(
+                temporary,
+                new StringBuilder()
+                    .Append("nvvdd=").Append(selection.NvVdd.ToString(CultureInfo.InvariantCulture))
+                    .Append('\n').Append("msvdd=").Append(selection.MsVdd.ToString(CultureInfo.InvariantCulture))
+                    .Append('\n').Append("board=").Append(selection.BoardInput.ToString(CultureInfo.InvariantCulture))
+                    .Append('\n').ToString());
+
+            File.Move(temporary, _railsPath, overwrite: true);
+            Log.Information(
+                "gpu: the rail selection {Nv}/{Ms}/{Input} mA is saved to {Path}",
+                selection.NvVdd, selection.MsVdd, selection.BoardInput, _railsPath);
+        }
+
+        private void DiscardRailSelection()
+        {
+            if (File.Exists(_railsPath))
+            {
+                File.Delete(_railsPath);
+                Log.Information("gpu.set_rom_override: the saved rail selection was removed from {Path}", _railsPath);
+            }
+        }
 
         private static string Watts(int milliwatts) =>
             (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W";
@@ -1370,8 +1579,9 @@ namespace UCU.Hardware.Gpu
             if (File.Exists(_originalsPath))
                 File.Delete(_originalsPath);
 
-            // The informational copy goes with them, and so does a verdict about a boot that
-            // no longer has anything staged.
+            // The informational copy and the saved rail selection go with them, and so does a
+            // verdict about a boot that no longer has anything staged.
+            DiscardRailSelection();
             DiscardMarker();
             _startup = null;
         }
@@ -1401,6 +1611,9 @@ namespace UCU.Hardware.Gpu
         }
 
         private sealed record Originals(string Version, Dictionary<uint, uint> Values, GpuPowerBudget? Budget);
+
+        /// <summary>The three runtime rail currents, in mA, as one selection.</summary>
+        private sealed record RailSelection(int NvVdd, int MsVdd, int BoardInput);
     }
 
     /// <summary>
