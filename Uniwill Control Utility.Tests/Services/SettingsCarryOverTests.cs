@@ -125,6 +125,91 @@ public sealed class SettingsCarryOverTests
     }
 
     [Fact]
+    public void Run_AdoptsMissingSettings_FromAnOlderConfig_WhenTheCurrentConfigIsOnlyPartlyFilled()
+    {
+        string root = NewTempDir();
+        try
+        {
+            string identity = Path.Combine(root, "jgudec", "Uniwill_Control_Utility_Url_abc123");
+            // Field case, 0.9.15: the current-version config carried a subset of the
+            // settings (and the upgrade flag was false there), EnablePowerBoostMode came
+            // back False because the pass never ran.
+            string current = WriteConfig(identity, "0.9.15.0", new()
+            {
+                ["StartOnBoot"] = "False",
+            });
+            WriteConfig(identity, "0.9.9.0", new()
+            {
+                ["EnablePowerBoostMode"] = "True",
+                ["StartOnBoot"] = "True",
+            });
+
+            var applied = new Dictionary<string, string>();
+            List<string> lines = SettingsCarryOver.Run(
+                current,
+                SettingsCarryOver.Read(current)!.Keys,
+                new[] { "EnablePowerBoostMode", "StartOnBoot" },
+                (name, value) =>
+                {
+                    applied[name] = value;
+                    return null;
+                },
+                out int adopted);
+
+            Assert.Equal("EnablePowerBoostMode", Assert.Single(applied).Key);
+            Assert.Equal("True", applied["EnablePowerBoostMode"]);
+            Assert.Equal(1, adopted);
+            Assert.Contains(lines,
+                line => line.Contains("EnablePowerBoostMode = True adopted from 0.9.9.0", StringComparison.Ordinal));
+            Assert.Contains(lines,
+                line => line.Contains("1 setting(s) adopted", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_AppliesNothing_WhenTheCurrentConfigAlreadyCarriesEverySetting()
+    {
+        string root = NewTempDir();
+        try
+        {
+            string identity = Path.Combine(root, "jgudec", "Uniwill_Control_Utility_Url_abc123");
+            string current = WriteConfig(identity, "0.9.15.0", new()
+            {
+                ["EnablePowerBoostMode"] = "True", // re-enabled by hand in this version
+            });
+            WriteConfig(identity, "0.9.9.0", new()
+            {
+                ["EnablePowerBoostMode"] = "False",
+            });
+
+            int appliedCount = 0;
+            List<string> lines = SettingsCarryOver.Run(
+                current,
+                SettingsCarryOver.Read(current)!.Keys,
+                new[] { "EnablePowerBoostMode" },
+                (_, _) =>
+                {
+                    appliedCount++;
+                    return null;
+                },
+                out int adopted);
+
+            Assert.Equal(0, adopted);
+            Assert.Equal(0, appliedCount);
+            Assert.Contains("nothing to adopt from 1 earlier config(s)", Assert.Single(lines),
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Plan_WithNoHistory_AdoptsNothingAndSaysSo()
     {
         var adopted = SettingsCarryOver.Plan(

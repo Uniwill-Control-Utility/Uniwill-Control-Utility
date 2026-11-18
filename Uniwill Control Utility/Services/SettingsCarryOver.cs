@@ -150,6 +150,60 @@ namespace Uniwill_Control_Utility.Services
             return adopted;
         }
 
+        /// <summary>
+        /// The pass: adopt every declared setting the current config does not carry,
+        /// newest older config first. App runs this on every start - the once-per-version
+        /// <c>Upgrade()</c> gate is not a substitute (a leftover config for the running
+        /// version carries the flag false: field, 0.9.15, EnablePowerBoostMode came back
+        /// False because the pass never ran).
+        ///
+        /// The short-circuit is a presence comparison, never a version flag: when the
+        /// current config already carries every declared setting no config file is
+        /// opened at all. <paramref name="tryApply"/> returns null on success, else the
+        /// reason the value could not be stored. Returns the lines to log.
+        /// </summary>
+        internal static List<string> Run(
+            string currentConfigPath,
+            IEnumerable<string>? presentInCurrent,
+            IEnumerable<string> userSettings,
+            Func<string, string, string?> tryApply,
+            out int adopted)
+        {
+            adopted = 0;
+            var lines = new List<string>();
+            var present = new HashSet<string>(
+                presentInCurrent ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            string[] pending = userSettings.Where(setting => !present.Contains(setting)).ToArray();
+
+            // History() only enumerates version directories; it stays outside the
+            // short-circuit so the closing line can still report how many exist.
+            List<(Version Version, string Path)> history = History(currentConfigPath);
+            if (pending.Length == 0)
+            {
+                lines.Add(Summary(0, history.Count));
+                return lines;
+            }
+
+            if (history.Count == 0)
+                lines.Add("settings carry-over: no earlier user.config found");
+
+            foreach ((string setting, string version, string value) in Plan(history, present, pending, lines.Add))
+            {
+                string? reason = tryApply(setting, value);
+                if (reason is not null)
+                {
+                    lines.Add($"settings carry-over: {setting} not adopted ({reason})");
+                    continue;
+                }
+
+                lines.Add($"settings carry-over: {setting} = {value} adopted from {version}");
+                adopted++;
+            }
+
+            lines.Add(Summary(adopted, history.Count));
+            return lines;
+        }
+
         /// <summary>The single closing line: what the pass did, or that there was nothing to do.</summary>
         internal static string Summary(int adopted, int configsExamined) => adopted == 0
             ? $"settings carry-over: nothing to adopt from {configsExamined} earlier config(s)"

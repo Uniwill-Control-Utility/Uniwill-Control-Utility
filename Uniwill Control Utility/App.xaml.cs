@@ -925,9 +925,6 @@ namespace Uniwill_Control_Utility
         {
             try
             {
-                if (!Settings.Default.SettingsUpgradeRequired)
-                    return;
-
                 // Presence must be sampled before Upgrade() or any Save: both make every
                 // user setting present in this version's config, which erases the only
                 // evidence of what this version had actually stored.
@@ -935,35 +932,34 @@ namespace Uniwill_Control_Utility
                     .OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath;
                 Dictionary<string, string>? present = SettingsCarryOver.Read(currentConfigPath);
 
-                Settings.Default.Upgrade();
+                // Upgrade() stays once per version. The carry-over pass below must not be
+                // gated on this flag: a leftover config for the running version carries it
+                // false, and gating the pass on it skipped the pass entirely (field,
+                // 0.9.15: EnablePowerBoostMode came back False after the update).
+                bool upgradeRequired = Settings.Default.SettingsUpgradeRequired;
+                if (upgradeRequired)
+                {
+                    Settings.Default.Upgrade();
+                    Settings.Default.SettingsUpgradeRequired = false;
+                }
 
                 // Upgrade() splits on its own choice of predecessor; this fills whatever
                 // that choice missed from the newest older config that does carry it.
-                List<(Version Version, string Path)> history = SettingsCarryOver.History(currentConfigPath);
-                if (history.Count == 0)
-                    _settingsCarryOverLog.Add("settings carry-over: Upgrade() found no earlier user.config");
-
-                int adopted = 0;
-                foreach ((string setting, string version, string value) in SettingsCarryOver.Plan(
-                             history,
-                             present is null ? Array.Empty<string>() : present.Keys,
+                int adopted;
+                foreach (string line in SettingsCarryOver.Run(
+                             currentConfigPath,
+                             present?.Keys,
                              UserSettingNames(),
-                             line => _settingsCarryOverLog.Add(line)))
+                             TryCarryOverSetting,
+                             out adopted))
                 {
-                    if (!TryCarryOverSetting(setting, value, out string reason))
-                    {
-                        _settingsCarryOverLog.Add($"settings carry-over: {setting} not adopted ({reason})");
-                        continue;
-                    }
-
-                    _settingsCarryOverLog.Add($"settings carry-over: {setting} = {value} adopted from {version}");
-                    adopted++;
+                    _settingsCarryOverLog.Add(line);
                 }
 
-                _settingsCarryOverLog.Add(SettingsCarryOver.Summary(adopted, history.Count));
-
-                Settings.Default.SettingsUpgradeRequired = false;
-                Settings.Default.Save();
+                // Zero writes in the steady state: only an upgrade or an adoption changes
+                // settings. The gated write also persists the cleared upgrade flag.
+                if (upgradeRequired || adopted > 0)
+                    Settings.Default.Save();
             }
             catch (ConfigurationErrorsException ex)
             {
@@ -993,36 +989,27 @@ namespace Uniwill_Control_Utility
 
         /// <summary>
         /// Stores one carried-over value through the same type conversion the settings
-        /// serializer uses. Returns false (with a reason) rather than throwing when the
-        /// value does not convert to the setting's type.
+        /// serializer uses. Returns null on success, or the reason it could not be applied.
         /// </summary>
-        private static bool TryCarryOverSetting(string name, string raw, out string reason)
+        private static string? TryCarryOverSetting(string name, string raw)
         {
-            reason = "";
             SettingsProperty? property = Settings.Default.Properties[name];
             if (property is null)
-            {
-                reason = "unknown setting";
-                return false;
-            }
+                return "unknown setting";
 
             try
             {
                 TypeConverter converter = TypeDescriptor.GetConverter(property.PropertyType);
                 object? converted = converter.ConvertFromInvariantString(raw);
                 if (converted is null)
-                {
-                    reason = "value did not convert";
-                    return false;
-                }
+                    return "value did not convert";
 
                 Settings.Default[name] = converted;
-                return true;
+                return null;
             }
             catch (Exception)
             {
-                reason = $"value '{raw}' is not a valid {property.PropertyType.Name}";
-                return false;
+                return $"value '{raw}' is not a valid {property.PropertyType.Name}";
             }
         }
 
