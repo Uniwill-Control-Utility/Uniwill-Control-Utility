@@ -131,7 +131,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await applyPlatformVisibilityAsync().ConfigureAwait(true);
                 applyPowerLimits();
                 setProfileTooltips();
-                setRomInfoTooltip();
                 loadSavedProfile();
 
                 // For Custom profile, restore slider values.
@@ -2384,17 +2383,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                     ? "SystemFillColorCautionBrush"
                     : "TextFillColorSecondaryBrush");
 
-            // Both follow this same state, so they re-render with it. The tooltip states the live
-            // target, so it is rebuilt here rather than only at navigation.
+            // Both follow this same state, so they re-render with it. The quick configurations'
+            // text is a tooltip, so it is rebuilt here rather than only at navigation.
             RenderRomStatusRow();
             RenderRailLimits();
-            setRomInfoTooltip();
             setQuickApplyTooltips();
         }
 
         /// <summary>
         /// Why the quick configurations are dimmed, or null while they are available. A dimmed
-        /// group cannot say this for itself, so the card says it once.
+        /// group cannot say this for itself, so the card says it once - except for consent, which
+        /// the statement directly above the buttons states by not being ticked.
         /// </summary>
         private string? QuickApplyReason()
         {
@@ -2406,9 +2405,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (!applied)
                 return LocalizationService.Get("Available once Extra GPU power is unlocked.");
-
-            if (chkRomConsent.IsChecked != true)
-                return LocalizationService.Get("Tick the statement above first.");
 
             if (!Settings.Default.EnableGpuClockControl)
                 return LocalizationService.Get("The 250 W set writes this unit's clock offsets, so it needs GPU clock control on in Settings. The other two leave the clocks alone.");
@@ -2505,37 +2501,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
 
         /// <summary>
-        /// The measurement tooltip's text, built here instead of walked by the page's translation
-        /// pass: a tooltip's content is not in the visual tree until it opens, so nothing else
-        /// would translate it. Rebuilt on every navigation, as the profile tooltips are.
-        /// </summary>
-        private void setRomInfoTooltip()
-        {
-            static string Row(string label, string value) =>
-                LocalizationService.Format("{0}: {1}", LocalizationService.Get(label), value);
-
-            tbRomInfo.Text = string.Join("\n",
-                Row("Ceiling (driver)", "250 W"),
-                // The target is not frozen copy: it is whatever the unlock was last asked for,
-                // and with no unlock applied it follows the preset.
-                Row("Target", _romOverride?.RequestedLimitMilliwatts is int request
-                    ? Watts(request)
-                    : LocalizationService.Get("follows the preset")),
-                Row("Rails", "250 A · 70 A · 14.026 A"),
-                Row("Stock rails", "210 A · 60 A · 11.053 A"),
-                Row("Driver max", "294 A · 84 A · 17.021 A"),
-                string.Empty,
-                LocalizationService.Get("The EC publishes a 95 W base TGP, so the cTGP offset is 130 and Dynamic Boost is off."),
-                string.Empty,
-                LocalizationService.Get("With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it."),
-                string.Empty,
-                LocalizationService.Get("Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it."));
-        }
-
-        /// <summary>
         /// The three quick configurations' captions, in each button's tooltip instead of under the
         /// row: the numbers are one hover — or one Tab stop — away, and the row stays one line.
-        /// Built here for the same reason the measurement tooltip is: a tooltip's content is not in
+        /// Built here for the same reason the profile tooltips are: a tooltip's content is not in
         /// the visual tree until it opens, so nothing else would translate it.
         /// </summary>
         private void setQuickApplyTooltips()

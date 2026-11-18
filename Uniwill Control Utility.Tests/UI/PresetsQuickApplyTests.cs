@@ -9,8 +9,8 @@ namespace Uniwill_Control_Utility.Tests.UI;
 ///   - the three writes travel in the engine's order - target, then rails, then clocks - because
 ///     the restart raises the rail policy and the clock write only lands after its cooldown;
 ///   - the group is gated on the unlock, the consent statement and (for 250 W) GPU clock control,
-///     and says which of those is missing;
-///   - the measurement tooltip states the live target instead of frozen copy.
+///     and says which of those is missing - except consent, which the ticked statement above the
+///     buttons states for itself.
 /// </summary>
 public sealed class PresetsQuickApplyTests
 {
@@ -80,8 +80,11 @@ public sealed class PresetsQuickApplyTests
 
         string reason = MethodBody(ReadPresetsPage(), "private string? QuickApplyReason()");
         Assert.Contains("Available once Extra GPU power is unlocked.", reason, StringComparison.Ordinal);
-        Assert.Contains("Tick the statement above first.", reason, StringComparison.Ordinal);
         Assert.Contains("GPU clock control on in Settings", reason, StringComparison.Ordinal);
+
+        // Consent is the one gap the row does not explain: the unticked statement is directly
+        // above the buttons. The behaviour stays - the buttons are still gated on it.
+        Assert.DoesNotContain("Tick the statement above first.", reason, StringComparison.Ordinal);
 
         // The captions are the buttons' tooltips, so the row is one line; the 250 W set's
         // board input sits above 14 A, so its caution keeps a visible marker on the button.
@@ -99,17 +102,13 @@ public sealed class PresetsQuickApplyTests
     }
 
     [Fact]
-    public void TheTooltipStatesTheLiveTarget()
+    public void TheMeasurementTooltipIsGoneFromTheCard()
     {
-        string body = MethodBody(ReadPresetsPage(), "private void setRomInfoTooltip()");
-
-        Assert.DoesNotContain("Row(\"Target\", \"225 W\")", body, StringComparison.Ordinal);
-        Assert.Contains("RequestedLimitMilliwatts", body, StringComparison.Ordinal);
-        Assert.Contains("follows the preset", body, StringComparison.Ordinal);
-
-        // The measurements stay measurements: the rails and the driver's ceiling are facts.
-        Assert.Contains("Row(\"Rails\", \"250 A · 70 A · 14.026 A\")", body, StringComparison.Ordinal);
-        Assert.Contains("Row(\"Ceiling (driver)\", \"250 W\")", body, StringComparison.Ordinal);
+        // The frozen measurement paragraph, the live target, the stock rails and the driver
+        // maxima left the UI entirely; the three buttons carry their own numbers.
+        Assert.DoesNotContain("setRomInfoTooltip", ReadPresetsPage(), StringComparison.Ordinal);
+        Assert.DoesNotContain("tbRomInfo", ReadPresetsXaml(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Measured on our test unit", ReadPresetsXaml(), StringComparison.Ordinal);
     }
 
     private static string Handler(string source, string from, string to)

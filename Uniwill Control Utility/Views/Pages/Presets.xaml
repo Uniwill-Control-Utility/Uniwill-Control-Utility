@@ -841,9 +841,9 @@
                         </ui:CardExpander>
                         <!-- GPU power ceiling override: a machine-wide driver setting, kept with
                              the tuning editors it belongs beside. Collapsed by default: the act is
-                             one statement and two buttons, and the measurements behind them are one
-                             tooltip. The numbers the unlock produces are on the status card above,
-                             so this card never repeats them. -->
+                             one statement and two buttons, and each measurement lives in the
+                             quick configuration it belongs to. The numbers the unlock produces are
+                             on the status card above, so this card never repeats them. -->
                         <ui:CardExpander x:Name="cardRomOverride"
                                          Margin="0,0,0,8"
                                          IsEnabled="True"
@@ -862,33 +862,6 @@
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
-                                <!-- The measurements behind the card sit behind one icon: the same
-                                     native tooltip the tuning rows use. Its text is built once in
-                                     code, because a tooltip's content is not in the visual tree
-                                     until it opens and nothing else would translate it. -->
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <ui:TextBlock VerticalAlignment="Center"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Measured on our test unit" />
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                                 Glyph="&#xE946;"
-                                                 FontSize="14"
-                                                 Margin="6,2,0,0"
-                                                 VerticalAlignment="Center"
-                                                 ToolTipService.ShowDuration="60000">
-                                        <ui:FontIcon.ToolTip>
-                                            <ToolTip>
-                                                <TextBlock x:Name="tbRomInfo"
-                                                           MaxWidth="420"
-                                                           FontSize="12"
-                                                           TextWrapping="Wrap"
-                                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                            </ToolTip>
-                                        </ui:FontIcon.ToolTip>
-                                    </ui:FontIcon>
-                                </StackPanel>
-
                                 <!-- Power boost mode off while an override is live: the card is
                                      shown for one reason only - removing the override. The line
                                      says why, and Restore stock is the act. -->
@@ -1056,9 +1029,6 @@
                                                TextWrapping="Wrap"
                                                Visibility="Collapsed"
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-
-                                    <!-- Divider -->
-                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                 </StackPanel>
 
                                 <!-- One line, and only for a state that needs explaining: a refusal,
@@ -1093,12 +1063,7 @@
                                      values. One block with its divider, because the card's "override
                                      is still live" state shows no sliders at all. -->
                                 <StackPanel x:Name="spRailSection">
-                                    <ui:TextBlock FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   TextWrapping="Wrap"
-                                                   Text="The rail currents are saved with the profile." />
-
-                                    <StackPanel x:Name="spRailControls" Margin="0,12,0,0">
+                                    <StackPanel x:Name="spRailControls">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />

@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Uniwill_Control_Utility.Tests.UI;
 
 /// <summary>
@@ -8,7 +10,8 @@ namespace Uniwill_Control_Utility.Tests.UI;
 ///     read re-binds the sliders to what the driver reports;
 ///   - it is scoped to the unlock being applied, and says nothing when it is not;
 ///   - a refusal or a transport failure comes back for the card's reason line, never silence;
-///   - the sliders still say how they take effect, and why they are inert without the unlock.
+///   - the sliders keep their row and their gating note, and one rule separates them from the
+///     quick configurations.
 /// </summary>
 public sealed class PresetsRailWriteTests
 {
@@ -58,12 +61,31 @@ public sealed class PresetsRailWriteTests
         Assert.DoesNotContain("btnRailApply", ReadPresetsPage(), StringComparison.Ordinal);
 
         // The sliders explain themselves: why they are inert. There is no second line about how a
-        // move is kept - the caption above the row says the currents belong to the profile.
+        // move is kept either - the sliders move with the preset slot, and the card says so only
+        // where the gating note already is.
         string source = ReadPresetsPage();
         Assert.Contains("Available once Extra GPU power is unlocked.", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Written when you press Apply, and kept for the next boot.", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Written when you press Apply, and kept for the next boot.", ReadPresetsXaml(), StringComparison.Ordinal);
-        Assert.Contains("The rail currents are saved with the profile.", ReadPresetsXaml(), StringComparison.Ordinal);
+        Assert.DoesNotContain("The rail currents are saved with the profile.", ReadPresetsXaml(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OneRuleInTheGapBetweenTheQuickRowAndTheRails()
+    {
+        // Both a trailing rule inside the quick row and the rails' own rule rendered in the same
+        // gap, so the card drew two lines above NVVDD. The rails' one is the survivor: it is the
+        // one the "still applied" state collapses.
+        string xaml = ReadPresetsXaml();
+        int start = xaml.IndexOf("x:Name=\"spQuickApply\"", StringComparison.Ordinal);
+        int end = xaml.IndexOf("x:Name=\"spRailSection\"", StringComparison.Ordinal);
+
+        Assert.True(start >= 0 && end > start, "The quick row and the rails block must exist.");
+
+        string gap = xaml.Substring(start, end - start);
+        int rules = Regex.Matches(gap, "Height=\"1\"").Count;
+
+        Assert.True(rules == 1, $"The gap between the quick row and the rails carries {rules} rules, not one.");
     }
 
     [Fact]
