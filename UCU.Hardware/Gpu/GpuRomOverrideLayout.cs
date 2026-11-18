@@ -75,7 +75,9 @@ namespace UCU.Hardware.Gpu
             // only ever stock x1.4 for its own ROM, and 250 A is what the tester's image already
             // ships as its stock ceiling - one number that fits both rather than a per-maker table.
             NvVddMilliAmps: 250_000,
-            MsVddMilliAmps: 84_000,
+            // 100 A rather than the reference's 84 A: it matches what mVolt offers and what the
+            // tester's image already ships as its MSVDD ceiling, so both machines see one number.
+            MsVddMilliAmps: 100_000,
             BoardInputMilliAmps: 17_021,
             NvVddCurrentMilliAmps: 250_000,
             MsVddCurrentMilliAmps: 70_000,

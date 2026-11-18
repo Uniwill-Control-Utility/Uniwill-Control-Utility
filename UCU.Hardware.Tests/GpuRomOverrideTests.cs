@@ -70,8 +70,8 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal("98-03-5E-00-5D-00-7F-05-00-04-7D-42-00-00", Hex(records[2].Data));
         Assert.Equal("98-03-5E-00-5D-94-80-05-00-04-90-D0-03-00", Hex(records[3].Data));
         Assert.Equal("98-03-5E-00-5D-98-80-05-00-04-90-D0-03-00", Hex(records[4].Data));
-        Assert.Equal("98-03-5E-00-5D-FA-80-05-00-04-20-48-01-00", Hex(records[5].Data));
-        Assert.Equal("98-03-5E-00-5D-FE-80-05-00-04-20-48-01-00", Hex(records[6].Data));
+        Assert.Equal("98-03-5E-00-5D-FA-80-05-00-04-A0-86-01-00", Hex(records[5].Data));
+        Assert.Equal("98-03-5E-00-5D-FE-80-05-00-04-A0-86-01-00", Hex(records[6].Data));
 
         Assert.Equal(
             new[] { "romOverride00", "romOverride01", "romOverride02", "romOverride03", "romOverride04", "romOverride05", "romOverride06" },
@@ -85,7 +85,7 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Equal(225_000, GpuPowerTiers.ExtraGpuPower.TgpTargetMilliwatts);
         Assert.Equal(225, GpuPowerTiers.ExtraGpuPower.TgpTargetWatts);
         Assert.Equal(250_000, GpuPowerTiers.ExtraGpuPower.NvVddMilliAmps);
-        Assert.Equal(84_000, GpuPowerTiers.ExtraGpuPower.MsVddMilliAmps);
+        Assert.Equal(100_000, GpuPowerTiers.ExtraGpuPower.MsVddMilliAmps);
         Assert.Equal(17_021, GpuPowerTiers.ExtraGpuPower.BoardInputMilliAmps);
         Assert.Equal(14_026, GpuPowerTiers.ExtraGpuPower.BoardInputCurrentMilliAmps);
     }
@@ -303,7 +303,7 @@ public sealed class GpuRomOverrideTests : IDisposable
         AssertRecord(registry.Records["romOverride00"], version, 0x57C36, 250_000);
         AssertRecord(registry.Records["romOverride01"], version, 0x57EFC, 17_021);
         AssertRecord(registry.Records["romOverride03"], version, 0x58094, 250_000);
-        AssertRecord(registry.Records["romOverride05"], version, 0x580FA, 84_000);
+        AssertRecord(registry.Records["romOverride05"], version, 0x580FA, 100_000);
     }
 
     [Fact]
@@ -1757,7 +1757,7 @@ public sealed class GpuRomOverrideTests : IDisposable
             new[] { "power", "NVVDD", "MSVDD", "board input" },
             state.VbiosPolicy.Records.Select(record => record.Rail));
         Assert.Equal(
-            new uint[] { 250_000, 250_000, 84_000, 17_021 },
+            new uint[] { 250_000, 250_000, 100_000, 17_021 },
             state.VbiosPolicy.Records.Select(record => record.Value));
     }
 

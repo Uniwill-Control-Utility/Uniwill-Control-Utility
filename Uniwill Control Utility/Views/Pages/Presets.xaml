@@ -1096,9 +1096,9 @@
                                                    Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
 
                                         <ui:Button x:Name="btnRailApply"
-                                                   Margin="0,12,0,0"
+                                                   Margin="0,20,0,4"
                                                    Padding="16,6"
-                                                   HorizontalAlignment="Left"
+                                                   HorizontalAlignment="Right"
                                                    Appearance="Primary"
                                                    Click="btnRailApply_Click"
                                                    Content="Apply limits" />
