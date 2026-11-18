@@ -920,119 +920,6 @@
                                     </Grid>
                                 </StackPanel>
 
-                                <!-- Divider: it belongs to the quick configurations, so it goes with
-                                     them when the card is showing the "still applied, feature off"
-                                     state and they are collapsed. -->
-                                <Border x:Name="brQuickDivider" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                                <!-- Three measured configurations, one click each, for a card that is
-                                     already unlocked: they set the target and that tier's three rail
-                                     currents, and 250 W also sets this unit's clock offsets. Each
-                                     button's caption is its tooltip, so the row is one line and the
-                                     numbers stay one hover - or one Tab stop - away. The 250 W set's
-                                     adapter caution lives in that tooltip and in the rails block,
-                                     which states it whenever the board input is above the tested
-                                     current. Label and buttons share one row: the label is the row's
-                                     left column, the three buttons its right. Each button carries that
-                                     tier's warning colour as its fill and the same brush as its 1 px
-                                     border, with the matching text token as its foreground, so the
-                                     pairing reads on the light tint and on the dark one. The
-                                     template's own hover, pressed and disabled states still own the
-                                     background while they are active, so a disabled button is never a
-                                     coloured one. -->
-                                <StackPanel x:Name="spQuickApply">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <ui:TextBlock Grid.Column="0"
-                                                      VerticalAlignment="Center"
-                                                      FontTypography="BodyStrong"
-                                                      Text="Quick configurations" />
-
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                            <ui:Button x:Name="btnApply200"
-                                                       Margin="0,0,8,0"
-                                                       Padding="16,6"
-                                                       Appearance="Secondary"
-                                                       Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
-                                                       BorderBrush="{DynamicResource SystemFillColorSuccessBrush}"
-                                                       BorderThickness="1"
-                                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"
-                                                       Click="btnApply200_Click"
-                                                       ToolTipService.ShowDuration="60000"
-                                                       ToolTipService.ShowOnDisabled="True"
-                                                       Content="Apply 200 W">
-                                                <ToolTipService.ToolTip>
-                                                    <ToolTip>
-                                                        <TextBlock x:Name="tbQuick200Tip"
-                                                                   MaxWidth="400"
-                                                                   FontSize="12"
-                                                                   TextWrapping="Wrap"
-                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                                    </ToolTip>
-                                                </ToolTipService.ToolTip>
-                                            </ui:Button>
-
-                                            <ui:Button x:Name="btnApply225"
-                                                       Margin="0,0,8,0"
-                                                       Padding="16,6"
-                                                       Appearance="Secondary"
-                                                       Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
-                                                       BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
-                                                       BorderThickness="1"
-                                                       Foreground="{DynamicResource SystemFillColorCautionBrush}"
-                                                       Click="btnApply225_Click"
-                                                       ToolTipService.ShowDuration="60000"
-                                                       ToolTipService.ShowOnDisabled="True"
-                                                       Content="Apply 225 W">
-                                                <ToolTipService.ToolTip>
-                                                    <ToolTip>
-                                                        <TextBlock x:Name="tbQuick225Tip"
-                                                                   MaxWidth="400"
-                                                                   FontSize="12"
-                                                                   TextWrapping="Wrap"
-                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                                    </ToolTip>
-                                                </ToolTipService.ToolTip>
-                                            </ui:Button>
-
-                                            <ui:Button x:Name="btnApply250"
-                                                       Padding="16,6"
-                                                       Appearance="Secondary"
-                                                       Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}"
-                                                       BorderBrush="{DynamicResource SystemFillColorCriticalBrush}"
-                                                       BorderThickness="1"
-                                                       Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                                                       Click="btnApply250_Click"
-                                                       ToolTipService.ShowDuration="60000"
-                                                       ToolTipService.ShowOnDisabled="True"
-                                                       Content="Apply 250 W">
-                                                <ToolTipService.ToolTip>
-                                                    <ToolTip>
-                                                        <TextBlock x:Name="tbQuick250Tip"
-                                                                   MaxWidth="400"
-                                                                   FontSize="12"
-                                                                   TextWrapping="Wrap"
-                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                                    </ToolTip>
-                                                </ToolTipService.ToolTip>
-                                            </ui:Button>
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <!-- Why the three are dimmed, when they are: the same one line the
-                                         card uses for its own actions. -->
-                                    <TextBlock x:Name="tbQuickApplyReason"
-                                               Margin="0,8,0,0"
-                                               FontSize="12"
-                                               TextWrapping="Wrap"
-                                               Visibility="Collapsed"
-                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-
                                 <!-- One line, and only for a state that needs explaining: a refusal,
                                      a partial apply, a read that failed, or why an action is
                                      dimmed. A clean unlock says itself in the status card's row. -->
@@ -1061,9 +948,10 @@
                                      blank screen, no consent), so it follows the unlock's state:
                                      inert and explained until it is applied. They stand on their
                                      own - an Apply of their own under the sliders, and no preset
-                                     carries them - because they are a machine-wide choice. One
-                                     block with its divider, because the card's "override is still
-                                     live" state shows no sliders at all. -->
+                                     carries them - because they are a machine-wide choice. The
+                                     card's whole action row lives in this block too, below the
+                                     sliders, because the "override is still live" state shows
+                                     none of it. -->
                                 <StackPanel x:Name="spRailSection">
                                     <StackPanel x:Name="spRailControls" Margin="0,0,0,0">
                                         <Grid>
@@ -1190,21 +1078,117 @@
                                                    Foreground="{DynamicResource SystemFillColorCautionBrush}"
                                                    Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
 
-                                        <Border Height="1"
-                                                Margin="-58,16,-46,0"
-                                                Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                </StackPanel>
 
-                                        <!-- The rails' own act. Inside the dimmed group, so an
-                                             unlock that is not applied disables it with the reason
-                                             the note below states. -->
-                                        <ui:Button x:Name="btnRailApply"
-                                                   Margin="0,20,0,4"
+                                <!-- One rule between the sliders and the actions under them. -->
+                                <Border Height="1"
+                                        Margin="-58,16,-46,0"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- One row, two separate gates: the three quick sets answer to the
+                                     unlock and the consent, Apply limits to the rail sliders they
+                                     write. Neither dims the other, so each control carries its own
+                                     IsEnabled and Opacity and no parent panel is dimmed. The quick
+                                     sets wrap inside their own column when the window is narrow;
+                                     Apply limits stays pinned to the right. -->
+                                <Grid x:Name="spRomActionRow" Margin="0,20,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <WrapPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <ui:Button x:Name="btnApply200"
+                                                   Margin="0,0,8,4"
                                                    Padding="16,6"
-                                                   HorizontalAlignment="Right"
-                                                   Appearance="Primary"
-                                                   Click="btnRailApply_Click"
-                                                   Content="Apply limits" />
-                                    </StackPanel>
+                                                   Appearance="Secondary"
+                                                   Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                                                   BorderBrush="{DynamicResource SystemFillColorSuccessBrush}"
+                                                   BorderThickness="1"
+                                                   Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                                   Click="btnApply200_Click"
+                                                   ToolTipService.ShowDuration="60000"
+                                                   ToolTipService.ShowOnDisabled="True"
+                                                   Content="Apply 200 W">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock x:Name="tbQuick200Tip"
+                                                               MaxWidth="400"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                </ToolTip>
+                                            </ToolTipService.ToolTip>
+                                        </ui:Button>
+
+                                        <ui:Button x:Name="btnApply225"
+                                                   Margin="0,0,8,4"
+                                                   Padding="16,6"
+                                                   Appearance="Secondary"
+                                                   Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                                                   BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                                                   BorderThickness="1"
+                                                   Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                                   Click="btnApply225_Click"
+                                                   ToolTipService.ShowDuration="60000"
+                                                   ToolTipService.ShowOnDisabled="True"
+                                                   Content="Apply 225 W">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock x:Name="tbQuick225Tip"
+                                                               MaxWidth="400"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                </ToolTip>
+                                            </ToolTipService.ToolTip>
+                                        </ui:Button>
+
+                                        <ui:Button x:Name="btnApply250"
+                                                   Margin="0,0,0,4"
+                                                   Padding="16,6"
+                                                   Appearance="Secondary"
+                                                   Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}"
+                                                   BorderBrush="{DynamicResource SystemFillColorCriticalBrush}"
+                                                   BorderThickness="1"
+                                                   Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                   Click="btnApply250_Click"
+                                                   ToolTipService.ShowDuration="60000"
+                                                   ToolTipService.ShowOnDisabled="True"
+                                                   Content="Apply 250 W">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock x:Name="tbQuick250Tip"
+                                                               MaxWidth="400"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                </ToolTip>
+                                            </ToolTipService.ToolTip>
+                                        </ui:Button>
+                                    </WrapPanel>
+
+                                    <!-- The rails' own act, with its own gate on the button: an
+                                         unlock that is not applied disables it, and the note below
+                                         says why. -->
+                                    <ui:Button x:Name="btnRailApply"
+                                               Grid.Column="1"
+                                               Margin="12,0,0,0"
+                                               Padding="16,6"
+                                               VerticalAlignment="Center"
+                                               Appearance="Primary"
+                                               Click="btnRailApply_Click"
+                                               Content="Apply limits" />
+                                </Grid>
+
+                                    <!-- Why the three are dimmed, when they are. The unlock itself is
+                                         the row's own note below, which covers both acts. -->
+                                    <TextBlock x:Name="tbQuickApplyReason"
+                                               Margin="0,6,0,0"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               Visibility="Collapsed"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
                                     <!-- Outside the disabled group: a reason a dimmed control
                                          cannot state for itself. -->

@@ -80,8 +80,20 @@ public sealed class PresetsQuickApplyTests
         Assert.DoesNotContain("brRomConsent", body, StringComparison.Ordinal);
 
         string reason = MethodBody(ReadPresetsPage(), "private string? QuickApplyReason()");
-        Assert.Contains("Available once Extra GPU power is unlocked.", reason, StringComparison.Ordinal);
         Assert.Contains("GPU clock control on in Settings", reason, StringComparison.Ordinal);
+
+        // "Not unlocked" is not said here any more: the three buttons now share one row with
+        // Apply limits, and that row's note below states the unlock once, for both acts.
+        Assert.DoesNotContain("Available once Extra GPU power is unlocked.", reason, StringComparison.Ordinal);
+        Assert.Contains(
+            "Available once Extra GPU power is unlocked.",
+            MethodBody(ReadPresetsPage(), "private void RenderRailLimits()"), StringComparison.Ordinal);
+
+        // The shared row is never dimmed as a whole - the quick sets are gated on the unlock and
+        // the consent, Apply limits on the sliders it writes, so each carries its own state.
+        string page = ReadPresetsPage();
+        Assert.DoesNotContain("spRomActionRow.IsEnabled", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("spRomActionRow.Opacity", page, StringComparison.Ordinal);
 
         // Consent is the one gap the row does not explain: the unticked statement is directly
         // above the buttons. The behaviour stays - the buttons are still gated on it.

@@ -1171,7 +1171,6 @@
   "Apply 200 W": "Primijeni 200 W",
   "Apply 225 W": "Primijeni 225 W",
   "Apply 250 W": "Primijeni 250 W",
-  "Quick configurations": "Brze konfiguracije",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Nije izmjereno kao cilj: koristi testirane struje tračnica od 225 W, čije su granice znatno iznad onoga što 200 W treba. Takt se ne dira.",
   "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.": "Testirana razina: 214 W na ploči, vruća točka 58-63 °C s priključenim tekućinskim hlađenjem. Takt se ne dira.",
   "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.": "Naša je jedinica izmjerila 248,5 W vršno i 236 W prosječno, 183 W čipa na 0,985-0,995 V i 2947 MHz, s +245 MHz jezgre i +1500 MHz memorije. Ti su pomaci takta rezultat ovog primjerka i mogu biti nestabilni na drugoj kartici.",

@@ -1171,7 +1171,6 @@
   "Apply 200 W": "Laksanakan 200 W",
   "Apply 225 W": "Laksanakan 225 W",
   "Apply 250 W": "Laksanakan 250 W",
-  "Quick configurations": "Konfigurasi pantas",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Tidak diukur sebagai sasaran: ia menggunakan arus rel 225 W yang diuji, yang hadnya jauh melebihi keperluan 200 W. Jam tidak diubah.",
   "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.": "Tahap yang diuji: 214 W kuasa papan, titik panas 58-63 °C dengan penyejuk cecair disambung. Jam tidak diubah.",
   "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.": "Unit kami mengukur 248.5 W puncak dan 236 W purata, cip 183 W pada 0.985-0.995 V dan 2947 MHz, dengan +245 MHz teras dan +1500 MHz memori. Offset jam itu ialah hasil sampel ini dan mungkin tidak stabil pada kad lain.",

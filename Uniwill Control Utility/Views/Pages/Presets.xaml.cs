@@ -2311,12 +2311,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             btnApply250.IsEnabled = measuredEnabled;
             btnApply250.Opacity = measuredEnabled ? 1.0 : 0.5;
 
-            // With Power boost mode off the card shows one line and Restore stock, so the quick
-            // configurations are gone with the rest of the actions - and the rule that separates
-            // them goes too, or it would sit under the row with nothing beneath it.
-            spQuickApply.Visibility = appliedWhileOff ? Visibility.Collapsed : Visibility.Visible;
-            brQuickDivider.Visibility = appliedWhileOff ? Visibility.Collapsed : Visibility.Visible;
-
+            // The quick configurations and Apply limits share one row inside spRailSection, which
+            // the "still applied, feature off" state collapses as a whole - so that state needs no
+            // lines of its own here.
             string? quickReason = QuickApplyReason();
             tbQuickApplyReason.Text = quickReason ?? string.Empty;
             tbQuickApplyReason.Visibility = quickReason is null ? Visibility.Collapsed : Visibility.Visible;
@@ -2386,8 +2383,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Why the quick configurations are dimmed, or null while they are available. A dimmed
-        /// group cannot say this for itself, so the card says it once - except for consent, which
-        /// the statement directly above the buttons states by not being ticked.
+        /// button cannot say this for itself, so the card says it once - except for consent, which
+        /// the statement above the row states by not being ticked, and the unlock, which the row's
+        /// own note states for both acts.
         /// </summary>
         private string? QuickApplyReason()
         {
@@ -2397,8 +2395,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool applied = _romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked
                            || _romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain;
 
+            // "Not unlocked" is the shared note's line, not this one's: the row it sits under now
+            // explains both acts with one sentence.
             if (!applied)
-                return LocalizationService.Get("Available once Extra GPU power is unlocked.");
+                return null;
 
             if (!Settings.Default.EnableGpuClockControl)
                 return LocalizationService.Get("The 250 W set writes this unit's clock offsets, so it needs GPU clock control on in Settings. The other two leave the clocks alone.");
@@ -2906,8 +2906,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Dimmed as one group, so "not available" never looks like three unrelated
-            // controls that happen to be off.
-            spRailControls.IsEnabled = applied && bounded && !_railLimitsBusy;
+            // controls that happen to be off. Apply limits sits outside that group - it shares
+            // its row with the quick sets, whose gate is a different one - so it carries the
+            // same state on itself.
+            bool usable = applied && bounded && !_railLimitsBusy;
+            spRailControls.IsEnabled = usable;
+            btnRailApply.IsEnabled = usable;
+            btnRailApply.Opacity = usable ? 1.0 : 0.5;
 
             string? refusal = _railLimitsError ?? rails?.Reason;
             tbRailReason.Text = RomReasonLine(refusal);

@@ -12,7 +12,8 @@ namespace Uniwill_Control_Utility.Tests.UI;
 ///     that persists them (the engine saves a successful write for the next boot), and it reads
 ///     no preset;
 ///   - the sliders keep their row, their gating note and their caution, with one rule separating
-///     them from the quick configurations.
+///     them from the action row below - where the quick sets' Apply limits shares the line with
+///     the quick configurations, each control gated on its own.
 /// </summary>
 public sealed class PresetsRailWriteTests
 {
@@ -67,13 +68,19 @@ public sealed class PresetsRailWriteTests
         Assert.Contains("Appearance=\"Primary\"", tag, StringComparison.Ordinal);
         Assert.Contains("Click=\"btnRailApply_Click\"", tag, StringComparison.Ordinal);
 
-        // Inside the group the card dims, so an unlock that is not applied disables it with the
-        // note below.
-        int group = xaml.IndexOf("x:Name=\"spRailControls\"", StringComparison.Ordinal);
+        // Below the sliders, in the row it shares with the quick sets - and outside the panel
+        // those sliders are dimmed with, so its own gate is set on the button itself.
+        int sliders = xaml.IndexOf("x:Name=\"sdRailBoardInput\"", StringComparison.Ordinal);
+        int row = xaml.IndexOf("x:Name=\"spRomActionRow\"", StringComparison.Ordinal);
         int button = xaml.IndexOf("x:Name=\"btnRailApply\"", StringComparison.Ordinal);
-        int groupEnd = xaml.IndexOf("x:Name=\"tbRailNote\"", StringComparison.Ordinal);
-        Assert.True(group >= 0 && button > group && groupEnd > button,
-            "Apply limits belongs to the row that is dimmed with it.");
+        int quick = xaml.IndexOf("x:Name=\"btnApply200\"", StringComparison.Ordinal);
+        Assert.True(sliders >= 0 && row > sliders && quick > row && button > quick,
+            "Apply limits follows the quick sets in one row under the sliders.");
+
+        string render = MethodBody(ReadPresetsPage(), "private void RenderRailLimits()");
+        Assert.Contains("bool usable = applied && bounded && !_railLimitsBusy;", render, StringComparison.Ordinal);
+        Assert.Contains("spRailControls.IsEnabled = usable;", render, StringComparison.Ordinal);
+        Assert.Contains("btnRailApply.IsEnabled = usable;", render, StringComparison.Ordinal);
 
         Assert.Contains("private async void btnRailApply_Click(", ReadPresetsPage(), StringComparison.Ordinal);
     }
@@ -97,21 +104,20 @@ public sealed class PresetsRailWriteTests
     }
 
     [Fact]
-    public void OneRuleInTheGapBetweenTheQuickRowAndTheRails()
+    public void OneRuleInTheGapBetweenTheSlidersAndTheActionRow()
     {
-        // Both a trailing rule inside the quick row and the rails' own rule rendered in the same
-        // gap, so the card drew two lines above NVVDD. The rails' one is the survivor: it is the
-        // one the "still applied" state collapses.
+        // The sliders and the row under them - the quick sets and Apply limits - are separated by
+        // exactly one rule: no trailing rule on the sliders plus another on the row.
         string xaml = ReadPresetsXaml();
-        int start = xaml.IndexOf("x:Name=\"spQuickApply\"", StringComparison.Ordinal);
-        int end = xaml.IndexOf("x:Name=\"spRailSection\"", StringComparison.Ordinal);
+        int start = xaml.IndexOf("x:Name=\"sdRailBoardInput\"", StringComparison.Ordinal);
+        int end = xaml.IndexOf("x:Name=\"spRomActionRow\"", StringComparison.Ordinal);
 
-        Assert.True(start >= 0 && end > start, "The quick row and the rails block must exist.");
+        Assert.True(start >= 0 && end > start, "The last rail slider and the action row must exist.");
 
         string gap = xaml.Substring(start, end - start);
         int rules = Regex.Matches(gap, "Height=\"1\"").Count;
 
-        Assert.True(rules == 1, $"The gap between the quick row and the rails carries {rules} rules, not one.");
+        Assert.True(rules == 1, $"The gap between the sliders and the action row carries {rules} rules, not one.");
     }
 
     private static string Handler(string source, string from, string to)
