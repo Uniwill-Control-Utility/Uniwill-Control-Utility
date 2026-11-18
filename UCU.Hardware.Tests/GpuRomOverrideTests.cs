@@ -1626,6 +1626,73 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
+    public void AReadThatFindsTheBudgetShort_AsksTheWatchForTheRepair()
+    {
+        // Field, 0.9.14: the 225 W apply landed and the EC republished 150 W, and the card read
+        // that republish inside the watch's interval — so the read itself is what asks for the
+        // repair (the engine answers the event with a nudge), and the numbers it renders are the
+        // repaired ones. A read never writes: WatchBudget stays the one write path.
+        var budget = new FakeBudget(_log) { Original = new GpuPowerBudget(150_000, 500_000) };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        budget.Reset();
+
+        int asked = 0;
+        store.Unlocked += () => asked++;
+        int sets = budget.Sets.Count;
+
+        GpuRomOverrideStateDto short1 = store.GetState();
+        Assert.Equal(GpuRomOverrideStates.Uncertain, short1.State);
+        Assert.Equal(1, asked);                                    // the read asked for the repair
+        Assert.Equal(150_000, short1.BudgetMilliwatts);
+        Assert.Equal(sets, budget.Sets.Count);                     // and wrote nothing
+
+        // The watch's tick is the repair, and the next read is the repaired numbers.
+        Assert.Equal(GpuBudgetWatchVerdict.Raised, store.WatchBudget().Verdict);
+        GpuRomOverrideStateDto repaired = store.GetState();
+        Assert.Equal(GpuRomOverrideStates.Unlocked, repaired.State);
+        Assert.Equal(225_000, repaired.BudgetMilliwatts);
+        Assert.Equal(1, asked);                                    // a budget at the target asks nothing
+
+        // A read at the target and one with no unlock staged ask nothing either.
+        store.SetEnabled(false);
+        asked = 0;
+        store.GetState();
+        Assert.Equal(0, asked);
+    }
+
+    [Fact]
+    public void ARepairThatCannotBeRaised_StillReadsBackShortWithBothNumbers()
+    {
+        // The hush the card opens for a read it asked the repair for is not a cover-up: the
+        // budget the EC will not part with still reads back as the gap, with both numbers.
+        var budget = new FakeBudget(_log) { Original = new GpuPowerBudget(150_000, 500_000) };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        budget.Reset();
+        budget.Refused = "the EC refused the F7 write";
+
+        int asked = 0;
+        store.Unlocked += () => asked++;
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, store.GetState().State);
+        Assert.Equal(1, asked);
+
+        // The repair ran and was refused: the state still names what the driver enforces.
+        Assert.Equal(GpuBudgetWatchVerdict.Failed, store.WatchBudget().Verdict);
+        GpuRomOverrideStateDto state = store.GetState();
+        Assert.Equal(GpuRomOverrideStates.Uncertain, state.State);
+        Assert.Contains("150 W", state.Reason!, StringComparison.Ordinal);
+        Assert.Contains("225 W", state.Reason!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Watch_StopsWhenTheUnlockIsGone()
     {
         var budget = new FakeBudget(_log);

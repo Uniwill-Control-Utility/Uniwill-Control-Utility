@@ -71,6 +71,21 @@ public sealed class GpuUnlockVerdictTests
     }
 
     [Fact]
+    public void ABudgetBelowTheRequestIsTheGapAReadAsksToRepair()
+    {
+        // The read-triggered repair's own condition: the driver answers min(request, budget),
+        // so a budget under the request is the gap the drift watch is asked to close.
+        Assert.True(GpuUnlockVerdict.BudgetShort(225_000, 150_000));
+        Assert.True(GpuUnlockVerdict.BudgetShort(225_000, 175_000));
+        Assert.False(GpuUnlockVerdict.BudgetShort(225_000, 225_000));
+        Assert.False(GpuUnlockVerdict.BudgetShort(225_000, 250_000));
+
+        // No request means the budget caps nothing, and an unread budget is not a shortfall.
+        Assert.False(GpuUnlockVerdict.BudgetShort(null, 150_000));
+        Assert.False(GpuUnlockVerdict.BudgetShort(225_000, null));
+    }
+
+    [Fact]
     public void TheEnvelopeStatesTheEcCeilingOnce_AndNamesItWhenItIsTheBindingLimit()
     {
         // The clamp keeps the request inside the EC's ceiling, so the ordinary line is the EC's

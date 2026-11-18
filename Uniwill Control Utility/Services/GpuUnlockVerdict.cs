@@ -50,13 +50,21 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// True when the laptop budget is below the request the unlock made, i.e. the driver is
+        /// answering min(request, budget) with the budget. That is the gap the drift watch repairs
+        /// and the one a read can catch seconds before the repair lands.
+        /// </summary>
+        public static bool BudgetShort(int? requestedMilliwatts, int? budgetMilliwatts) =>
+            requestedMilliwatts is int asked && budgetMilliwatts is int budget && budget < asked;
+
+        /// <summary>
         /// The one line the card owes when the machine enforces less than it was asked for
         /// (the EC refusing the cTGP offset is the measured cause), or null when it delivers.
-        /// Nothing while a post-apply verification is open: the EC republishes its own F7
-        /// budget for a few seconds after a write (measured 2026-11-18: the applied 225 W read
-        /// back at 150 W), so the gap the card would name there is the feature recovering, not
-        /// a failure. The last verification pass renders with the window closed, so a shortfall
-        /// that survived it is still said.
+        /// Nothing while a post-apply verification — or the repair a state read asked for — is
+        /// open: the EC republishes its own F7 budget for a few seconds after a write (measured
+        /// 2026-11-18: the applied 225 W read back at 150 W), so the gap the card would name
+        /// there is the feature recovering, not a failure. The re-read that closes either window
+        /// renders with it closed, so a shortfall that survived is still said.
         /// </summary>
         public static string? Shortfall(int? requestedMilliwatts, int? enforcedMilliwatts, bool midRecovery = false)
         {

@@ -2219,6 +2219,17 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _postApplyVerifyRun;
         private bool _postApplyVerifying;
 
+        // A read that finds the driver's laptop budget below the unlock's request has just asked
+        // the engine's drift watch for the repair (the state verb nudges it), so the card re-reads
+        // once instead of showing the republish it is about to fix. The window opens on that read
+        // and closes when the single re-read below has rendered, so a budget that survives the
+        // repair is still said. A running watch is nudged out of its sleep and writes at once; a
+        // watch that had to be started ticks after the engine's 3 s first interval, so four
+        // seconds covers both.
+        private static readonly TimeSpan BudgetRepairWait = TimeSpan.FromSeconds(4);
+
+        private bool _budgetRepairing;
+
         private async Task RefreshRomOverrideAsync()
         {
             _gpuTuning ??= App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
@@ -2241,6 +2252,18 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // not a page failure.
                 DebugLog($"GPU ROM override state unavailable: {ex.Message}");
                 _romOverride = null;
+            }
+
+            // The EC republishes its own F7 seconds after the card is at the tier, and the drift
+            // watch repairs it on its interval: a read that finds the budget short has just asked
+            // the engine for that repair, so one re-read renders the repaired numbers instead of
+            // the gap it is mending. A post-apply window already covers its own apply.
+            if (!_budgetRepairing && !_postApplyVerifying
+                && _romOverride?.Enabled == true
+                && GpuUnlockVerdict.BudgetShort(_romOverride.RequestedLimitMilliwatts, _romOverride.BudgetMilliwatts))
+            {
+                _budgetRepairing = true;
+                _ = RepairBudgetAsync();
             }
 
             RenderRomOverride();
@@ -2320,6 +2343,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             spRomBusy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
 
+            // A state read that found the budget short has asked the drift watch for the repair,
+            // so the card must not accuse itself of the gap it is mending: that sentence is
+            // hushed while the repair this read triggered is outstanding, and the re-read below
+            // renders with the window closed, so a budget that survived it is still named.
+            bool mendingBudget = _budgetRepairing
+                && GpuUnlockVerdict.BudgetShort(state?.RequestedLimitMilliwatts, state?.BudgetMilliwatts);
+
             // One line, and only where there is something to explain: a refusal, a partial
             // apply, a failed read, or the reason an action is dimmed. A clean unlock needs no
             // sentence — the values row on the status card is the state, and the buttons moved
@@ -2336,7 +2366,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                                     "This is refused when the GPU's VBIOS is not the one this build was measured on, or when another tool already holds the override. This card never overwrites an override it did not write: remove it in that tool, then restart the GPU."),
                                 state.Reason)
                             : uncertain
-                                ? WithReason(LocalizationService.Get("Partly applied: the change could not be verified."), state.Reason)
+                                ? (mendingBudget
+                                    ? null
+                                    : WithReason(LocalizationService.Get("Partly applied: the change could not be verified."), state.Reason))
                                 : canUnlock && !powerBoost
                                     ? LocalizationService.Get("Turn on Power boost mode in Settings first.")
                                     : canUnlock && !consent
@@ -2355,7 +2387,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         state?.RequestedLimitMilliwatts,
                         state?.BudgetMilliwatts,
                         state?.CurrentLimitMilliwatts),
-                    _postApplyVerifying);
+                    _postApplyVerifying || _budgetRepairing);
 
             if (shortfall != null)
                 line = line is null ? shortfall : line + "\n" + shortfall;
@@ -2558,6 +2590,25 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _postApplyVerifying = i < PostApplyVerifySchedule.Length - 1;
                 await RefreshRomOverrideAsync().ConfigureAwait(true);
             }
+        }
+
+        /// <summary>
+        /// The one re-read after a state read found the driver's budget below the unlock's
+        /// request. It waits for the drift watch the read nudged to have had its tick, re-reads
+        /// once (still hushed), then closes the window on the same state: a budget that survived
+        /// the repair is named instead of hushed. Only the state read plus a render — the repair
+        /// stays the watch's <c>WatchBudget</c> write.
+        /// </summary>
+        private async Task RepairBudgetAsync()
+        {
+            await Task.Delay(BudgetRepairWait).ConfigureAwait(true);
+
+            // The re-read renders hushed; the window then closes on that same state, so a budget
+            // that survived the repair is said instead of staying hushed.
+            await RefreshRomOverrideAsync().ConfigureAwait(true);
+
+            _budgetRepairing = false;
+            RenderRomOverride();
         }
 
         private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>

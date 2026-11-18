@@ -182,9 +182,11 @@ public sealed class GpuRomOverrideStartupTests
         Assert.Equal(4, overrides.WatchCalls);
 
         // The first tick is the one that catches the EC's own republish after an apply, so it
-        // lands on the short interval; every later tick is the standing watch.
+        // lands on the short interval; every later tick is the standing watch. The standing
+        // interval is ten seconds: the EC republishes at will, and one budget read is one
+        // NVAPI query, so the worst a republish can stand is ten seconds.
         Assert.Equal(GpuRomOverrideStartup.FirstWatchInterval.TotalSeconds, _waits[0].TotalSeconds);
-        Assert.All(_waits.Skip(1), wait => Assert.Equal(30, wait.TotalSeconds));
+        Assert.All(_waits.Skip(1), wait => Assert.Equal(10, wait.TotalSeconds));
         Assert.Single(_lines);   // only the restore that ended it
         Assert.Contains("no longer staged", _lines[0], StringComparison.Ordinal);
     }

@@ -167,8 +167,10 @@ namespace UCU.Hardware.Gpu
         GpuBudgetWatchResult WatchBudget();
 
         /// <summary>
-        /// Raised when a completed apply lands. Only a notification: the engine starts its
-        /// drift watch from it, and nothing in the store reads it back.
+        /// Raised when a completed apply lands, and when a state read finds the laptop budget
+        /// below the target (the EC republished it and the drift watch's repair is due). Only a
+        /// notification: the engine starts its drift watch from it, and nothing in the store
+        /// reads it back.
         /// </summary>
         event Action? Unlocked;
 
@@ -228,7 +230,10 @@ namespace UCU.Hardware.Gpu
         /// </summary>
         private volatile GpuRomOverrideStateDto? _startup;
 
-        /// <summary>Fires when a completed apply lands; see <see cref="IGpuRomOverrideService.Unlocked"/>.</summary>
+        /// <summary>
+        /// Fires when a completed apply lands, and when a state read finds the budget short;
+        /// see <see cref="IGpuRomOverrideService.Unlocked"/>.
+        /// </summary>
         public event Action? Unlocked;
 
         public GpuRomOverrideStore(
@@ -376,7 +381,16 @@ namespace UCU.Hardware.Gpu
                     return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, budget: budget, rails: rails);
 
                 if (BudgetReason(budget, target) is string capped)
+                {
+                    // The EC republishes its own F7 asynchronously, so a read can land in the
+                    // window before the drift watch's next tick repairs it: ask for that tick
+                    // now, so the card does not report a gap the feature is about to close. Only
+                    // the notification - WatchBudget stays the one write path.
+                    if (budget.Budget is GpuPowerBudget held && held.F7Milliwatts < target)
+                        NotifyUnlocked();
+
                     return State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, budget: budget, rails: rails);
+                }
 
                 // Every live witness can hold while a start-up attempt still failed (the
                 // rails it could not move read back as the record maxima): say so instead of
@@ -1008,7 +1022,9 @@ namespace UCU.Hardware.Gpu
             return true;
         }
 
-        /// <summary>An unlock listener's failure must not turn a completed apply into Uncertain.</summary>
+        /// <summary>
+        /// An unlock listener's failure must not turn an apply or a state read into a failure.
+        /// </summary>
         private void NotifyUnlocked()
         {
             try
@@ -1017,7 +1033,7 @@ namespace UCU.Hardware.Gpu
             }
             catch (Exception ex)
             {
-                Log.Information("gpu.set_rom_override: the unlock listener failed: {Type} {Message}", ex.GetType().Name, ex.Message);
+                Log.Information("gpu: the unlock listener failed: {Type} {Message}", ex.GetType().Name, ex.Message);
             }
         }
 

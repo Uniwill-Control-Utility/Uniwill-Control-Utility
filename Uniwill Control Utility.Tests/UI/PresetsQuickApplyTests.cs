@@ -206,12 +206,44 @@ public sealed class PresetsQuickApplyTests
         // While the window is open the shortfall line is quiet; the pass closes it before the
         // last render, so a gap that survived is still said.
         string render = MethodBody(page, "private void RenderRomOverride()");
-        Assert.Contains("_postApplyVerifying);", render, StringComparison.Ordinal);
+        Assert.Contains("_postApplyVerifying || _budgetRepairing);", render, StringComparison.Ordinal);
         Assert.Contains("_postApplyVerifying = i < PostApplyVerifySchedule.Length - 1;", verify, StringComparison.Ordinal);
 
         // The apply's own read-back may have rendered the republished budget already, so the
         // window renders once when it opens.
         Assert.Contains("RenderRomOverride();", MethodBody(page, "private void BeginPostApplyVerify()"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AReadThatFindsTheBudgetShort_ReReadsOnceAndHushesOnlyItsOwnRepair()
+    {
+        // Field, 0.9.14: the EC republished 175 W and the card was opened inside the drift
+        // watch's interval, so it reported a failure that was already being repaired. The read
+        // is the ask (the state verb nudges the watch), and one short re-read renders the
+        // repaired numbers.
+        string page = ReadPresetsPage();
+
+        string refresh = MethodBody(page, "private async Task RefreshRomOverrideAsync()");
+        Assert.Contains("GpuUnlockVerdict.BudgetShort(", refresh, StringComparison.Ordinal);
+        Assert.Contains("_budgetRepairing = true;", refresh, StringComparison.Ordinal);
+        Assert.Contains("RepairBudgetAsync(", refresh, StringComparison.Ordinal);
+
+        // A read is only a read: the repair stays the watch's own write.
+        Assert.DoesNotContain("SetRomOverrideAsync", refresh, StringComparison.Ordinal);
+
+        string repair = MethodBody(page, "private async Task RepairBudgetAsync()");
+        Assert.Contains("await Task.Delay(BudgetRepairWait)", repair, StringComparison.Ordinal);
+        Assert.Contains("await RefreshRomOverrideAsync()", repair, StringComparison.Ordinal);
+        Assert.Contains("_budgetRepairing = false;", repair, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRomOverrideAsync", repair, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRailLimitsAsync", repair, StringComparison.Ordinal);
+
+        // The window opens on the read that asked and closes after its one re-read has rendered,
+        // so a budget that survived the repair is said: both the card's partial-apply sentence
+        // and the shortfall line follow it.
+        string render = MethodBody(page, "private void RenderRomOverride()");
+        Assert.Contains("_postApplyVerifying || _budgetRepairing);", render, StringComparison.Ordinal);
+        Assert.Contains("bool mendingBudget = _budgetRepairing", render, StringComparison.Ordinal);
     }
 
     private static string Handler(string source, string from, string to)

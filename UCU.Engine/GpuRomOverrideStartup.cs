@@ -60,10 +60,11 @@ namespace UCU.Engine
         /// <summary>
         /// How often the drift watch reads the laptop budget. The EC republishes its own F7
         /// whenever the machine's power mode changes (measured 2026-11-18: a 225 W budget at
-        /// 10:27 and the EC's 150 W minutes later), so one read every half minute keeps the
-        /// card at the tier without polling the driver hard.
+        /// 10:27 and the EC's 150 W minutes later), so one read every ten seconds keeps the
+        /// card at the tier without polling the driver hard: one budget read is one NVAPI
+        /// query, and the worst a republish can now stand is ten seconds.
         /// </summary>
-        internal static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(30);
+        internal static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// The watch's first tick, and the one an apply cuts to: the EC republishes its own F7
@@ -127,11 +128,15 @@ namespace UCU.Engine
             await WatchAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        /// <summary>Starts the drift watch unless one is already running (a second apply is not a second timer).</summary>
+        /// <summary>
+        /// Starts the drift watch unless one is already running (a second apply is not a second
+        /// timer).
+        /// </summary>
         private void StartWatch()
         {
-            // A write that lands while the watch sleeps would otherwise wait out the interval
-            // before anything looked at the budget it just moved: cut the sleep short instead.
+            // A write that lands while the watch sleeps — or a state read that catches the EC's
+            // republished budget before the next tick — would otherwise wait out the interval
+            // before anything looked at the budget it just reported: cut the sleep short instead.
             if (Interlocked.Exchange(ref _watching, 1) == 1)
             {
                 Nudge();
@@ -345,7 +350,10 @@ namespace UCU.Engine
             }
         }
 
-        /// <summary>Cuts the current sleep short, so the tick after an apply runs at once.</summary>
+        /// <summary>
+        /// Cuts the current sleep short, so the repair after an apply — or after a state read
+        /// that found the budget short — runs at once.
+        /// </summary>
         private void Nudge()
         {
             lock (_wakeLock)
