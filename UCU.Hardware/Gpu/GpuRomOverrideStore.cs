@@ -171,9 +171,10 @@ namespace UCU.Hardware.Gpu
         private readonly string _markerPath;
 
         /// <summary>
-        /// The last start-up attempt's state (null before one ran, cleared by a completed
-        /// apply). A boot whose re-apply never landed must not read as Unlocked: after a
-        /// driver reset the rails sit at the record maxima, which no live read-back in
+        /// The last attempt's state (null before one ran, cleared by a completed apply or
+        /// settle): a start-up re-apply that did not land, or an apply that stopped after its
+        /// first write. A boot or a failed apply must not read as Unlocked: after a driver
+        /// reset the rails sit at the record maxima, which no live read-back in
         /// <see cref="GetState"/> would call wrong.
         /// </summary>
         private volatile GpuRomOverrideStateDto? _startup;
@@ -327,6 +328,12 @@ namespace UCU.Hardware.Gpu
                         version, limits, request, budget: budget, rails: rails);
                 }
 
+                // The rails are the move the records do not make, and the one a driver reset
+                // takes away: whatever else reads back intact, a card at stock rail currents
+                // is not unlocked.
+                if (RailsReason(rails) is string unrailed)
+                    return State(GpuRomOverrideStates.Uncertain, unrailed, version, limits, request, budget: budget, rails: rails);
+
                 return State(GpuRomOverrideStates.Unlocked, null, version, limits, request, budget: budget, rails: rails);
             }
             catch (Exception ex)
@@ -428,7 +435,9 @@ namespace UCU.Hardware.Gpu
                     foreach ((string name, byte[] data) in desired)
                     {
                         if (!readback.TryGetValue(name, out byte[]? written) || !written.AsSpan().SequenceEqual(data))
-                            return State(GpuRomOverrideStates.Uncertain, $"the '{name}' record did not read back as written", version, limits, request);
+                        {
+                            return Partial(State(GpuRomOverrideStates.Uncertain, $"the '{name}' record did not read back as written", version, limits, request));
+                        }
                     }
 
                     // (c) Only a driver restart makes it re-read the records.
@@ -445,7 +454,7 @@ namespace UCU.Hardware.Gpu
                 // originals file are the intent); it survives a boot only sometimes, so
                 // nothing may depend on it.
                 if (state.State != GpuRomOverrideStates.Unlocked)
-                    return state;
+                    return Partial(state);
 
                 _startup = null;
                 WriteMarker();
@@ -985,6 +994,19 @@ namespace UCU.Hardware.Gpu
                 Log.Information("gpu.set_rom_override: {Type} {Message}", ex.GetType().Name, ex.Message);
                 return State(GpuRomOverrideStates.Uncertain, ex.Message, version, new GpuPowerLimits(null, null), request, budget: budget, rails: rails);
             }
+        }
+
+        /// <summary>
+        /// An Uncertain answer from a path that has already written (the EC offset, the
+        /// records, the rails). It is remembered so the status verb, which reads the live
+        /// witnesses again, cannot report Unlocked over it: after a driver reset the rails
+        /// read back at the record maxima, which is exactly the field case of 0.9.12 — a
+        /// failed re-apply whose rails never moved. A completed apply or settle clears it.
+        /// </summary>
+        private GpuRomOverrideStateDto Partial(GpuRomOverrideStateDto state)
+        {
+            _startup = state;
+            return state;
         }
 
         private GpuRomOverrideStateDto State(

@@ -133,6 +133,8 @@ namespace UCU.Hardware.Gpu
 
         private GpuRailLimits Execute(int? nvvdd, int? msvdd, int? boardInput)
         {
+            using IDisposable session = _calls.Open();
+
             if (!_calls.TryGetGpu(out IntPtr gpu, out string? gpuReason))
                 return GpuRailLimits.Refused(gpuReason ?? "NVAPI enumerated no GPU");
 

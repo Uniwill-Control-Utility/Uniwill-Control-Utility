@@ -78,15 +78,23 @@ namespace UCU.Hardware.Gpu
 
         private const int Kilo = 1000;
 
+        /// <summary>
+        /// The same NVAPI table the rail and budget paths use: one session per operation, and
+        /// the one stale-session retry that lives there. (The pstate writes still ride
+        /// NvAPIWrapper's own module, which cannot be scoped per operation.)
+        /// </summary>
+        private readonly NvApiPowerCalls _nvapi = new();
+
         public GpuTuningResultDto ApplyVfCurveOffsets(IReadOnlyDictionary<int, int> offsetsMhz, int memoryOffsetMhz)
         {
+            using IDisposable session = _nvapi.Open();
+
             try
             {
                 if (!TryGetGpuHandle(out IntPtr gpu))
                     return Refused("no NVAPI GPU handle");
 
-                IntPtr setPtr = NvApi.QueryInterface(NvApi.SetClockBoostTableId);
-                if (setPtr == IntPtr.Zero)
+                if (!_nvapi.TryQuery(NvApi.SetClockBoostTableId, out IntPtr setPtr))
                     return Refused("NvAPI_GPU_SetClockBoostTable (0x0733E009) is not available");
 
                 var setControl = Marshal.GetDelegateForFunctionPointer<NvApi.GpuBufferDelegate>(setPtr);
@@ -152,13 +160,14 @@ namespace UCU.Hardware.Gpu
 
         public GpuTuningResultDto SetDrsPreference(DrsGpuPreference preference)
         {
+            using IDisposable session = _nvapi.Open();
+
             try
             {
                 if (!TryGetGpuHandle(out IntPtr gpu))
                     return Refused("no NVAPI GPU handle");
 
-                IntPtr setPtr = NvApi.QueryInterface(NvApi.SetPreferredGpuId);
-                if (setPtr == IntPtr.Zero)
+                if (!_nvapi.TryQuery(NvApi.SetPreferredGpuId, out IntPtr setPtr))
                     return Refused("NvAPI_GPU_SetPreferredGPU (0x8B34C9A2) is not available");
 
                 var setPreferred = Marshal.GetDelegateForFunctionPointer<NvApi.GpuBufferDelegate>(setPtr);
@@ -352,12 +361,11 @@ namespace UCU.Hardware.Gpu
         /// 0x2420 buffer, walking the usable points in 8-byte mask windows. False when the read
         /// is unavailable or refused - the caller falls back to the from-zero table and says so.
         /// </summary>
-        private static bool TryReadClockBoostTable(IntPtr gpu, out byte[] table)
+        private bool TryReadClockBoostTable(IntPtr gpu, out byte[] table)
         {
             table = Array.Empty<byte>();
 
-            IntPtr getPtr = NvApi.QueryInterface(NvApi.GetClockBoostTableId);
-            if (getPtr == IntPtr.Zero)
+            if (!_nvapi.TryQuery(NvApi.GetClockBoostTableId, out IntPtr getPtr))
                 return false;
 
             var getTable = Marshal.GetDelegateForFunctionPointer<NvApi.GpuBufferDelegate>(getPtr);
@@ -431,7 +439,7 @@ namespace UCU.Hardware.Gpu
         /// read or a fault logs "unverified" rather than claiming either way: this is a witness for
         /// the log, never a second verdict that could turn a landed write into a failure.
         /// </summary>
-        private static void VerifyCurveSurvived(
+        private void VerifyCurveSurvived(
             IntPtr gpu,
             IReadOnlyDictionary<int, int> offsetsMhz,
             int appliedPoints)
@@ -488,42 +496,13 @@ namespace UCU.Hardware.Gpu
             return new GpuTuningResultDto { Succeeded = false, Status = -1, Detail = detail };
         }
 
-        private static bool TryGetGpuHandle(out IntPtr gpu)
-        {
-            gpu = IntPtr.Zero;
-
-            IntPtr initPtr = NvApi.QueryInterface(NvApi.InitializeId);
-            IntPtr enumPtr = NvApi.QueryInterface(NvApi.EnumPhysicalGpusId);
-            if (initPtr == IntPtr.Zero || enumPtr == IntPtr.Zero)
-                return false;
-
-            Marshal.GetDelegateForFunctionPointer<NvApi.InitializeDelegate>(initPtr)();
-
-            IntPtr[] handles = new IntPtr[64];
-            int status = Marshal.GetDelegateForFunctionPointer<NvApi.EnumPhysicalGpusDelegate>(enumPtr)(handles, out int count);
-            if (status != 0 || count <= 0)
-                return false;
-
-            gpu = handles[0];
-            return true;
-        }
+        private bool TryGetGpuHandle(out IntPtr gpu) => _nvapi.TryGetGpu(out gpu, out _);
 
         private static class NvApi
         {
-            internal const uint InitializeId = 0x0150E828;
-            internal const uint EnumPhysicalGpusId = 0xE5AC921F;
             internal const uint SetClockBoostTableId = 0x0733E009;
             internal const uint GetClockBoostTableId = 0x23F1B133;
             internal const uint SetPreferredGpuId = 0x8B34C9A2;
-
-            [DllImport("nvapi64.dll", EntryPoint = "nvapi_QueryInterface", CallingConvention = CallingConvention.Cdecl)]
-            internal static extern IntPtr QueryInterface(uint functionId);
-
-            [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-            internal delegate int InitializeDelegate();
-
-            [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-            internal delegate int EnumPhysicalGpusDelegate([Out] IntPtr[] gpuHandles, out int gpuCount);
 
             [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
             internal delegate int GpuBufferDelegate(IntPtr gpuHandle, [In, Out] byte[] buffer);

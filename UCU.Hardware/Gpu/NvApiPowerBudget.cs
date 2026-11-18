@@ -110,6 +110,12 @@ namespace UCU.Hardware.Gpu
     /// </summary>
     public interface INvApiF7Calls
     {
+        /// <summary>
+        /// Starts one operation's NVAPI session, as <see cref="INvApiPowerCalls.Open"/>: every
+        /// entry point (and the function bodies read for them) belongs to that one load.
+        /// </summary>
+        IDisposable Open() => NvApiNoScope.Instance;
+
         /// <summary><c>nvapi_QueryInterface</c>; false when the driver does not export the id.</summary>
         bool TryQuery(uint id, out IntPtr entry);
 
@@ -189,9 +195,6 @@ namespace UCU.Hardware.Gpu
         private static readonly byte[] SetIdentity = { 0x33, 0xE6, 0x80, 0x20 };
 
         private readonly INvApiF7Calls _calls;
-        private IntPtr _dispatch;
-        private uint _nativeSize;
-        private bool _platformInitialized;
 
         public NvApiPowerBudget()
             : this(new NvApiF7Calls())
@@ -221,16 +224,18 @@ namespace UCU.Hardware.Gpu
 
         private GpuPowerBudgetState Execute(GpuPowerBudget? target)
         {
+            using IDisposable session = _calls.Open();
+
             if (!_calls.TryGetGpu(out IntPtr gpu, out string? gpuReason))
                 return new GpuPowerBudgetState(null, null, gpuReason ?? "NVAPI enumerated no GPU");
 
-            if (!TryResolveDispatch(out string? reason) || !TryInitializePlatform(out reason))
+            if (!TryResolveDispatch(out F7Transport transport, out string? reason) || !TryInitializePlatform(out reason))
                 return new GpuPowerBudgetState(null, null, reason);
 
             if (!TryBoardPolicy(gpu, out int index, out int min, out int max, out reason))
                 return new GpuPowerBudgetState(null, null, reason);
 
-            if (!TryF7(gpu, index, value: null, out int f7, out reason))
+            if (!TryF7(transport, gpu, index, value: null, out int f7, out reason))
                 return new GpuPowerBudgetState(null, null, reason);
 
             if (!TryPlatformRead(out int platform, out reason))
@@ -260,12 +265,12 @@ namespace UCU.Hardware.Gpu
 
             if (want.F7Milliwatts != f7)
             {
-                if (!TryF7(gpu, index, (uint)want.F7Milliwatts, out _, out reason))
+                if (!TryF7(transport, gpu, index, (uint)want.F7Milliwatts, out _, out reason))
                     return new GpuPowerBudgetState(f7, platform, reason);
 
                 // The set is only done when a second read says so. A driver that answers
                 // the set but keeps the old value is the failure this refuses to report.
-                if (!TryF7(gpu, index, value: null, out int readback, out reason))
+                if (!TryF7(transport, gpu, index, value: null, out int readback, out reason))
                     return new GpuPowerBudgetState(f7, platform, reason);
 
                 if (readback != want.F7Milliwatts)
@@ -289,15 +294,15 @@ namespace UCU.Hardware.Gpu
         }
 
         /// <summary>
-        /// The dispatch pointer, resolved once from the two power interfaces' own bodies.
-        /// Every step is a refusal: a signature that is not there (or is there twice), an
-        /// ABI this code does not know, or GET and SET pointing somewhere else.
+        /// The dispatch pointer and the ABI size of this operation's nvapi64, resolved from
+        /// the two power interfaces' own bodies. Every step is a refusal: a signature that is
+        /// not there (or is there twice), an ABI this code does not know, or GET and SET
+        /// pointing somewhere else.
         /// </summary>
-        private bool TryResolveDispatch(out string? reason)
+        private bool TryResolveDispatch(out F7Transport transport, out string? reason)
         {
+            transport = default;
             reason = null;
-            if (_dispatch != IntPtr.Zero)
-                return true;
 
             if (!_calls.TryQuery(NvApiPowerLayout.LimitReadId, out IntPtr get))
             {
@@ -385,16 +390,13 @@ namespace UCU.Hardware.Gpu
                 return false;
             }
 
-            _nativeSize = nativeSize;
-            _dispatch = new IntPtr(target);
+            transport = new F7Transport(new IntPtr(target), nativeSize);
             return true;
         }
 
         private bool TryInitializePlatform(out string? reason)
         {
             reason = null;
-            if (_platformInitialized)
-                return true;
 
             if (!_calls.TryQuery(NvApiF7Layout.PlatformInitializeId, out IntPtr initialize))
             {
@@ -411,7 +413,6 @@ namespace UCU.Hardware.Gpu
                 return false;
             }
 
-            _platformInitialized = true;
             return true;
         }
 
@@ -463,9 +464,10 @@ namespace UCU.Hardware.Gpu
         /// The response is the driver's own echo, so every documented field is checked and
         /// every other byte from 0x38 on must still be the zero this code wrote.
         /// </summary>
-        private bool TryF7(IntPtr gpu, int index, uint? value, out int result, out string? reason)
+        private bool TryF7(F7Transport transport, IntPtr gpu, int index, uint? value, out int result, out string? reason)
         {
             result = 0;
+            uint nativeSize = transport.NativeSize;
 
             ulong handle = unchecked((ulong)gpu.ToInt64());
             if (index < 0 || index >= NvApiF7Layout.MaxBoardIndex || handle == 0 || handle > uint.MaxValue)
@@ -476,15 +478,15 @@ namespace UCU.Hardware.Gpu
 
             uint method = value is null ? NvApiF7Layout.GetMethod : NvApiF7Layout.SetMethod;
             int offset = NvApiF7Layout.ValueOffset + index * NvApiF7Layout.ValueStride;
-            if (offset + 8 > _nativeSize)
+            if (offset + 8 > nativeSize)
             {
                 reason = "the F7 ABI is too small for this board index";
                 return false;
             }
 
-            byte[] guarded = new byte[_nativeSize + 2 * NvApiPowerLayout.GuardBandLength];
+            byte[] guarded = new byte[nativeSize + 2 * NvApiPowerLayout.GuardBandLength];
             guarded.AsSpan().Fill(NvApiPowerLayout.GuardByte);
-            Array.Clear(guarded, NvApiPowerLayout.GuardBandLength, (int)_nativeSize);
+            Array.Clear(guarded, NvApiPowerLayout.GuardBandLength, (int)nativeSize);
 
             int at = NvApiPowerLayout.GuardBandLength;
             Write32(guarded, at + NvApiF7Layout.HandleOffset, (uint)handle);
@@ -498,7 +500,7 @@ namespace UCU.Hardware.Gpu
             try
             {
                 if (!_calls.TryDispatch(
-                        _dispatch, NvApiF7Layout.DispatchMethod, pin.AddrOfPinnedObject() + at, _nativeSize, out status, out reason))
+                        transport.Dispatch, NvApiF7Layout.DispatchMethod, pin.AddrOfPinnedObject() + at, nativeSize, out status, out reason))
                 {
                     return false;
                 }
@@ -523,7 +525,7 @@ namespace UCU.Hardware.Gpu
                 return false;
             }
 
-            for (int i = 0x38; i < _nativeSize; i++)
+            for (int i = 0x38; i < nativeSize; i++)
             {
                 if (i == 0x38 ||
                     i == offset - 4 || i == offset - 3 ||
@@ -715,6 +717,12 @@ namespace UCU.Hardware.Gpu
 
         private static void Write32(byte[] buffer, int offset, uint value) =>
             BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(offset, 4), value);
+
+        /// <summary>
+        /// The dispatch entry and ABI size resolved from this operation's nvapi64: they are a
+        /// pointer into the image that answered, so they die with the session that loaded it.
+        /// </summary>
+        private readonly record struct F7Transport(IntPtr Dispatch, uint NativeSize);
     }
 
     /// <summary>
@@ -746,20 +754,13 @@ namespace UCU.Hardware.Gpu
 
         private readonly NvApiPowerCalls _gpu = new();
 
-        public bool TryQuery(uint id, out IntPtr entry)
-        {
-            entry = IntPtr.Zero;
+        /// <summary>
+        /// The same nvapi64 load the GPU handle came from: the entry points and the code
+        /// pages the F7 checks read are one image, alive for this operation only.
+        /// </summary>
+        public IDisposable Open() => _gpu.Open();
 
-            try
-            {
-                entry = QueryInterface(id);
-                return entry != IntPtr.Zero;
-            }
-            catch (DllNotFoundException)
-            {
-                return false;
-            }
-        }
+        public bool TryQuery(uint id, out IntPtr entry) => _gpu.TryQuery(id, out entry);
 
         public bool TryGetGpu(out IntPtr gpu, out string? reason) => _gpu.TryGetGpu(out gpu, out reason);
 
@@ -880,9 +881,6 @@ namespace UCU.Hardware.Gpu
                 return false;
             }
         }
-
-        [DllImport("nvapi64.dll", EntryPoint = "nvapi_QueryInterface")]
-        private static extern IntPtr QueryInterface(uint id);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr RtlLookupFunctionEntry(ulong controlPc, out ulong imageBase, IntPtr historyTable);

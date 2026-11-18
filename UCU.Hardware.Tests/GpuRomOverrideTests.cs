@@ -900,6 +900,40 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
+    public void State_AfterAFailedRailsApply_DoesNotReportUnlocked()
+    {
+        // Field 0.9.12: the apply stopped at the rails (NVAPI -6 after the GPU restart) while
+        // the records, the EC offset, the budget and — from the unlock before the reboot —
+        // the driver's request all still matched. The status verb reads the live witnesses
+        // again, so the rails are one of them: a card at stock currents is not unlocked.
+        var registry = new FakeRomRegistry(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log) { Answer = new GpuPowerRequestState(225_000, 5_000, 250_000, null) };
+        var budget = new FakeBudget(_log) { Current = new GpuPowerBudget(225_000, 500_000) };
+        var rails = new FakeRails(_log) { Refused = "EnumPhysicalGPUs failed (status -6)" };
+        GpuRomOverrideStore store = NewStore(registry, new FakeRestarter(_log), ceiling, ec, request, budget, rails);
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, store.SetEnabled(true).State);
+
+        // What the earlier unlock left in the driver: the budget raised and the request made
+        // (the restart republished the EC's own 150 W budget).
+        budget.Current = new GpuPowerBudget(225_000, 500_000);
+
+        GpuRomOverrideStateDto sameRun = store.GetState();
+        Assert.Equal(GpuRomOverrideStates.Uncertain, sameRun.State);
+        Assert.Contains("rails", sameRun.Reason!, StringComparison.Ordinal);
+
+        // The engine restarted since (no remembered verdict): the live rail read alone must
+        // keep the same answer.
+        GpuRomOverrideStateDto nextRun = NewStore(
+            registry, new FakeRestarter(_log), ceiling, new FakeEc(_log), request, budget, rails).GetState();
+
+        Assert.Equal(GpuRomOverrideStates.Uncertain, nextRun.State);
+        Assert.Contains("NVVDD", nextRun.Reason!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Restore_PutsTheRailsBackToStock_BeforeTheRestart()
     {
         var rails = new FakeRails(_log);

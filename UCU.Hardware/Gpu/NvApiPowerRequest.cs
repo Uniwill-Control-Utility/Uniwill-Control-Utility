@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
+using Serilog;
 
 namespace UCU.Hardware.Gpu
 {
@@ -51,6 +52,13 @@ namespace UCU.Hardware.Gpu
     /// </summary>
     public interface INvApiPowerCalls
     {
+        /// <summary>
+        /// Starts one operation's NVAPI session: every entry point resolved until the
+        /// returned scope is disposed belongs to the same load of nvapi64. A scripted table
+        /// has no module to load, so its default is a no-op scope.
+        /// </summary>
+        IDisposable Open() => NvApiNoScope.Instance;
+
         /// <summary><c>nvapi_QueryInterface</c>; false when the driver does not export the id.</summary>
         bool TryResolve(uint id, out NvApiGpuCall call);
 
@@ -109,6 +117,8 @@ namespace UCU.Hardware.Gpu
 
         private GpuPowerRequestState Execute(int? request)
         {
+            using IDisposable session = _calls.Open();
+
             if (!_calls.TryGetGpu(out IntPtr gpu, out string? gpuReason))
                 return new GpuPowerRequestState(null, null, null, gpuReason ?? "NVAPI enumerated no GPU");
 
@@ -341,55 +351,103 @@ namespace UCU.Hardware.Gpu
     }
 
     /// <summary>
-    /// The production table: <c>nvapi64.dll</c>'s <c>nvapi_QueryInterface</c>. The
-    /// document's own probe (docs/gpu/NvBiosProbe) loads NVAPI the same way.
+    /// The production table: <c>nvapi64.dll</c>'s <c>nvapi_QueryInterface</c>, resolved from a
+    /// module loaded for one operation and freed at its end. NVAPI binds its session to the
+    /// display driver instance it first meets; the engine's own GPU restart replaces that
+    /// instance, and a session that outlived it answers <c>NVAPI_DEVICE_NOT_FOUND</c> (-6) for
+    /// the rest of the process. A session opened now binds to the driver that is there now,
+    /// and one stale answer gets exactly one reload — the retry rule of the whole NVAPI
+    /// surface, because every path (power policy, rails, budget, VBIOS probe, tuning)
+    /// resolves its entry points here.
     /// </summary>
     public sealed class NvApiPowerCalls : INvApiPowerCalls
     {
+        private readonly INvApiModuleLoader _loader;
+
+        /// <summary>
+        /// The session of the current operation, per thread: the GPU verbs are ordered on the
+        /// engine's domain queue while the start-up settle pass runs on its own thread, and
+        /// one module cannot be shared (or freed) between them.
+        /// </summary>
+        private readonly ThreadLocal<Session?> _session = new();
+
+        public NvApiPowerCalls()
+            : this(NvApiModule.Loader)
+        {
+        }
+
+        public NvApiPowerCalls(INvApiModuleLoader loader) => _loader = loader;
+
+        public IDisposable Open()
+        {
+            _session.Value = Load();
+            return new Scope(this);
+        }
+
         public bool TryResolve(uint id, out NvApiGpuCall call)
         {
             call = null!;
-
-            try
-            {
-                IntPtr entry = QueryInterface(id);
-                if (entry == IntPtr.Zero)
-                    return false;
-
-                call = Marshal.GetDelegateForFunctionPointer<NvApiGpuCall>(entry);
-                return true;
-            }
-            catch (DllNotFoundException)
-            {
+            if (!TryQuery(id, out IntPtr entry))
                 return false;
-            }
+
+            call = Marshal.GetDelegateForFunctionPointer<NvApiGpuCall>(entry);
+            return true;
+        }
+
+        /// <summary>
+        /// <c>nvapi_QueryInterface</c> from this operation's session (the nvapi64 function
+        /// bodies the F7 path disassembles come from the same image).
+        /// </summary>
+        public bool TryQuery(uint id, out IntPtr entry)
+        {
+            if (Current().Module is INvApiModuleTable module)
+                return module.TryQuery(id, out entry);
+
+            entry = IntPtr.Zero;
+            return false;
         }
 
         public bool TryGetGpu(out IntPtr gpu, out string? reason)
         {
             gpu = IntPtr.Zero;
+            if (TryEnumerate(out gpu, out int status, out reason))
+                return true;
+
+            // The session went away with the driver instance it bound to (our own GPU
+            // restart). One fresh module and one retry; a second answer is the report.
+            if (!NvApiModule.IsStale(status) || !Reload(out reason))
+                return false;
+
+            Log.Information("NVAPI session was stale (-6) after the GPU restart; reloaded nvapi64 and retried");
+
+            return TryEnumerate(out gpu, out _, out reason);
+        }
+
+        /// <summary><c>nvapi_Initialize</c> + <c>EnumPhysicalGPUs</c> on the current session.</summary>
+        private bool TryEnumerate(out IntPtr gpu, out int status, out string? reason)
+        {
+            gpu = IntPtr.Zero;
+            status = 0;
             reason = null;
 
             try
             {
-                IntPtr initialize = QueryInterface(NvApiPowerLayout.InitializeId);
-                if (initialize == IntPtr.Zero)
+                if (!TryQuery(NvApiPowerLayout.InitializeId, out IntPtr initialize))
                 {
-                    reason = NvApiPowerLayout.Unavailable(NvApiPowerLayout.InitializeId);
+                    reason = LoadReason ?? NvApiPowerLayout.Unavailable(NvApiPowerLayout.InitializeId);
                     return false;
                 }
 
-                int status = Marshal.GetDelegateForFunctionPointer<InitializeCall>(initialize)();
+                status = Marshal.GetDelegateForFunctionPointer<InitializeCall>(initialize)();
                 if (status != 0)
                 {
                     reason = $"nvapi_Initialize failed (status {status})";
                     return false;
                 }
 
-                IntPtr enumerate = QueryInterface(NvApiPowerLayout.EnumPhysicalGpusId);
-                if (enumerate == IntPtr.Zero)
+                if (!TryQuery(NvApiPowerLayout.EnumPhysicalGpusId, out IntPtr enumerate))
                 {
-                    reason = NvApiPowerLayout.Unavailable(NvApiPowerLayout.EnumPhysicalGpusId);
+                    reason = LoadReason ?? NvApiPowerLayout.Unavailable(NvApiPowerLayout.EnumPhysicalGpusId);
                     return false;
                 }
 
@@ -410,18 +468,68 @@ namespace UCU.Hardware.Gpu
                 gpu = handles[0];
                 return true;
             }
-            catch (DllNotFoundException)
+            catch (Exception ex) when (ex is DllNotFoundException or ArgumentException or MarshalDirectiveException)
             {
-                reason = "nvapi64.dll is not available on this machine";
+                reason = $"NVAPI could not be called: {ex.Message}";
                 return false;
             }
         }
 
-        [DllImport("nvapi64.dll", EntryPoint = "nvapi_QueryInterface")]
-        private static extern IntPtr QueryInterface(uint id);
+        private string? LoadReason => _session.Value?.Reason;
 
-        private delegate int InitializeCall();
+        private Session Current()
+        {
+            if (_session.Value is Session open)
+                return open;
 
-        private delegate int EnumPhysicalGpusCall([Out] IntPtr[] handles, out uint count);
+            // No operation opened a session on this thread: one is loaded for it, as before.
+            Session lazy = Load();
+            _session.Value = lazy;
+            return lazy;
+        }
+
+        private Session Load()
+        {
+            Close();
+            return _loader.TryLoad(out INvApiModuleTable? table, out string? reason)
+                ? new Session(table, null)
+                : new Session(null, reason);
+        }
+
+        private bool Reload(out string? reason)
+        {
+            _session.Value = Load();
+            reason = _session.Value?.Reason;
+            return _session.Value?.Module != null;
+        }
+
+        private void Close()
+        {
+            if (_session.Value is not Session open)
+                return;
+
+            open.Module?.Dispose();
+            _session.Value = null;
+        }
+
+        /// <summary>One module load: the table, or why the load failed.</summary>
+        private sealed record Session(INvApiModuleTable? Module, string? Reason);
+
+        /// <summary>The scope one operation holds: closing it frees the module it opened.</summary>
+        private sealed class Scope : IDisposable
+        {
+            private readonly NvApiPowerCalls _calls;
+
+            public Scope(NvApiPowerCalls calls) => _calls = calls;
+
+            public void Dispose() => _calls.Close();
+        }
+
+        /// <summary>The two <c>nvapi64</c> shapes every path needs; internal for the session tests.</summary>
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int InitializeCall();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int EnumPhysicalGpusCall([Out] IntPtr[] handles, out uint count);
     }
 }

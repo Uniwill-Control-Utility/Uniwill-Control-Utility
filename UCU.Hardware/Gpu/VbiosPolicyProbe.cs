@@ -92,6 +92,8 @@ namespace UCU.Hardware.Gpu
 
         public VbiosPolicyState Read()
         {
+            using IDisposable session = _calls.Open();
+
             if (!_calls.TryGetGpu(out IntPtr gpu, out string? gpuReason))
                 return VbiosPolicyState.Failed(gpuReason ?? "NVAPI enumerated no GPU");
 
