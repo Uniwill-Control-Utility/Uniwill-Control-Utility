@@ -1660,6 +1660,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             presets[slotIndex].CpuCoPerCore = (int[])_coPerCore.Clone();
             presets[slotIndex].CpuCoUnifiedValue = sdCoUnified.Value;
 
+            // The rail currents travel with the slot. Stamped only while the rail row is bound and
+            // usable: with the unlock off (or a failed read) the sliders carry no owner choice, and
+            // the slot keeps the values it already has.
+            if (spRailControls.IsEnabled)
+            {
+                presets[slotIndex].GpuRailNvvddMilliamps = Quantize(sdRailNvvdd.Value, 0);
+                presets[slotIndex].GpuRailMsvddMilliamps = Quantize(sdRailMsvdd.Value, 0);
+                presets[slotIndex].GpuRailBoardInputMilliamps = Quantize(sdRailBoardInput.Value, 3);
+            }
+
             // Also save V-F curve offsets from editor if active
             if (_vfActivePreset >= 0)
             {
@@ -1733,6 +1743,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _coPerCore = preset.CpuCoPerCore ?? Array.Empty<int>();
                 sdCoUnified.Value = preset.CpuCoUnifiedValue;
 
+                // The slot's rail currents: recorded here and rendered by RenderRailLimits once
+                // the driver's policy bounds the sliders (a value assigned before the bounds are
+                // read would be clamped to the slider's placeholder range).
+                _presetRails = (preset.GpuRailNvvddMilliamps, preset.GpuRailMsvddMilliamps, preset.GpuRailBoardInputMilliamps);
+
                 // Sync CO visibility after programmatic IsChecked change (events don't fire)
                 updateCoVisibility();
 
@@ -1766,6 +1781,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
+                _presetRails = null;
                 DebugLog($"LoadCustomPreset: slot {slotIndex + 1} is empty, skipping");
             }
         }
@@ -2190,6 +2206,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         private string? _railLimitsError;
         private string? _railLimitsNote;
         private bool _railBinding;
+
+        // The loaded Custom slot's rail currents. Set on a slot load and preferred over the
+        // driver's live reading while it stands, because the slot is the owner's saved choice;
+        // a slider move clears it (that move is the session's value, remembered only by Save).
+        private (int Nvvdd, int Msvdd, int Board)? _presetRails;
 
         // The tested tier's rails and the stock rails, the UI's own copy of what the engine
         // ships (RomOverrideLayout.Stock*MilliAmps in UCU.Hardware, which this project does
@@ -2888,20 +2909,48 @@ namespace Uniwill_Control_Utility.Views.Pages
             // controls that happen to be off.
             spRailControls.IsEnabled = applied && bounded && !_railLimitsBusy;
 
+            // A loaded slot's rails are what the row shows: bounds above are set, so the values
+            // land inside the driver's policy instead of the slider's placeholder range.
+            if (bounded)
+                ApplyPresetRailsToSliders();
+
             string? refusal = _railLimitsError ?? rails?.Reason;
             tbRailReason.Text = RomReasonLine(refusal);
             tbRailReason.Visibility = string.IsNullOrEmpty(tbRailReason.Text) ? Visibility.Collapsed : Visibility.Visible;
 
-            // There is no button of their own any more, so the row says how a moved slider
-            // reaches the hardware - and that the page's Apply is what keeps it for the next boot.
+            // No line of their own: the caption above says where the values live, and a refusal
+            // or a failed read is what the row has to explain. Silence otherwise.
             tbRailNote.Text = !applied
                 ? LocalizationService.Get("Available once Extra GPU power is unlocked.")
                 : !bounded
                     ? LocalizationService.Get("The current limits could not be read.")
-                    : _railLimitsNote ?? LocalizationService.Get("Written when you press Apply, and kept for the next boot.");
+                    : _railLimitsNote ?? string.Empty;
+            tbRailNote.Visibility = string.IsNullOrEmpty(tbRailNote.Text) ? Visibility.Collapsed : Visibility.Visible;
 
             UpdateRailReadouts();
             UpdateRailCaution();
+        }
+
+        /// <summary>
+        /// Moves the three sliders to the loaded slot's rail currents, inside the bounds
+        /// <see cref="BindRail"/> just set. Silent while no slot is loaded or the row is unbound.
+        /// </summary>
+        private void ApplyPresetRailsToSliders()
+        {
+            if (_currentProfile != "Custom" || _presetRails is not (int nvvdd, int msvdd, int board))
+                return;
+
+            _railBinding = true;
+            try
+            {
+                sdRailNvvdd.Value = Math.Clamp(nvvdd, sdRailNvvdd.Minimum, sdRailNvvdd.Maximum);
+                sdRailMsvdd.Value = Math.Clamp(msvdd, sdRailMsvdd.Minimum, sdRailMsvdd.Maximum);
+                sdRailBoardInput.Value = Math.Clamp(board, sdRailBoardInput.Minimum, sdRailBoardInput.Maximum);
+            }
+            finally
+            {
+                _railBinding = false;
+            }
         }
 
         /// <summary>
@@ -2983,6 +3032,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             _railLimitsNote = null;
+            _presetRails = null;   // a move is this session's value; only Save remembers it
             UpdateRailReadouts();
             UpdateRailCaution();
         }

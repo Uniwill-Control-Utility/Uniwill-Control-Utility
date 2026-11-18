@@ -57,10 +57,45 @@ public sealed class PresetsRailWriteTests
         Assert.DoesNotContain("btnRailApply", ReadPresetsXaml(), StringComparison.Ordinal);
         Assert.DoesNotContain("btnRailApply", ReadPresetsPage(), StringComparison.Ordinal);
 
-        // The sliders explain themselves: why they are inert, and how a move reaches the driver.
+        // The sliders explain themselves: why they are inert. There is no second line about how a
+        // move is kept - the caption above the row says the currents belong to the profile.
         string source = ReadPresetsPage();
         Assert.Contains("Available once Extra GPU power is unlocked.", source, StringComparison.Ordinal);
-        Assert.Contains("Written when you press Apply, and kept for the next boot.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Written when you press Apply, and kept for the next boot.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Written when you press Apply, and kept for the next boot.", ReadPresetsXaml(), StringComparison.Ordinal);
+        Assert.Contains("The rail currents are saved with the profile.", ReadPresetsXaml(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheRailsTravelWithTheSlot()
+    {
+        string page = ReadPresetsPage();
+
+        // Save stamps the three sliders into the slot it saves.
+        string save = MethodBody(page, "private void SaveCustomPreset(int slotIndex)");
+        Assert.Contains("GpuRailNvvddMilliamps = Quantize(sdRailNvvdd.Value, 0)", save, StringComparison.Ordinal);
+        Assert.Contains("GpuRailMsvddMilliamps = Quantize(sdRailMsvdd.Value, 0)", save, StringComparison.Ordinal);
+        Assert.Contains("GpuRailBoardInputMilliamps = Quantize(sdRailBoardInput.Value, 3)", save, StringComparison.Ordinal);
+
+        // Load reads them back, and the card's render puts them on the sliders once the driver's
+        // policy has bounded them (a value assigned earlier would clamp to the placeholder range).
+        string load = MethodBody(page, "private void LoadCustomPreset(int slotIndex)");
+        Assert.Contains("_presetRails = (preset.GpuRailNvvddMilliamps", load, StringComparison.Ordinal);
+        Assert.Contains("ApplyPresetRailsToSliders();", page, StringComparison.Ordinal);
+
+        // The write itself keeps reading the sliders: after a load they hold the slot's values,
+        // and an unsaved move is this session's value.
+        Assert.Contains("Quantize(sdRailNvvdd.Value, 0)", MethodBody(page,
+            "private async Task<(string? Note, string? Error)> WriteRailLimitsAsync()"), StringComparison.Ordinal);
+
+        // The boot / tray / watcher apply carries the slot's rails the same way, scoped to the unlock.
+        string applier = File.ReadAllText(Path.Combine(RepositoryRoot(), "Uniwill Control Utility", "Services", "PresetProfileApplier.cs"));
+        Assert.Contains("await ApplyRailsFromPresetAsync(customSlot, customMode)", applier, StringComparison.Ordinal);
+        string rails = MethodBody(applier, "private static async Task ApplyRailsFromPresetAsync(");
+        Assert.Contains("preset.GpuRailNvvddMilliamps", rails, StringComparison.Ordinal);
+        Assert.Contains("preset.GpuRailMsvddMilliamps", rails, StringComparison.Ordinal);
+        Assert.Contains("preset.GpuRailBoardInputMilliamps", rails, StringComparison.Ordinal);
+        Assert.Contains("if (!state.Enabled)", rails, StringComparison.Ordinal);
     }
 
     private static string MethodBody(string source, string signature)

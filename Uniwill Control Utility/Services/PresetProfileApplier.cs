@@ -446,6 +446,63 @@ namespace Uniwill_Control_Utility.Services
             // the slider the owner just applied is the intention, so the unlock's request,
             // F7 raise and cTGP offset move to it without a second click.
             await RetargetUnlockAsync(profileName, TargetTgpMilliwatts(profileName), "Preset").ConfigureAwait(false);
+
+            // 6. The rail currents the slot carries, in the same order the page's Apply uses:
+            // after the target (its restart raises the rail policy) and before anything reads
+            // the rails back. This is what makes them the profile's on the boot path too.
+            await ApplyRailsFromPresetAsync(customSlot, customMode).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Carries a Custom slot's rail currents to the driver, the way the page's Apply does.
+        /// Scoped to the unlock: the rails live in the policy it raises, so with no override
+        /// applied nothing is written and nothing is said. Best effort — a refusal or a
+        /// transport failure is logged, never thrown, because the preset's power limits have
+        /// already landed by this point.
+        /// </summary>
+        private static async Task ApplyRailsFromPresetAsync(int slot, Models.PresetMode mode)
+        {
+            if (slot < 0)
+                return;
+
+            var presets = CustomPresetStore.Load(mode);
+            if (slot >= presets.Length)
+                return;
+
+            CustomPreset preset = presets[slot];
+            string name = DisplayName(CustomProfileKey(slot, mode));
+
+            UCU.Contracts.Capabilities.IGpuTuningCapability? gpu =
+                App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
+            if (gpu is null)
+                return;
+
+            string rails = $"{preset.GpuRailNvvddMilliamps / 1000.0:0.##}/{preset.GpuRailMsvddMilliamps / 1000.0:0.##}/{preset.GpuRailBoardInputMilliamps / 1000.0:0.###} A";
+
+            try
+            {
+                UCU.Contracts.GpuRomOverrideStateDto state = await gpu.GetRomOverrideStateAsync().ConfigureAwait(false);
+                if (!state.Enabled)
+                {
+                    Scripts.Misc.DiagnosticLogger.LogInfo(
+                        $"[Preset] {name} rails {rails} not written: Extra GPU power is not applied");
+                    return;
+                }
+
+                UCU.Contracts.GpuRailLimitsDto answer = await gpu.SetRailLimitsAsync(
+                    preset.GpuRailNvvddMilliamps,
+                    preset.GpuRailMsvddMilliamps,
+                    preset.GpuRailBoardInputMilliamps).ConfigureAwait(false);
+
+                Scripts.Misc.DiagnosticLogger.LogInfo(answer.Reason is null
+                    ? $"[Preset] {name} rails set to {rails}"
+                    : $"[Preset] {name} rails refused: {answer.Reason}");
+            }
+            catch (Exception ex)
+            {
+                Scripts.Misc.DiagnosticLogger.LogInfo(
+                    $"[Preset] {name} rail write failed: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         /// <summary>

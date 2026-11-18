@@ -957,78 +957,100 @@
                                      button's caption is its tooltip, so the row is one line and the
                                      numbers stay one hover - or one Tab stop - away. The 250 W set's
                                      adapter caution keeps a visible marker on the button itself: a
-                                     caution may not live only in a tooltip. -->
+                                     caution may not live only in a tooltip. Label and buttons share
+                                     one row: the label is the row's left column, the three buttons
+                                     its right. Each button carries that tier's warning colour as its
+                                     fill; the foreground is the matching text token, so the pairing
+                                     reads on the light tint and on the dark one. The template's own
+                                     hover, pressed and disabled states still own the background while
+                                     they are active, so a disabled button is never a coloured one. -->
                                 <StackPanel x:Name="spQuickApply">
-                                    <ui:TextBlock FontTypography="BodyStrong" Text="Quick configurations" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <ui:Button x:Name="btnApply200"
-                                                   Margin="0,0,8,0"
-                                                   Padding="16,6"
-                                                   Appearance="Secondary"
-                                                   Click="btnApply200_Click"
-                                                   ToolTipService.ShowDuration="60000"
-                                                   ToolTipService.ShowOnDisabled="True"
-                                                   Content="Apply 200 W">
-                                            <ToolTipService.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock x:Name="tbQuick200Tip"
-                                                               MaxWidth="400"
-                                                               FontSize="12"
-                                                               TextWrapping="Wrap"
-                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                                </ToolTip>
-                                            </ToolTipService.ToolTip>
-                                        </ui:Button>
+                                        <ui:TextBlock Grid.Column="0"
+                                                      VerticalAlignment="Center"
+                                                      FontTypography="BodyStrong"
+                                                      Text="Quick configurations" />
 
-                                        <ui:Button x:Name="btnApply225"
-                                                   Margin="0,0,8,0"
-                                                   Padding="16,6"
-                                                   Appearance="Secondary"
-                                                   Click="btnApply225_Click"
-                                                   ToolTipService.ShowDuration="60000"
-                                                   ToolTipService.ShowOnDisabled="True"
-                                                   Content="Apply 225 W (tested)">
-                                            <ToolTipService.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock x:Name="tbQuick225Tip"
-                                                               MaxWidth="400"
-                                                               FontSize="12"
-                                                               TextWrapping="Wrap"
-                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                                </ToolTip>
-                                            </ToolTipService.ToolTip>
-                                        </ui:Button>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <ui:Button x:Name="btnApply200"
+                                                       Margin="0,0,8,0"
+                                                       Padding="16,6"
+                                                       Appearance="Secondary"
+                                                       Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                                       Click="btnApply200_Click"
+                                                       ToolTipService.ShowDuration="60000"
+                                                       ToolTipService.ShowOnDisabled="True"
+                                                       Content="Apply 200 W">
+                                                <ToolTipService.ToolTip>
+                                                    <ToolTip>
+                                                        <TextBlock x:Name="tbQuick200Tip"
+                                                                   MaxWidth="400"
+                                                                   FontSize="12"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </ToolTip>
+                                                </ToolTipService.ToolTip>
+                                            </ui:Button>
 
-                                        <ui:Button x:Name="btnApply250"
-                                                   Padding="16,6"
-                                                   Appearance="Secondary"
-                                                   Click="btnApply250_Click"
-                                                   ToolTipService.ShowDuration="60000"
-                                                   ToolTipService.ShowOnDisabled="True">
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <!-- The caution the rails block carries, as the one
-                                                     visible part of it that cannot be hovered away. -->
-                                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                                             Glyph="&#xE7BA;"
-                                                             FontSize="14"
-                                                             Margin="0,0,6,0"
-                                                             VerticalAlignment="Center"
-                                                             Foreground="{DynamicResource SystemFillColorCautionBrush}" />
-                                                <TextBlock VerticalAlignment="Center"
-                                                           Text="Apply 250 W (measured on our unit)" />
-                                            </StackPanel>
-                                            <ToolTipService.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock x:Name="tbQuick250Tip"
-                                                               MaxWidth="400"
-                                                               FontSize="12"
-                                                               TextWrapping="Wrap"
-                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                                </ToolTip>
-                                            </ToolTipService.ToolTip>
-                                        </ui:Button>
-                                    </StackPanel>
+                                            <ui:Button x:Name="btnApply225"
+                                                       Margin="0,0,8,0"
+                                                       Padding="16,6"
+                                                       Appearance="Secondary"
+                                                       Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                                                       Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                                       Click="btnApply225_Click"
+                                                       ToolTipService.ShowDuration="60000"
+                                                       ToolTipService.ShowOnDisabled="True"
+                                                       Content="Apply 225 W (tested)">
+                                                <ToolTipService.ToolTip>
+                                                    <ToolTip>
+                                                        <TextBlock x:Name="tbQuick225Tip"
+                                                                   MaxWidth="400"
+                                                                   FontSize="12"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </ToolTip>
+                                                </ToolTipService.ToolTip>
+                                            </ui:Button>
+
+                                            <ui:Button x:Name="btnApply250"
+                                                       Padding="16,6"
+                                                       Appearance="Secondary"
+                                                       Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}"
+                                                       Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                       Click="btnApply250_Click"
+                                                       ToolTipService.ShowDuration="60000"
+                                                       ToolTipService.ShowOnDisabled="True">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <!-- The caution the rails block carries, as the one
+                                                         visible part of it that cannot be hovered away. -->
+                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                                 Glyph="&#xE7BA;"
+                                                                 FontSize="14"
+                                                                 Margin="0,0,6,0"
+                                                                 VerticalAlignment="Center"
+                                                                 Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                                                    <TextBlock VerticalAlignment="Center"
+                                                               Text="Apply 250 W" />
+                                                </StackPanel>
+                                                <ToolTipService.ToolTip>
+                                                    <ToolTip>
+                                                        <TextBlock x:Name="tbQuick250Tip"
+                                                                   MaxWidth="400"
+                                                                   FontSize="12"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </ToolTip>
+                                                </ToolTipService.ToolTip>
+                                            </ui:Button>
+                                        </StackPanel>
+                                    </Grid>
 
                                     <!-- Why the three are dimmed, when they are: the same one line the
                                          card uses for its own actions. -->
@@ -1070,15 +1092,15 @@
                                 <!-- The runtime rail currents. A live NVAPI write (no restart, no
                                      blank screen, no consent), so it follows the unlock's state:
                                      inert and explained until it is applied. The page's Apply writes
-                                     them, in the same act that applies the preset, because this write
-                                     is what keeps the owner's choice for the next boot. One block
-                                     with its divider, because the card's "override is still live"
-                                     state shows no sliders at all. -->
+                                     them, in the same act that applies the preset, and the slot
+                                     carries them, so a preset switch moves them with the rest of its
+                                     values. One block with its divider, because the card's "override
+                                     is still live" state shows no sliders at all. -->
                                 <StackPanel x:Name="spRailSection">
                                     <ui:TextBlock FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    TextWrapping="Wrap"
-                                                   Text="These values are machine-wide and are not saved with a preset." />
+                                                   Text="The rail currents are saved with the profile." />
 
                                     <StackPanel x:Name="spRailControls" Margin="0,12,0,0">
                                         <Grid>
