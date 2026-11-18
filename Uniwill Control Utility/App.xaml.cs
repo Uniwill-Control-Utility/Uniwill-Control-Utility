@@ -276,14 +276,17 @@ namespace Uniwill_Control_Utility
                     Console.WriteLine($"File logging to '{LOGS_FOLDER}' unavailable: {ex.Message}");
                 }
 
+                // The switch starts at Warning, so the startup lines below are gated out
+                // unless the user's level is applied first (field: the carry-over report
+                // never reached the log in any version).
+                Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
+
                 Log.Logger = loggerConfiguration.CreateLogger();
 
                 Log.Information("Logger initialized");
 
                 foreach (string line in _settingsCarryOverLog)
                     Log.Information("{SettingsCarryOver}", line);
-
-                Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
 
                 // Mixed-install guard. Installing the MSI while the app is running
                 // leaves the running exe in place (Windows cannot replace a locked
