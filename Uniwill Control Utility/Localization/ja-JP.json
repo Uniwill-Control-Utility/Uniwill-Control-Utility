@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "ドライバーの目標を {0}、レール電流を {1} A GPU コア、{2} A メモリ、{3} A ボード入力に、クロックオフセットをコア {4} MHz、メモリ {5} MHz に設定します。",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "適用しましたが、クロックオフセットは入っていません: ドライバーが確認しませんでした。目標とレール電流は有効です。",
   "Apply limits": "上限を適用",
-  "Standalone: these currents are not saved with a preset.": "独立設定: これらの電流値はプリセットに保存されません。"
+  "Standalone: these currents are not saved with a preset.": "独立設定: これらの電流値はプリセットに保存されません。",
+  "Request": "要求",
+  "Laptop budget": "ノートPCのバジェット",
+  "EC ceiling {0} · enforced {1}": "EC 上限 {0} · 適用値 {1}",
+  "the EC is the limit": "EC 上限が制限です"
 }

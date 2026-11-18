@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Це задає ціль драйвера {0}, струми шин {1} А ядро GPU, {2} А пам'ять і {3} А вхід плати та зміщення частоти {4} МГц ядра і {5} МГц пам'яті.",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Застосовано, крім зміщень частоти: драйвер їх не підтвердив. Ціль і струми шин діють.",
   "Apply limits": "Застосувати межі",
-  "Standalone: these currents are not saved with a preset.": "Окремо: ці струми не зберігаються з профілем."
+  "Standalone: these currents are not saved with a preset.": "Окремо: ці струми не зберігаються з профілем.",
+  "Request": "Запит",
+  "Laptop budget": "Бюджет ноутбука",
+  "EC ceiling {0} · enforced {1}": "Межа EC {0} · застосовано {1}",
+  "the EC is the limit": "межа EC є обмеженням"
 }

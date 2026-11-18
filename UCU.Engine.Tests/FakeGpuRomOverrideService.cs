@@ -66,6 +66,11 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
         return Answer;
     }
 
+    /// <summary>The EC ceiling each clamp reached this fake with (mW).</summary>
+    public List<int> ClampCalls { get; } = new();
+
+    public void ClampTargetToEcCeiling(int ecTgpMilliwatts) => ClampCalls.Add(ecTgpMilliwatts);
+
     public GpuReapplyResult ReapplyAtStartup()
     {
         ReapplyCalls++;

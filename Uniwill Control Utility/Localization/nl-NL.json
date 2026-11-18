@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Dit zet het stuurprogrammadoel op {0}, de railstromen op {1} A GPU-core, {2} A geheugen en {3} A bordingang en de klokoffsets op {4} MHz core en {5} MHz geheugen.",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Toegepast, behalve de klokoffsets: het stuurprogramma heeft ze niet bevestigd. Het doel en de railstromen zijn actief.",
   "Apply limits": "Limieten toepassen",
-  "Standalone: these currents are not saved with a preset.": "Losstaand: deze stromen worden niet met een profiel opgeslagen."
+  "Standalone: these currents are not saved with a preset.": "Losstaand: deze stromen worden niet met een profiel opgeslagen.",
+  "Request": "Verzoek",
+  "Laptop budget": "Laptopbudget",
+  "EC ceiling {0} · enforced {1}": "EC-limiet {0} · toegepast {1}",
+  "the EC is the limit": "de EC-limiet is de beperkende"
 }

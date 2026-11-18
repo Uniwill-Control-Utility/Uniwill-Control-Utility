@@ -68,6 +68,31 @@ namespace Uniwill_Control_Utility.Services
                 : null;
         }
 
+        /// <summary>
+        /// The envelope line under the status row. The row above carries the two driver-side
+        /// figures, named for what they are (the request and the laptop budget); this says the
+        /// EC's own ceiling once, with what the machine actually enforces — and, when the EC is
+        /// the lower of the two, that the EC is what binds. Null when the driver was not asked
+        /// (no invented number).
+        /// </summary>
+        public static string? Envelope(int? ecCeilingMilliwatts, int? requestedMilliwatts, int? enforcedMilliwatts)
+        {
+            if (ecCeilingMilliwatts is not int ceiling)
+                return null;
+
+            string line = LocalizationService.Format(
+                "EC ceiling {0} · enforced {1}",
+                Watts(ceiling),
+                enforcedMilliwatts is int enforced ? Watts(enforced) : "-- W");
+
+            bool binding = requestedMilliwatts is int asked
+                && enforcedMilliwatts is int got
+                && got == ceiling
+                && ceiling < asked;
+
+            return binding ? line + " · " + LocalizationService.Get("the EC is the limit") : line;
+        }
+
         private static string Watts(int milliwatts) =>
             (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W";
     }

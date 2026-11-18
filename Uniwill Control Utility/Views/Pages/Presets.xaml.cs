@@ -2413,8 +2413,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             string.IsNullOrWhiteSpace(reason) ? text : text + "\n" + RomReasonLine(reason);
 
         /// <summary>
-        /// The unlock's numbers as the status card's second row: TGP and the budget, plus the three
-        /// rails, each the driver's own read-back rather than the tier's request. The row is keyed to
+        /// The unlock's numbers as the status card's second row: the driver's request and the
+        /// laptop budget (named for what they are), plus the three rails, each the driver's own
+        /// read-back rather than the tier's request. The row is keyed to
         /// <see cref="UCU.Contracts.GpuRomOverrideStateDto.Enabled"/>, not to the derived state: it is
         /// absent until the owner has unlocked at least once, and once enabled it renders whatever the
         /// numbers are — a number the driver could not be asked for stays "--" while the start-up
@@ -2443,13 +2444,30 @@ namespace Uniwill_Control_Utility.Views.Pages
             spRomStatusValues.Visibility = powerBoost ? Visibility.Visible : Visibility.Collapsed;
             tbRomStatusPbmOff.Visibility = powerBoost ? Visibility.Collapsed : Visibility.Visible;
             if (!powerBoost)
+            {
+                tbRomStatEnvelope.Visibility = Visibility.Collapsed;
                 return;
+            }
 
             tbRomStatRequest.Text = Watts(state!.RequestedLimitMilliwatts);
             tbRomStatBudget.Text = Watts(state.BudgetMilliwatts);
             tbRomStatNvvdd.Text = Amps(state.NvvddCurrentMilliamps, 0) + " A";
             tbRomStatMsvdd.Text = Amps(state.MsvddCurrentMilliamps, 0) + " A";
             tbRomStatBoard.Text = Amps(state.BoardInputCurrentMilliamps, 3) + " A";
+
+            // The envelope, once: the EC's cTGP ceiling and what the machine enforces. The
+            // request and the budget above are what the driver was asked; the EC's number is
+            // the hardware limit they are clamped to, so it is named here and nowhere else.
+            string? envelope = GpuUnlockVerdict.Envelope(
+                state.CurrentLimitMilliwatts,
+                state.RequestedLimitMilliwatts,
+                GpuUnlockVerdict.Enforced(
+                    state.RequestedLimitMilliwatts,
+                    state.BudgetMilliwatts,
+                    state.CurrentLimitMilliwatts));
+
+            tbRomStatEnvelope.Text = envelope ?? string.Empty;
+            tbRomStatEnvelope.Visibility = envelope is null ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private static string Watts(int? milliwatts) =>

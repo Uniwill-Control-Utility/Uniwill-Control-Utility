@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Ceci règle la cible du pilote à {0}, les courants de rail à {1} A cœur GPU, {2} A mémoire et {3} A entrée carte, et les décalages d'horloge à {4} MHz cœur et {5} MHz mémoire.",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Appliqué, sauf les décalages d'horloge : le pilote ne les a pas confirmés. La cible et les courants de rail sont en place.",
   "Apply limits": "Appliquer les limites",
-  "Standalone: these currents are not saved with a preset.": "Indépendant : ces courants ne sont pas enregistrés avec un préréglage."
+  "Standalone: these currents are not saved with a preset.": "Indépendant : ces courants ne sont pas enregistrés avec un préréglage.",
+  "Request": "Demande",
+  "Laptop budget": "Budget du portable",
+  "EC ceiling {0} · enforced {1}": "Plafond EC {0} · appliqué {1}",
+  "the EC is the limit": "c'est le plafond EC qui s'applique"
 }

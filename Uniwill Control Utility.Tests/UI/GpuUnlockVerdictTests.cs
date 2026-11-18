@@ -69,4 +69,25 @@ public sealed class GpuUnlockVerdictTests
         Assert.Contains("150 W", line, StringComparison.Ordinal);
         Assert.Contains("225 W", line, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void TheEnvelopeStatesTheEcCeilingOnce_AndNamesItWhenItIsTheBindingLimit()
+    {
+        // The clamp keeps the request inside the EC's ceiling, so the ordinary line is the EC's
+        // number and the enforced one - the request and the budget are the row above.
+        string line = GpuUnlockVerdict.Envelope(200_000, 200_000, 200_000)!;
+        Assert.Contains("EC ceiling 200 W", line, StringComparison.Ordinal);
+        Assert.Contains("enforced 200 W", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("is the limit", line, StringComparison.Ordinal);
+
+        // Nothing was read: no invented number, so no line at all.
+        Assert.Null(GpuUnlockVerdict.Envelope(null, 250_000, 150_000));
+
+        // A ceiling below the unlock's floor is not a target (the thermal failsafe holds the EC
+        // at its base): the EC is then the binding number and the line says so. Asserted as the
+        // line growing the binding clause, so a translated catalog cannot fail the test.
+        string held = GpuUnlockVerdict.Envelope(150_000, 225_000, 150_000)!;
+        Assert.Contains("150 W", held, StringComparison.Ordinal);
+        Assert.NotEqual(GpuUnlockVerdict.Envelope(150_000, 150_000, 150_000), held);
+    }
 }

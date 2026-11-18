@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Questo imposta l'obiettivo del driver a {0}, le correnti di rail a {1} A core GPU, {2} A memoria e {3} A ingresso scheda e gli offset di clock a {4} MHz core e {5} MHz memoria.",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Applicato, tranne gli offset di clock: il driver non li ha confermati. L'obiettivo e le correnti di rail sono attivi.",
   "Apply limits": "Applica limiti",
-  "Standalone: these currents are not saved with a preset.": "Autonomo: queste correnti non vengono salvate con un preset."
+  "Standalone: these currents are not saved with a preset.": "Autonomo: queste correnti non vengono salvate con un preset.",
+  "Request": "Richiesta",
+  "Laptop budget": "Budget del portatile",
+  "EC ceiling {0} · enforced {1}": "Limite EC {0} · applicato {1}",
+  "the EC is the limit": "il limite EC è quello attivo"
 }

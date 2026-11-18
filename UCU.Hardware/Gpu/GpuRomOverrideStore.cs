@@ -134,6 +134,16 @@ namespace UCU.Hardware.Gpu
         GpuRomOverrideStateDto SetEnabled(bool enabled, int? targetTgpMilliwatts = null);
 
         /// <summary>
+        /// The EC now carries a cTGP ceiling below the unlock's target: a preset lowered its
+        /// slider, and the EC is the hardware envelope, so the target and the driver half
+        /// follow it down (the target is saved, the driver's request and the laptop budget
+        /// are lowered with it). It only ever lowers: a preset that raises the EC leaves the
+        /// target alone, and so does one below the unlock's accepted floor — that ceiling
+        /// cannot be a target, so the card's shortfall line names the gap instead.
+        /// </summary>
+        void ClampTargetToEcCeiling(int ecTgpMilliwatts);
+
+        /// <summary>
         /// One attempt at re-applying the live half of a completed unlock, for engine start:
         /// a reboot keeps the records but clears the EC offset, the rails, the laptop budget
         /// and the driver's request. The verdict says whether another attempt can help —
@@ -397,6 +407,42 @@ namespace UCU.Hardware.Gpu
 
         public GpuRomOverrideStateDto SetEnabled(bool enabled, int? targetTgpMilliwatts = null) =>
             enabled ? Apply(targetTgpMilliwatts) : Restore();
+
+        public void ClampTargetToEcCeiling(int ecTgpMilliwatts)
+        {
+            try
+            {
+                int target = TargetMilliwatts;
+                if (ecTgpMilliwatts >= target || ecTgpMilliwatts < RomOverrideLayout.StockPowerMilliwatts)
+                    return;
+
+                // No staged unlock: nothing holds the driver half, so there is nothing to move.
+                if (!IntentHolds())
+                    return;
+
+                WriteTarget(ecTgpMilliwatts);
+
+                // The driver enforces min(request, budget), so both follow the EC down: a
+                // request left above the EC would read as a shortfall the EC is causing.
+                _request.Request(ecTgpMilliwatts);
+
+                GpuPowerBudgetState budget = _budget.Read();
+                if (budget.Budget is GpuPowerBudget current &&
+                    current.F7Milliwatts > ecTgpMilliwatts &&
+                    TryTierBudget("gpu.ec_clamp", ecTgpMilliwatts, current, out GpuPowerBudget lowered, out _))
+                {
+                    _budget.Set(lowered);
+                }
+
+                Log.Information(
+                    "gpu: the EC ceiling is {Ceiling}, below the unlock target {Target}: the target, the driver request and the laptop budget follow the EC",
+                    Watts(ecTgpMilliwatts), Watts(target));
+            }
+            catch (Exception ex)
+            {
+                Log.Information("gpu: the EC ceiling could not be applied to the unlock target: {Type} {Message}", ex.GetType().Name, ex.Message);
+            }
+        }
 
         /// <summary>
         /// The sliders' read: the live rail currents and the policy range each is bounded

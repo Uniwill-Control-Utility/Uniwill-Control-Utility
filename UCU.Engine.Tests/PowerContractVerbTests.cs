@@ -52,6 +52,34 @@ public sealed class PowerContractVerbTests
     }
 
     [Fact]
+    public async Task ActivateGpuPowerControl_HandsTheEcCeilingToTheUnlockTarget()
+    {
+        // A preset apply writes the EC's cTGP offset and nothing else knows the ceiling: the
+        // offset is over this board's DefaultTGP (ECSpec 95 W), so offset 110 is a 205 W EC
+        // ceiling, and the unlock's target must follow it down rather than keep aiming higher.
+        var transport = new FakeEcTransport();
+        transport.PresetSpecTable(0xD2, 0xD2, 0xD2, 0x0A, 0x37, 0x19, 0x57, 0x5F, 0xFF);
+
+        await using var host = await EngineHostFixture.StartAsync(transport: transport);
+
+        await host.Power.ActivateGpuPowerControlAsync(ctgpOffset: 110, dbOffset: 0);
+
+        Assert.Equal(new[] { 205_000 }, host.FakeRomOverrides.ClampCalls);
+    }
+
+    [Fact]
+    public async Task ActivateGpuPowerControl_NoEcSpecTable_HandsNoCeilingToTheUnlock()
+    {
+        // Without a DefaultTGP the offset alone is not watts: the store is not given a number
+        // invented from the 55 W fallback (which would clamp the target to a guess).
+        await using var host = await EngineHostFixture.StartAsync();
+
+        await host.Power.ActivateGpuPowerControlAsync(ctgpOffset: 110, dbOffset: 0);
+
+        Assert.Empty(host.FakeRomOverrides.ClampCalls);
+    }
+
+    [Fact]
     public async Task HealContract_GpuHalf_ReplaysTheActivation_MovesNoCpuLimits()
     {
         await using var host = await EngineHostFixture.StartAsync();

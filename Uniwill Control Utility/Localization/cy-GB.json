@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Mae hyn yn gosod targed y gyrrwr i {0}, y cerrynt rheilffordd i {1} A craidd GPU, {2} A cof a {3} A mewnbwn bwrdd, a'r gwrthbwyso cloc i {4} MHz craidd a {5} MHz cof.",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Wedi'i gymhwyso, ac eithrio'r gwrthbwyso cloc: ni wnaeth y gyrrwr eu cadarnhau. Mae'r targed a'r cerrynt rheilffordd mewn grym.",
   "Apply limits": "Gweithredu'r terfynau",
-  "Standalone: these currents are not saved with a preset.": "Annibynnol: ni chedwir y cerrynt hyn gyda rhagosodiad."
+  "Standalone: these currents are not saved with a preset.": "Annibynnol: ni chedwir y cerrynt hyn gyda rhagosodiad.",
+  "Request": "Cais",
+  "Laptop budget": "Cyllideb y gliniadur",
+  "EC ceiling {0} · enforced {1}": "Nenfwd EC {0} · gorfodwyd {1}",
+  "the EC is the limit": "yr EC yw'r terfyn"
 }

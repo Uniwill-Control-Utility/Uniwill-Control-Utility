@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "这会将驱动目标设为 {0}，供电电流设为 {1} A GPU 核心、{2} A 显存和 {3} A 板输入，时钟偏移设为核心 {4} MHz、显存 {5} MHz。",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "已应用，但时钟偏移除外：驱动未确认。目标与供电电流已生效。",
   "Apply limits": "应用限值",
-  "Standalone: these currents are not saved with a preset.": "独立设置：这些电流不会随预设保存。"
+  "Standalone: these currents are not saved with a preset.": "独立设置：这些电流不会随预设保存。",
+  "Request": "请求",
+  "Laptop budget": "笔记本预算",
+  "EC ceiling {0} · enforced {1}": "EC 上限 {0} · 实际执行 {1}",
+  "the EC is the limit": "EC 上限即为限制"
 }

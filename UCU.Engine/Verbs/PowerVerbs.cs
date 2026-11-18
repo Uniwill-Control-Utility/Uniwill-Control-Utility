@@ -1,12 +1,13 @@
 using UCU.Contracts;
 using UCU.Hardware.Ec;
+using UCU.Hardware.Gpu;
 
 namespace UCU.Engine
 {
     /// <summary>Power-domain verbs: CPU power limits, TCC offset, OEM performance modes.</summary>
     internal static class PowerVerbs
     {
-        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate)
+        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate, IGpuRomOverrideService romOverrides)
         {
             add(EngineVerbs.Power.GetLimits, (p, ct) =>
             {
@@ -94,7 +95,9 @@ namespace UCU.Engine
             add(EngineVerbs.Power.ActivateGpuPowerControl, (p, ct) =>
             {
                 GpuPowerControlDto dto = EngineSerializer.BindParams<GpuPowerControlDto>(p);
-                gate.Acquire().ActivateGpuPowerControl(dto.CtgpOffset, dto.DbOffset);
+                var ec = gate.Acquire();
+                ec.ActivateGpuPowerControl(dto.CtgpOffset, dto.DbOffset);
+                ClampUnlockToEcCeiling(romOverrides, ec, dto.CtgpOffset);
                 return Task.FromResult<object?>(null);
             });
 
@@ -141,7 +144,11 @@ namespace UCU.Engine
                 var ec = gate.Acquire();
 
                 if (dto.ApplyGpu)
+                {
                     ec.ActivateGpuPowerControl(dto.GpuCtgpOffset, dto.GpuDbOffset);
+                    ClampUnlockToEcCeiling(romOverrides, ec, dto.GpuCtgpOffset);
+                }
+
                 if (dto.ApplyCpu)
                     ec.ApplyCpuPowerLimits(dto.Pl1Watts, dto.Pl2Watts);
 
@@ -170,6 +177,20 @@ namespace UCU.Engine
                 DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
                 return Task.FromResult<object?>(gate.Acquire().SetLiquidCoolerAttached(dto.Enabled));
             });
+        }
+
+        /// <summary>
+        /// The EC's cTGP is the offset a write leaves over this board's own DefaultTGP, so every
+        /// write of it is the envelope the unlock's driver half must sit inside: a write that
+        /// puts the EC below the unlock's target hands that ceiling to the store, which lowers
+        /// the target (and with it the driver request and the laptop budget) to it. A ceiling
+        /// the EC did not answer a DefaultTGP for is skipped: the offset alone is not watts.
+        /// </summary>
+        private static void ClampUnlockToEcCeiling(IGpuRomOverrideService romOverrides, EcEngine ec, int ctgpOffset)
+        {
+            GpuPowerInfoDto info = ec.GetGpuPowerInfo();
+            if (info.Supported)
+                romOverrides.ClampTargetToEcCeiling((ctgpOffset + info.DefaultTgpWatts) * 1000);
         }
     }
 }

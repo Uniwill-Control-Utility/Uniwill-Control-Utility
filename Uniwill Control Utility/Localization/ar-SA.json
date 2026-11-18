@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "يضبط هذا هدف البرنامج على {0}، وتيارات المسارات على {1} A لنواة GPU و{2} A للذاكرة و{3} A لدخل اللوحة، وإزاحات التردد على {4} MHz للنواة و{5} MHz للذاكرة.",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "تم التطبيق، باستثناء إزاحات التردد: لم يؤكدها البرنامج. الهدف وتيارات المسارات سارية.",
   "Apply limits": "تطبيق الحدود",
-  "Standalone: these currents are not saved with a preset.": "مستقل: هذه التيارات لا تُحفظ مع إعداد مسبق."
+  "Standalone: these currents are not saved with a preset.": "مستقل: هذه التيارات لا تُحفظ مع إعداد مسبق.",
+  "Request": "الطلب",
+  "Laptop budget": "ميزانية الحاسوب المحمول",
+  "EC ceiling {0} · enforced {1}": "سقف EC {0} · المُطبَّق {1}",
+  "the EC is the limit": "حد EC هو الحد"
 }

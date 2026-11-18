@@ -116,7 +116,7 @@ namespace UCU.Engine
             void Add(string verb, VerbHandler handler) => handlers.Add(verb, handler);
 
             FanVerbs.Register(Add, gate, rawWriteGuard);
-            PowerVerbs.Register(Add, gate);
+            PowerVerbs.Register(Add, gate, gpuRomOverrides);
             MuxVerbs.Register(Add, gate);
             KeyboardVerbs.Register(Add, gate);
             BatteryVerbs.Register(Add, gate);

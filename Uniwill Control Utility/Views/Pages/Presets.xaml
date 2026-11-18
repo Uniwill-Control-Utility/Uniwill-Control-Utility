@@ -219,11 +219,11 @@
 
                                     <StackPanel x:Name="spRomStatusValues" Orientation="Horizontal" Margin="24,0,0,0">
                                         <StackPanel Margin="0,0,16,0">
-                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="TGP" />
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Request" />
                                             <TextBlock x:Name="tbRomStatRequest" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
                                         </StackPanel>
                                         <StackPanel Margin="0,0,16,0">
-                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Budget" />
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Laptop budget" />
                                             <TextBlock x:Name="tbRomStatBudget" Margin="0,2,0,0" FontSize="13" FontWeight="SemiBold" Text="-- W" />
                                         </StackPanel>
                                         <StackPanel Margin="0,0,16,0">
@@ -240,6 +240,17 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
+
+                                <!-- The envelope, said once: the EC's own cTGP ceiling and what the
+                                     machine actually enforces. The row above carries the two
+                                     driver-side figures (the request and the laptop budget); this
+                                     line is what they cannot exceed. Set in code, so it is localised
+                                     at render time. -->
+                                <ui:TextBlock x:Name="tbRomStatEnvelope"
+                                              Margin="24,6,24,0"
+                                              FontTypography="Caption"
+                                              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                              TextWrapping="Wrap" />
                             </StackPanel>
                         </StackPanel>
                     </ui:Card>

@@ -2119,6 +2119,81 @@ public sealed class GpuRomOverrideTests : IDisposable
         Assert.Empty(state.VbiosPolicy.Records);
     }
 
+    [Fact]
+    public void TheClampFollowsTheEcCeilingDown_AndPersistsTheLowerTarget()
+    {
+        // A preset applied at 200 W after the unlock aimed at 225 W: the EC is the envelope,
+        // so the target, the driver's request and the laptop budget all follow it down.
+        var registry = new FakeRomRegistry(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        GpuRomOverrideStore store = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request, budget);
+
+        store.SetEnabled(true);
+        Assert.Equal("225000", File.ReadAllText(TargetPath));
+
+        store.ClampTargetToEcCeiling(200_000);
+
+        // Persisted, so a boot re-apply and the drift watch aim at the EC's number.
+        Assert.Equal("200000", File.ReadAllText(TargetPath));
+        Assert.Equal(200_000, request.Requests[^1]);
+        Assert.Equal(200_000, budget.Current.F7Milliwatts);
+
+        // The records, the tier and the ROM ceiling are untouched: the EC became the limit,
+        // there is no new tier.
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.GetState().State);
+        Assert.Equal(200_000, store.GetState().TargetTgpMilliwatts);
+        Assert.Equal(7, registry.Records.Count);
+    }
+
+    [Fact]
+    public void TheClampOnlyEverLowersTheTarget()
+    {
+        var request = new FakeRequest(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), request);
+
+        store.SetEnabled(true);
+        int asked = request.Requests.Count;
+
+        // A preset that raises the EC above the target: a preset may lower the unlock's
+        // target, never raise it.
+        store.ClampTargetToEcCeiling(250_000);
+        Assert.Equal("225000", File.ReadAllText(TargetPath));
+        Assert.Equal(asked, request.Requests.Count);
+
+        // A ceiling below the unlock's accepted floor (the thermal failsafe holds the EC at its
+        // base): that cannot be a target, so it is left to the card's shortfall line.
+        store.ClampTargetToEcCeiling(95_000);
+        Assert.Equal("225000", File.ReadAllText(TargetPath));
+        Assert.Equal(asked, request.Requests.Count);
+    }
+
+    [Fact]
+    public void TheClampDoesNothingWhenTheUnlockIsNotEnabled()
+    {
+        // A target a previous unlock left behind, with nothing staged on the key: no driver
+        // half exists to move, so the file must not be rewritten either.
+        string targetPath = TargetPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        File.WriteAllText(targetPath, "225000");
+
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log),
+            new FakeEc(_log), request, budget);
+
+        store.ClampTargetToEcCeiling(200_000);
+
+        Assert.Equal("225000", File.ReadAllText(targetPath));
+        Assert.Empty(request.Requests);
+        Assert.Empty(budget.Sets);
+    }
+
     private GpuRomOverrideStore NewStore(
         FakeRomRegistry registry,
         FakeRestarter restarter,

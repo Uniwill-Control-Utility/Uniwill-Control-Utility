@@ -1182,5 +1182,9 @@
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "यह ड्राइवर का लक्ष्य {0}, रेल धाराएँ {1} A GPU कोर, {2} A मेमोरी और {3} A बोर्ड इनपुट, और क्लॉक ऑफ़सेट {4} MHz कोर और {5} MHz मेमोरी सेट करता है।",
   "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "लागू हुआ, क्लॉक ऑफ़सेट को छोड़कर: ड्राइवर ने उन्हें पुष्ट नहीं किया। लक्ष्य और रेल धाराएँ लागू हैं।",
   "Apply limits": "सीमाएँ लागू करें",
-  "Standalone: these currents are not saved with a preset.": "स्वतंत्र: ये धाराएँ किसी प्रीसेट के साथ सहेजी नहीं जाती हैं।"
+  "Standalone: these currents are not saved with a preset.": "स्वतंत्र: ये धाराएँ किसी प्रीसेट के साथ सहेजी नहीं जाती हैं।",
+  "Request": "अनुरोध",
+  "Laptop budget": "लैपटॉप बजट",
+  "EC ceiling {0} · enforced {1}": "EC सीमा {0} · लागू {1}",
+  "the EC is the limit": "EC सीमा ही सीमा है"
 }
