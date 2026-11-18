@@ -876,6 +876,14 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool GpuUnlockConsentGiven {
+            get { return ((bool)(this["GpuUnlockConsentGiven"])); }
+            set { this["GpuUnlockConsentGiven"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool ApplyGpuClocksOnStartup {
             get { return ((bool)(this["ApplyGpuClocksOnStartup"])); }

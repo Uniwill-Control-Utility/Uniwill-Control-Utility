@@ -208,7 +208,10 @@
     <Setting Name="EnableGpuClockControl" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="ApplyGpuClocksOnStartup" Type="System.Boolean" Scope="User">
+<Setting Name="GpuUnlockConsentGiven" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+        <Setting Name="ApplyGpuClocksOnStartup" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="ApplyCpuCurveOptimizerOnStartup" Type="System.Boolean" Scope="User">

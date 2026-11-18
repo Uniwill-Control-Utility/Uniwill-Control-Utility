@@ -859,6 +859,11 @@
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="Raises the GPU's power ceiling at driver level" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Text="Standalone: these currents are not saved with a preset." />
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
@@ -1060,12 +1065,7 @@
                                      block with its divider, because the card's "override is still
                                      live" state shows no sliders at all. -->
                                 <StackPanel x:Name="spRailSection">
-                                    <ui:TextBlock FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   TextWrapping="Wrap"
-                                                   Text="Standalone: these currents are not saved with a preset." />
-
-                                    <StackPanel x:Name="spRailControls" Margin="0,12,0,0">
+                                    <StackPanel x:Name="spRailControls" Margin="0,0,0,0">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -1189,6 +1189,10 @@
                                                    Visibility="Collapsed"
                                                    Foreground="{DynamicResource SystemFillColorCautionBrush}"
                                                    Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
+
+                                        <Border Height="1"
+                                                Margin="-58,16,-46,0"
+                                                Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                                         <!-- The rails' own act. Inside the dimmed group, so an
                                              unlock that is not applied disables it with the reason

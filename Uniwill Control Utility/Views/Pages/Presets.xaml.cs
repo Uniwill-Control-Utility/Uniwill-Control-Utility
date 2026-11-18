@@ -2163,6 +2163,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _romOverrideBusy;
         private string? _romOverrideError;
 
+        // True while the renderer reflects the saved acknowledgement into the checkbox, so the
+        // change handler does not save what it just loaded.
+        private bool _reflectingRomConsent;
+
         // The platform gate (an NVIDIA driver key has no card without a card), set by the
         // visibility pass and combined with Power boost mode on every render.
         private bool _hasNvidia;
@@ -2242,6 +2246,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool canUnlock = state != null && !unlocked && !blocked;
 
             // Both actions stay visible; each is gated separately and dimmed when off.
+            // The acknowledgement survives a restart once given (Settings.Default), so the
+            // confirmation dialog is what still guards the act; reflecting it here keeps the
+            // checkbox honest without re-saving on every render.
+            if (!_reflectingRomConsent && chkRomConsent.IsChecked != Settings.Default.GpuUnlockConsentGiven)
+            {
+                _reflectingRomConsent = true;
+                try { chkRomConsent.IsChecked = Settings.Default.GpuUnlockConsentGiven; }
+                finally { _reflectingRomConsent = false; }
+            }
+
             bool consent = chkRomConsent.IsChecked == true;
             bool powerBoost = Settings.Default.EnablePowerBoostMode;
 
@@ -2426,7 +2440,17 @@ namespace Uniwill_Control_Utility.Views.Pages
         private static string Watts(int? milliwatts) =>
             milliwatts is int value ? (value / 1000.0).ToString("0.#") + " W" : "-- W";
 
-        private void chkRomConsent_Changed(object sender, RoutedEventArgs e) => RenderRomOverride();
+        private void chkRomConsent_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_reflectingRomConsent
+                && Settings.Default.GpuUnlockConsentGiven != (chkRomConsent.IsChecked == true))
+            {
+                Settings.Default.GpuUnlockConsentGiven = chkRomConsent.IsChecked == true;
+                Settings.Default.Save();
+            }
+
+            RenderRomOverride();
+        }
 
         /// <summary>
         /// The three quick configurations' captions, in each button's tooltip instead of under the
