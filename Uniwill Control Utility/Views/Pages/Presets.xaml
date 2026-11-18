@@ -877,11 +877,9 @@
                                      because the statement is what gates them. Both actions stay on
                                      the card - the irrelevant one is disabled and explained, never
                                      hidden and never a silent no-op. The "still applied, feature
-                                     off" state has nothing to state, so the checkbox and the rule
-                                     above it go and Restore stock stands alone in the row. -->
+                                     off" state has nothing to state, so the checkbox goes and
+                                     Restore stock stands alone in the row. -->
                                 <StackPanel>
-                                    <Border x:Name="brRomConsent" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -917,22 +915,26 @@
                                     </Grid>
                                 </StackPanel>
 
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Divider: it belongs to the quick configurations, so it goes with
+                                     them when the card is showing the "still applied, feature off"
+                                     state and they are collapsed. -->
+                                <Border x:Name="brQuickDivider" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                                 <!-- Three measured configurations, one click each, for a card that is
                                      already unlocked: they set the target and that tier's three rail
                                      currents, and 250 W also sets this unit's clock offsets. Each
                                      button's caption is its tooltip, so the row is one line and the
                                      numbers stay one hover - or one Tab stop - away. The 250 W set's
-                                     adapter caution keeps a visible marker on the button itself: a
-                                     caution may not live only in a tooltip. Label and buttons share
-                                     one row: the label is the row's left column, the three buttons
-                                     its right. Each button carries that tier's warning colour as its
-                                     fill; the foreground is the matching text token, so the pairing
-                                     reads on the light tint and on the dark one. The template's own
-                                     hover, pressed and disabled states still own the background while
-                                     they are active, so a disabled button is never a coloured one. -->
+                                     adapter caution lives in that tooltip and in the rails block,
+                                     which states it whenever the board input is above the tested
+                                     current. Label and buttons share one row: the label is the row's
+                                     left column, the three buttons its right. Each button carries that
+                                     tier's warning colour as its fill and the same brush as its 1 px
+                                     border, with the matching text token as its foreground, so the
+                                     pairing reads on the light tint and on the dark one. The
+                                     template's own hover, pressed and disabled states still own the
+                                     background while they are active, so a disabled button is never a
+                                     coloured one. -->
                                 <StackPanel x:Name="spQuickApply">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -951,6 +953,8 @@
                                                        Padding="16,6"
                                                        Appearance="Secondary"
                                                        Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                                                       BorderBrush="{DynamicResource SystemFillColorSuccessBrush}"
+                                                       BorderThickness="1"
                                                        Foreground="{DynamicResource SystemFillColorSuccessBrush}"
                                                        Click="btnApply200_Click"
                                                        ToolTipService.ShowDuration="60000"
@@ -972,11 +976,13 @@
                                                        Padding="16,6"
                                                        Appearance="Secondary"
                                                        Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                                                       BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                                                       BorderThickness="1"
                                                        Foreground="{DynamicResource SystemFillColorCautionBrush}"
                                                        Click="btnApply225_Click"
                                                        ToolTipService.ShowDuration="60000"
                                                        ToolTipService.ShowOnDisabled="True"
-                                                       Content="Apply 225 W (tested)">
+                                                       Content="Apply 225 W">
                                                 <ToolTipService.ToolTip>
                                                     <ToolTip>
                                                         <TextBlock x:Name="tbQuick225Tip"
@@ -992,22 +998,13 @@
                                                        Padding="16,6"
                                                        Appearance="Secondary"
                                                        Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}"
+                                                       BorderBrush="{DynamicResource SystemFillColorCriticalBrush}"
+                                                       BorderThickness="1"
                                                        Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                                                        Click="btnApply250_Click"
                                                        ToolTipService.ShowDuration="60000"
-                                                       ToolTipService.ShowOnDisabled="True">
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <!-- The caution the rails block carries, as the one
-                                                         visible part of it that cannot be hovered away. -->
-                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                                                 Glyph="&#xE7BA;"
-                                                                 FontSize="14"
-                                                                 Margin="0,0,6,0"
-                                                                 VerticalAlignment="Center"
-                                                                 Foreground="{DynamicResource SystemFillColorCautionBrush}" />
-                                                    <TextBlock VerticalAlignment="Center"
-                                                               Text="Apply 250 W" />
-                                                </StackPanel>
+                                                       ToolTipService.ShowOnDisabled="True"
+                                                       Content="Apply 250 W">
                                                 <ToolTipService.ToolTip>
                                                     <ToolTip>
                                                         <TextBlock x:Name="tbQuick250Tip"

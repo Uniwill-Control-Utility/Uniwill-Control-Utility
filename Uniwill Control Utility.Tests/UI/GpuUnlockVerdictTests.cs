@@ -21,6 +21,25 @@ public sealed class GpuUnlockVerdictTests
     }
 
     [Fact]
+    public void APresetBelowTheStockCeilingCarriesNoTargetAndTheRestOfTheAcceptedRangeDoes()
+    {
+        // The retarget guard: the engine accepts the stock ceiling (175 W) up to its tier
+        // ceiling (250 W), so 200 W is a target - the bug was a floor at the measured 225 W,
+        // which left a 200 W preset aiming at 225 W. Below the stock ceiling the preset carries
+        // nothing and the old target stands.
+        Assert.Equal(200_000, GpuUnlockVerdict.UnlockTarget(200_000));
+        Assert.Equal(175_000, GpuUnlockVerdict.UnlockTarget(175_000));
+        Assert.Equal(225_000, GpuUnlockVerdict.UnlockTarget(225_000));
+        Assert.Equal(250_000, GpuUnlockVerdict.UnlockTarget(250_000));
+
+        Assert.Null(GpuUnlockVerdict.UnlockTarget(174_000));
+        Assert.Null(GpuUnlockVerdict.UnlockTarget(251_000));
+
+        // A stock preset hands its TGP to the firmware, so it carries no target at all.
+        Assert.Null(GpuUnlockVerdict.UnlockTarget(null));
+    }
+
+    [Fact]
     public void Enforced_IsTheSmallestOfTheRequestTheBudgetAndTheEcLimit()
     {
         // The driver answers min(request, budget) and the EC's cTGP caps that again.

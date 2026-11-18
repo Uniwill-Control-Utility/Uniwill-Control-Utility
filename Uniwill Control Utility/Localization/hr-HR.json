@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "Nadjačavanje dodatne snage GPU-a još je primijenjeno.",
   "The card enforces {0}, not the requested {1}.": "Kartica primjenjuje {0}, a ne traženih {1}.",
   "Apply 200 W": "Primijeni 200 W",
-  "Apply 225 W (tested)": "Primijeni 225 W (testirano)",
+  "Apply 225 W": "Primijeni 225 W",
   "Apply 250 W": "Primijeni 250 W",
   "Quick configurations": "Brze konfiguracije",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Nije izmjereno kao cilj: koristi testirane struje tračnica od 225 W, čije su granice znatno iznad onoga što 200 W treba. Takt se ne dira.",

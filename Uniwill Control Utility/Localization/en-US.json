@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "The extra GPU power override is still applied.",
   "The card enforces {0}, not the requested {1}.": "The card enforces {0}, not the requested {1}.",
   "Apply 200 W": "Apply 200 W",
-  "Apply 225 W (tested)": "Apply 225 W (tested)",
+  "Apply 225 W": "Apply 225 W",
   "Apply 250 W": "Apply 250 W",
   "Quick configurations": "Quick configurations",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.",

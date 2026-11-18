@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "Переопределение дополнительной мощности GPU всё ещё применено.",
   "The card enforces {0}, not the requested {1}.": "Карта применяет {0}, а не запрошенные {1}.",
   "Apply 200 W": "Применить 200 Вт",
-  "Apply 225 W (tested)": "Применить 225 Вт (проверено)",
+  "Apply 225 W": "Применить 225 Вт",
   "Apply 250 W": "Применить 250 Вт",
   "Quick configurations": "Быстрые конфигурации",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Не измерено как цель: используются проверенные токи шин 225 Вт, чьи пределы намного выше того, что нужно 200 Вт. Частоты не затрагиваются.",

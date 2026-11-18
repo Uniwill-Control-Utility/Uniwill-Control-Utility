@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "การเขียนทับกำลังไฟ GPU เพิ่มเติมยังถูกใช้งานอยู่",
   "The card enforces {0}, not the requested {1}.": "การ์ดบังคับใช้ {0} ไม่ใช่ {1} ที่ร้องขอ",
   "Apply 200 W": "นำไปใช้ 200 W",
-  "Apply 225 W (tested)": "นำไปใช้ 225 W (ทดสอบแล้ว)",
+  "Apply 225 W": "นำไปใช้ 225 W",
   "Apply 250 W": "นำไปใช้ 250 W",
   "Quick configurations": "การตั้งค่าด่วน",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "ไม่ได้วัดเป็นเป้าหมาย: ใช้กระแสเรล 225 W ที่ทดสอบแล้ว ซึ่งขีดจำกัดสูงกว่าที่ 200 W ต้องการมาก ไม่แตะคล็อก",

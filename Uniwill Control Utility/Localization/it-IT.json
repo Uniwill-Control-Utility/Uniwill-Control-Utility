@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "L'override della potenza GPU aggiuntiva è ancora applicato.",
   "The card enforces {0}, not the requested {1}.": "La scheda applica {0}, non i {1} richiesti.",
   "Apply 200 W": "Applica 200 W",
-  "Apply 225 W (tested)": "Applica 225 W (testato)",
+  "Apply 225 W": "Applica 225 W",
   "Apply 250 W": "Applica 250 W",
   "Quick configurations": "Configurazioni rapide",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Non misurato come obiettivo: usa le correnti di rail testate da 225 W, i cui limiti superano di molto ciò che servono 200 W. I clock non vengono toccati.",

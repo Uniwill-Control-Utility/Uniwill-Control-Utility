@@ -2302,11 +2302,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // The statement is what gates the actions beside it, so it is one row: the checkbox
             // on the left, the unlock pair on the right. The "still applied, feature off" state
-            // has nothing to state, so the checkbox and the rule above it go and Restore stock
-            // stands alone in that row.
+            // has nothing to state, so the checkbox goes and Restore stock stands alone in that
+            // row.
             bool statement = (canUnlock || unlocked || uncertain) && !appliedWhileOff;
             chkRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;
-            brRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;
             chkRomConsent.IsEnabled = !busy;
 
             bool quickEnabled = !busy && !_railLimitsBusy && (unlocked || uncertain) && powerBoost && consent;
@@ -2321,8 +2320,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             btnApply250.Opacity = measuredEnabled ? 1.0 : 0.5;
 
             // With Power boost mode off the card shows one line and Restore stock, so the quick
-            // configurations are gone with the rest of the actions.
+            // configurations are gone with the rest of the actions - and the rule that separates
+            // them goes too, or it would sit under the row with nothing beneath it.
             spQuickApply.Visibility = appliedWhileOff ? Visibility.Collapsed : Visibility.Visible;
+            brQuickDivider.Visibility = appliedWhileOff ? Visibility.Collapsed : Visibility.Visible;
 
             string? quickReason = QuickApplyReason();
             tbQuickApplyReason.Text = quickReason ?? string.Empty;
@@ -2574,16 +2575,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // The unlock aims at the TGP the page would apply: a Custom preset's slider
                 // is the owner's intention, while a stock preset hands its TGP to the
-                // firmware, so the engine's measured target stands there. A slider below the
-                // measured 225 W is not carried as the target here — the quieter 200 W
-                // configuration has its own button, and this path must not quietly re-aim a
-                // manual unlock at whatever the preset rail happens to hold.
+                // firmware, so the engine's measured target stands there. The engine accepts
+                // the stock ceiling up to its tier ceiling, so 200 W is a target too — below
+                // the stock ceiling the preset carries none and the old target stands.
                 int? targetTgp = _currentProfile == "Custom"
-                    ? (int)Math.Round(sdNvPower.Value * 1000)
+                    ? GpuUnlockVerdict.UnlockTarget((int)Math.Round(sdNvPower.Value * 1000))
                     : null;
-
-                if (targetTgp < GpuUnlockVerdict.TestedTargetMilliwatts)
-                    targetTgp = null;
 
                 _romOverride = await GpuDeviceRestartGuard.RunAsync(
                     App.GetService<IHardwareMonitoringService>(),

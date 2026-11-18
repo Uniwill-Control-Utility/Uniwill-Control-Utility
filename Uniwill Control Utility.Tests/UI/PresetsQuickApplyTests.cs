@@ -68,15 +68,16 @@ public sealed class PresetsQuickApplyTests
 
         // The statement the buttons need stays on the card while the unlock is applied - and it
         // shares its row with the unlock pair, so with nothing to state the row keeps Restore.
+        // No rule of its own: the divider that used to sit above it went with the caption row it
+        // separated it from.
         Assert.Contains(
             "bool statement = (canUnlock || unlocked || uncertain) && !appliedWhileOff;",
             body, StringComparison.Ordinal);
         Assert.Contains(
             "chkRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;",
             body, StringComparison.Ordinal);
-        Assert.Contains(
-            "brRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;",
-            body, StringComparison.Ordinal);
+        Assert.DoesNotContain("brRomConsent", ReadPresetsXaml(), StringComparison.Ordinal);
+        Assert.DoesNotContain("brRomConsent", body, StringComparison.Ordinal);
 
         string reason = MethodBody(ReadPresetsPage(), "private string? QuickApplyReason()");
         Assert.Contains("Available once Extra GPU power is unlocked.", reason, StringComparison.Ordinal);
@@ -86,14 +87,34 @@ public sealed class PresetsQuickApplyTests
         // above the buttons. The behaviour stays - the buttons are still gated on it.
         Assert.DoesNotContain("Tick the statement above first.", reason, StringComparison.Ordinal);
 
-        // The captions are the buttons' tooltips, so the row is one line; the 250 W set's
-        // board input sits above 14 A, so its caution keeps a visible marker on the button.
+        // The captions are the buttons' tooltips, so the row is one line; the 250 W set's board
+        // input sits above 14 A, so its caution lives in that tooltip and in the rails block,
+        // which states it whenever the board input is above the tested current. No glyph on the
+        // button, and no 1 px border whose brush differs from its own text.
         string xaml = ReadPresetsXaml();
         Assert.Contains("<ui:Button x:Name=\"btnApply250\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<ToolTipService.ToolTip>", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"tbQuick250Tip\"", xaml, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"Wrap\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Glyph=\"&#xE7BA;\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Glyph=\"&#xE7BA;\"", xaml, StringComparison.Ordinal);
+
+        foreach (var (button, brush) in new[]
+                 {
+                     ("btnApply200", "SystemFillColorSuccessBrush"),
+                     ("btnApply225", "SystemFillColorCautionBrush"),
+                     ("btnApply250", "SystemFillColorCriticalBrush"),
+                 })
+        {
+            string tag = Handler(xaml, $"<ui:Button x:Name=\"{button}\"", "</ui:Button>");
+
+            Assert.Contains($"BorderBrush=\"{{DynamicResource {brush}}}\"", tag, StringComparison.Ordinal);
+            Assert.Contains("BorderThickness=\"1\"", tag, StringComparison.Ordinal);
+            Assert.Contains($"Foreground=\"{{DynamicResource {brush}}}\"", tag, StringComparison.Ordinal);
+        }
+
+        // The statement above the buttons is the consent gate they are dimmed by; the caption the
+        // middle button used to carry is gone.
+        Assert.DoesNotContain("Apply 225 W (tested)", xaml, StringComparison.Ordinal);
 
         string tooltips = MethodBody(ReadPresetsPage(), "private void setQuickApplyTooltips()");
         Assert.Contains("Above 14.0 A the GPU can outdraw", tooltips, StringComparison.Ordinal);

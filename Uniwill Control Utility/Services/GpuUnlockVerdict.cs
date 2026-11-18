@@ -14,6 +14,26 @@ namespace Uniwill_Control_Utility.Services
         public const int TestedTargetMilliwatts = 225_000;
 
         /// <summary>
+        /// The range the unlock accepts, mirrored from UCU.Hardware (which this project does not
+        /// reference): <c>RomOverrideLayout.StockPowerMilliwatts</c> up to
+        /// <c>GpuPowerTiers.ExtraGpuPower.PowerMilliwatts</c>. Below the stock ceiling the engine
+        /// refuses the target outright, above the tier's ceiling it clamps — so a preset there
+        /// carries no target at all.
+        /// </summary>
+        public const int MinTargetMilliwatts = 175_000;
+        public const int MaxTargetMilliwatts = 250_000;
+
+        /// <summary>
+        /// The target a preset carries into a live unlock, or null when it carries none (a stock
+        /// preset's firmware-owned TGP, or a slider the engine would refuse). 200 W is a supported
+        /// configuration, so the measured target is not the floor.
+        /// </summary>
+        public static int? UnlockTarget(int? milliwatts) =>
+            milliwatts is int value && value >= MinTargetMilliwatts && value <= MaxTargetMilliwatts
+                ? value
+                : null;
+
+        /// <summary>
         /// Tested only at the measured target: a higher request (250 W, the ROM ceiling) is
         /// legal to make but outside the measured configuration, and a shortfall is its own
         /// state, so neither may carry the badge.

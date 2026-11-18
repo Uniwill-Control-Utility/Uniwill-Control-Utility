@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "De overschrijving van het extra GPU-vermogen is nog steeds toegepast.",
   "The card enforces {0}, not the requested {1}.": "De kaart handhaaft {0}, niet de gevraagde {1}.",
   "Apply 200 W": "200 W toepassen",
-  "Apply 225 W (tested)": "225 W toepassen (getest)",
+  "Apply 225 W": "225 W toepassen",
   "Apply 250 W": "250 W toepassen",
   "Quick configurations": "Snelconfiguraties",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "Niet als doel gemeten: het gebruikt de geteste railstromen van 225 W, waarvan de grenzen ruim boven liggen wat 200 W nodig heeft. De klokken blijven ongemoeid.",

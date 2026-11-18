@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "额外 GPU 功耗的覆盖设置仍然生效。",
   "The card enforces {0}, not the requested {1}.": "显卡实际执行 {0}，而非请求的 {1}。",
   "Apply 200 W": "应用 200 W",
-  "Apply 225 W (tested)": "应用 225 W（已测试）",
+  "Apply 225 W": "应用 225 W",
   "Apply 250 W": "应用 250 W",
   "Quick configurations": "快捷配置",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "未作为目标实测：它沿用已测试的 225 W 供电电流，其上限远高于 200 W 所需。时钟不做改动。",

@@ -1169,7 +1169,7 @@
   "The extra GPU power override is still applied.": "अतिरिक्त GPU पावर का ओवरराइड अभी भी लागू है।",
   "The card enforces {0}, not the requested {1}.": "कार्ड {0} लागू करता है, अनुरोधित {1} नहीं।",
   "Apply 200 W": "200 W लागू करें",
-  "Apply 225 W (tested)": "225 W लागू करें (परीक्षित)",
+  "Apply 225 W": "225 W लागू करें",
   "Apply 250 W": "250 W लागू करें",
   "Quick configurations": "त्वरित कॉन्फ़िगरेशन",
   "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.": "लक्ष्य के रूप में नहीं मापा गया: यह परीक्षित 225 W रेल धाराएँ उपयोग करता है, जिनकी सीमाएँ 200 W की ज़रूरत से काफ़ी ऊपर हैं। क्लॉक को छुआ नहीं जाता।",

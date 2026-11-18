@@ -528,18 +528,19 @@ namespace Uniwill_Control_Utility.Services
         /// Carries a preset's TGP into a live unlock. The unlock aims one driver request,
         /// one F7 raise and one cTGP offset at a single target, so a preset applied while it
         /// is staged must move that target — otherwise the card keeps the number the last
-        /// unlock was given. Nothing runs with no unlock staged, or for a TGP below the
-        /// unlock's measured floor (the store refuses that, and the old target stands).
+        /// unlock was given. Nothing runs with no unlock staged, or for a TGP the engine would
+        /// refuse (below the stock ceiling, where the old target stands).
         /// </summary>
         internal static async Task RetargetUnlockAsync(string profileName, int? tgpMilliwatts, string verb)
         {
-            if (tgpMilliwatts is not int target)
-                return;
-
-            if (target < GpuUnlockVerdict.TestedTargetMilliwatts)
+            if (GpuUnlockVerdict.UnlockTarget(tgpMilliwatts) is not int target)
             {
-                Scripts.Misc.DiagnosticLogger.LogInfo(
-                    $"[{verb}] {profileName} asks {target / 1000.0:0.##} W, below the unlock's measured floor; its target is unchanged");
+                if (tgpMilliwatts is int asked)
+                {
+                    Scripts.Misc.DiagnosticLogger.LogInfo(
+                        $"[{verb}] {profileName} asks {asked / 1000.0:0.##} W, outside the unlock's {GpuUnlockVerdict.MinTargetMilliwatts / 1000} to {GpuUnlockVerdict.MaxTargetMilliwatts / 1000} W range; its target is unchanged");
+                }
+
                 return;
             }
 
