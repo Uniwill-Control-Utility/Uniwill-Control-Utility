@@ -11,9 +11,8 @@ namespace Uniwill_Control_Utility.Tests.UI;
 ///   - the rails' Apply is the only writer, it sends the three slider values through the verb
 ///     that persists them (the engine saves a successful write for the next boot), and it reads
 ///     no preset;
-///   - the sliders keep their row, their gating note and their caution, with one rule separating
-///     them from the action row below - where the quick sets' Apply limits shares the line with
-///     the quick configurations, each control gated on its own.
+///   - the sliders keep their row, their gating note, and one rule separating them from the
+///     action row below, where their Apply limits stands alone.
 /// </summary>
 public sealed class PresetsRailWriteTests
 {
@@ -68,14 +67,13 @@ public sealed class PresetsRailWriteTests
         Assert.Contains("Appearance=\"Primary\"", tag, StringComparison.Ordinal);
         Assert.Contains("Click=\"btnRailApply_Click\"", tag, StringComparison.Ordinal);
 
-        // Below the sliders, in the row it shares with the quick sets - and outside the panel
-        // those sliders are dimmed with, so its own gate is set on the button itself.
+        // Below the sliders, in its own row - and outside the panel those sliders are dimmed
+        // with, so its own gate is set on the button itself.
         int sliders = xaml.IndexOf("x:Name=\"sdRailBoardInput\"", StringComparison.Ordinal);
         int row = xaml.IndexOf("x:Name=\"spRomActionRow\"", StringComparison.Ordinal);
         int button = xaml.IndexOf("x:Name=\"btnRailApply\"", StringComparison.Ordinal);
-        int quick = xaml.IndexOf("x:Name=\"btnApply200\"", StringComparison.Ordinal);
-        Assert.True(sliders >= 0 && row > sliders && quick > row && button > quick,
-            "Apply limits follows the quick sets in one row under the sliders.");
+        Assert.True(sliders >= 0 && row > sliders && button > row,
+            "Apply limits follows the sliders in one row under them.");
 
         string render = MethodBody(ReadPresetsPage(), "private void RenderRailLimits()");
         Assert.Contains("bool usable = applied && bounded && !_railLimitsBusy;", render, StringComparison.Ordinal);
@@ -92,11 +90,11 @@ public sealed class PresetsRailWriteTests
         Assert.Contains("Text=\"Standalone: these currents are not saved with a preset.\"",
             xaml, StringComparison.Ordinal);
 
-        // The gating note and the adapter caution stay as they were.
+        // The gating note stays as it was; the board input is still settable up to the driver's
+        // policy maximum, and the card carries no adapter warning about it.
         string page = ReadPresetsPage();
         Assert.Contains("Available once Extra GPU power is unlocked.", page, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Above 14.0 A the GPU can outdraw", xaml, StringComparison.Ordinal);
-        Assert.Contains("sdRailBoardInput.Value > TestedBoardInputMilliamps", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("tbRailCaution", page, StringComparison.Ordinal);
 
         // Nothing claims the values travel with a profile any more.
         Assert.DoesNotContain("saved with the profile", page, StringComparison.Ordinal);

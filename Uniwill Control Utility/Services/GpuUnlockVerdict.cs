@@ -61,7 +61,7 @@ namespace Uniwill_Control_Utility.Services
         /// The state the card's actions follow. A read taken inside a hush window — the
         /// post-apply verification or the repair a short budget asked for — can land on the EC's
         /// republish and answer <c>Uncertain</c>, which counts as unlockable, so the actions would
-        /// re-derive from it and flash (field, v0.9.14: Apply 200 W briefly enabled Unlock extra
+        /// re-derive from it and flash (field, v0.9.14: an apply briefly enabled Unlock extra
         /// GPU power). While a window is open the last read taken outside one stands.
         /// </summary>
         public static string? Settled(string? lastSettled, string? read, bool hushing) =>

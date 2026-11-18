@@ -45,7 +45,7 @@ public sealed class GpuUnlockVerdictTests
     [Fact]
     public void AReadInsideAHushWindowDoesNotReDeriveTheActions()
     {
-        // Field, v0.9.14: pressing Apply 200 W briefly enabled Unlock extra GPU power. The read
+        // Field, v0.9.14: pressing an apply briefly enabled Unlock extra GPU power. The read
         // the post-apply window makes lands on the EC's republish and answers Uncertain, which
         // counts as unlockable, so the buttons were re-derived from a mid-repair read and the
         // settled Unlocked read disabled them again.
