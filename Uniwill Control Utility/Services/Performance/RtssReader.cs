@@ -394,8 +394,9 @@ namespace Uniwill_Control_Utility.Services.Performance
 
         /// <summary>
         /// Try to read FPS data for the given process ID from RTSS shared memory.
-        /// If the exact PID is not found, falls back to the first hooked app with FPS &gt; 0
-        /// (handles the case where the foreground window is not the game itself).
+        /// Only the requested process's own entry is ever reported (see
+        /// <see cref="PickEntryIndex"/>): no entry means no FPS this tick, never
+        /// another process's frame rate.
         /// </summary>
         public static bool TryRead(int processId, out RtssFpsData data)
         {
@@ -417,9 +418,8 @@ namespace Uniwill_Control_Utility.Services.Performance
                 // Read header (signature and array layout already validated).
                 RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
 
-                // Scan app array — collect all apps, look for exact PID match and best fallback.
-                RtssFpsData? bestFallback = null;
-                List<(int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
+                // Scan app array — the pid/carried fields of every occupied slot.
+                List<(int Entry, int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
 
                 for (uint i = 0; i < header.AppArrSize; i++)
                 {
@@ -432,57 +432,50 @@ namespace Uniwill_Control_Utility.Services.Performance
                     int flags = Marshal.ReadInt32(entryPtr, 4 + MaxPath);
                     int dwFrameTime = Marshal.ReadInt32(entryPtr, 268 + 12); // offset 280
 
-                    allApps.Add((pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
-
-                    if (pid == processId)
-                    {
-                        data = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
-                        if (data.Fps > 0)
-                            return true;
-                    }
-
-                    // Collect fallback: best game-like app with FPS > 0.
-                    if (IsGameProcess(name) && dwFrameTime > 0)
-                    {
-                        RtssFpsData candidate = ParseAppEntry(entryPtr, (int)header.AppEntrySize, pid);
-                        if (candidate.Fps > 0 && (bestFallback == null || candidate.Fps > bestFallback.Value.Fps))
-                            bestFallback = candidate;
-                    }
+                    allApps.Add(((int)i, pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
                 }
 
-                // If exact PID wasn't found but we have a game entry with FPS, use it.
-                if (bestFallback != null && bestFallback.Value.Fps > 0)
+                int entry = PickEntryIndex(allApps.Select(a => (a.Entry, a.Pid)).ToList(), processId);
+                if (entry >= 0)
                 {
-                    data = bestFallback.Value;
-                    LogOnce($"fallback:{data.ProcessId}", $"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
-                    return true;
+                    IntPtr entryPtr = IntPtr.Add(viewPtr, (int)(header.AppArrOffset + (uint)entry * header.AppEntrySize));
+                    RtssFpsData own = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
+                    if (own.Fps > 0)
+                    {
+                        data = own;
+                        return true;
+                    }
                 }
 
-                // Log all apps once for diagnostics (debounced by LogOnce).
+                // No frames for the foreground process: no FPS this tick. The app list
+                // is logged so a "nothing shows" report stays diagnosable.
                 string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
-                LogOnce($"apps:{allApps.Count}", $"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
+                LogOnce($"apps:{allApps.Count}:{processId}", $"no FPS for PID {processId} (not tracked by RTSS); RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
 
                 return false;
             }
         }
 
-        private static bool IsGameProcess(string processName)
+        /// <summary>
+        /// The entry TryRead may report for a tick: the requested process's own, never
+        /// another hooked process's. RTSS hooks whatever renders - wallpaper engines
+        /// among it - so the old "first hooked app with frames" fallback served
+        /// webwallpaper64's 139 FPS while the foreground game had none (log 2026-11-18,
+        /// fg 18808, "fallback [30016]"). Returns the app-array entry index, or -1 for
+        /// no FPS this tick.
+        /// </summary>
+        internal static int PickEntryIndex(IReadOnlyList<(int Entry, int Pid)> apps, int requestedPid)
         {
-            // Filter out known non-game processes that RTSS may hook.
-            // RTSS stores the full path in szName, so extract the file name.
-            if (string.IsNullOrEmpty(processName))
-                return false;
+            if (requestedPid <= 0)
+                return -1;
 
-            string fileName = System.IO.Path.GetFileName(processName).ToLowerInvariant();
-            return fileName != "gameoverlayui64.exe" &&
-                   fileName != "gameoverlayui.exe" &&
-                   fileName != "steam.exe" &&
-                   fileName != "egui.exe" &&
-                   fileName != "rtss.exe" &&
-                   fileName != "rivatuner.exe" &&
-                   fileName != "msiafterburner.exe" &&
-                   fileName != "afterburner.exe" &&
-                   fileName != "a2guard.exe";
+            foreach ((int entry, int pid) in apps)
+            {
+                if (pid == requestedPid)
+                    return entry;
+            }
+
+            return -1;
         }
 
         private static string ReadAnsiString(IntPtr basePtr, int offset, int maxLength)

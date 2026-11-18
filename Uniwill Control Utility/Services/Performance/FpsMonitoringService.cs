@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -82,83 +83,57 @@ namespace Uniwill_Control_Utility.Services.Performance
                     continue;
                 }
 
-                // Try RTSS first — it works with DX12, anti-cheat, and all graphics APIs.
+                // RTSS answers only for the foreground process's own entry: no entry
+                // means no FPS this tick, never another process's borrowed frame rate.
                 if (!RtssReader.TryRead(processId, out RtssFpsData rtssData) || rtssData.Fps <= 0)
                 {
                     if (tickCount % 10 == 0)
-                        Serilog.Log.Debug("[FPS] tick {Tick} fgPid={Pid} - no RTSS data", tickCount, processId);
+                        Serilog.Log.Debug("[FPS] tick {Tick} fgPid={Pid} - no RTSS entry for the foreground process", tickCount, processId);
                     Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
                     continue;
                 }
 
-                if (tickCount % 10 == 0)
-                    Serilog.Log.Debug("[FPS] tick {Tick} fgPid={FgPid} rtssPid={RtssPid} name={Name} fps={Fps}", tickCount, processId, rtssData.ProcessId, rtssData.ProcessName, rtssData.Fps);
-
-                // RTSS returned data for a hooked process. We must verify that the
-                // process belongs to a recognized installed game AND that the game
-                // window is actually in focus (or fullscreen) before showing the overlay.
-                //
-                // Two scenarios:
-                //
-                // 1) Exact PID match (rtssData.ProcessId == processId): the foreground
-                //    IS the hooked game. Verify it's a recognized installed game.
-                //
-                // 2) Fallback match (rtssData.ProcessId != processId): the foreground
-                //    is NOT the hooked game. This happens when our overlay (topmost)
-                //    reports itself as foreground. The game is still active behind it.
-                //    We verify the game has a visible, non-minimized window so we
-                //    don't show the overlay when the user has switched to a different
-                //    app (Terminal, browser, etc.).
-
-                int gamePid;
-                string gameHint;
-
-                if (rtssData.ProcessId == processId)
+                // TryGetProcessDetails may fail for anti-cheat-protected games (EAC blocks
+                // MainModule access). RTSS already provides the executable path, so use it.
+                string name;
+                string path;
+                if (!TryGetProcessDetailsCached(processId, out name, out path))
                 {
-                    // Exact match — foreground is the hooked process.
-                    gamePid = processId;
-                    gameHint = rtssData.ProcessName;
-                }
-                else
-                {
-                    // Fallback — foreground is NOT the hooked game (overlay is
-                    // topmost). Verify the game has a visible window that isn't
-                    // minimized, meaning it's still active behind us.
-                    if (!HasVisibleWindow(rtssData.ProcessId))
-                    {
-                        Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
-                        continue;
-                    }
-
-                    gamePid = rtssData.ProcessId;
-                    gameHint = rtssData.ProcessName;
-                }
-
-                // Only show for recognized installed games (same list as Adaptive Mode).
-                bool recognized = IsRecognizedGame(gamePid, gameHint);
-                if (!recognized)
-                {
-                    Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
-                    continue;
-                }
-
-                int actualPid = rtssData.ProcessId;
-
-                // TryGetProcessDetails may fail for anti-cheat-protected games (EAC blocks MainModule access).
-                // RTSS already provides the process name and executable path, so use those as fallback.
-                string name = string.Empty;
-                string path = string.Empty;
-                if (!TryGetProcessDetailsCached(actualPid, out name, out path))
-                {
-                    // Extract file name from RTSS-provided path (RTSS stores full path in szName).
                     path = rtssData.ProcessName;
                     name = System.IO.Path.GetFileNameWithoutExtension(rtssData.ProcessName);
                 }
 
+                // Live frames for the foreground process are the strongest "this is a
+                // game" signal, so it is the rule that accepts a hooked game missing
+                // from the installed list. The shell/our own process are still refused.
+                string? rule = AcceptanceRule(name, path, rtssTracked: true);
+                if (rule is null)
+                {
+                    Serilog.Log.Debug("[FPS] IsRecognizedGame pid={Pid} - not recognized exeName={ExeName} exePath={ExePath}", processId, name, path);
+                    Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
+                    continue;
+                }
+
+                // Guard: the frames must belong to a process with a visible top-level
+                // window. RTSS hooks whatever renders (wallpaper engines included), and
+                // hidden frames are not what the user is looking at.
+                if (!HasVisibleWindow(processId))
+                {
+                    if (tickCount % 10 == 0)
+                        Serilog.Log.Debug("[FPS] tick {Tick} pid={Pid} - accepted {Rule} but no visible top-level window", tickCount, processId, rule);
+                    Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
+                    continue;
+                }
+
+                LogAcceptanceOnce(processId, rule, name, path);
+
+                if (tickCount % 10 == 0)
+                    Serilog.Log.Debug("[FPS] tick {Tick} fgPid={FgPid} name={Name} rule={Rule} fps={Fps}", tickCount, processId, rtssData.ProcessName, rule, rtssData.Fps);
+
                 Volatile.Write(ref _latest, new FpsMetricsSnapshot
                 {
                     IsAvailable = true,
-                    ProcessId = actualPid,
+                    ProcessId = processId,
                     ProcessName = name,
                     ExecutablePath = path,
                     GraphicsApi = rtssData.GraphicsApi,
@@ -293,86 +268,97 @@ namespace Uniwill_Control_Utility.Services.Performance
             return found;
         }
 
-        /// <summary>
-        /// Checks whether the given process ID matches a recognized installed game
-        /// from Game_Manager.installedGames (same positive-list used by the Adaptive page).
-        /// Falls back to matching by processNameHint when MainModule is inaccessible
-        /// (EAC-protected games block process.MainModule).
-        /// </summary>
-        private static bool IsRecognizedGame(int processId, string processNameHint = "")
+        private const string SteamCommonSegment = @"\steamapps\common\";
+
+        // The desktop shell and our own process are never games, whatever RTSS hooks.
+        private static readonly HashSet<string> NonGameProcesses = BuildNonGameProcessNames();
+
+        private static HashSet<string> BuildNonGameProcessNames()
         {
-            if (processId <= 0)
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "explorer", "progman", "winlogon", "lockapp", "searchhost",
+                "startmenuexperiencehost", "shellexperiencehost", "textinputhost"
+            };
+            try { names.Add(Process.GetCurrentProcess().ProcessName); } catch { }
+            return names;
+        }
+
+        /// <summary>
+        /// Why a foreground process counts as a game, or null when it does not, in
+        /// precedence order: the shell/our own process are refused first, then RTSS
+        /// tracking (live frames for this process — the strongest rendering signal),
+        /// then a Steam library path, then the installed-games list. The installed list
+        /// is an additional acceptance path, never a gate: 0.9.13 rejected re9.exe,
+        /// which RTSS was hooking perfectly, only because the list had not enumerated it.
+        /// </summary>
+        internal static string? AcceptanceRule(string? exeName, string? exePath, bool rtssTracked)
+        {
+            string name = FileNameWithoutExtension(exeName);
+            if (name.Length == 0)
+                name = FileNameWithoutExtension(exePath);
+
+            if (name.Length == 0 || NonGameProcesses.Contains(name))
+                return null;
+
+            if (rtssTracked)
+                return "rtss-tracked";
+
+            if (!string.IsNullOrEmpty(exePath) && exePath.Contains(SteamCommonSegment, StringComparison.OrdinalIgnoreCase))
+                return "steam-library path";
+
+            return MatchesInstalledList(exeName, exePath) ? "installed list" : null;
+        }
+
+        private static string FileNameWithoutExtension(string? path)
+            => string.IsNullOrWhiteSpace(path) ? string.Empty : System.IO.Path.GetFileNameWithoutExtension(path);
+
+        /// <summary>
+        /// Positive-list match against Game_Manager.installedGames. A null or empty list
+        /// (syncGame_Library is async and may not have run yet) matches nothing and falls
+        /// through to the other rules, rather than allowing or blocking everything.
+        /// </summary>
+        private static bool MatchesInstalledList(string? exeName, string? exePath)
+        {
+            List<Game_Manager.GameLauncherItem>? games = Game_Manager.installedGames;
+            if (games is null || games.Count == 0)
                 return false;
 
-            var games = Game_Manager.installedGames;
-            // If the game library hasn't loaded yet (syncGame_Library is async and
-            // runs after the overlay starts), trust RTSS data. Once loaded, filter
-            // by the positive list (same as Adaptive Mode's combobox).
-            if (games is null)
-            {
-                Serilog.Log.Debug("[FPS] IsRecognizedGame pid={Pid} - installedGames is null, allowing", processId);
-                return true;
-            }
-
-            if (games.Count == 0)
-            {
-                Serilog.Log.Debug("[FPS] IsRecognizedGame pid={Pid} - installedGames is empty, blocking", processId);
-                return false;
-            }
-
-            string? exeName = null;
-            string? exePath = null;
-
-            try
-            {
-                using Process process = Process.GetProcessById(processId);
-                exeName = process.ProcessName;
-                exePath = process.MainModule?.FileName;
-            }
-            catch
-            {
-                // Process gone or inaccessible (anti-cheat protection).
-                // Fall back to the hint if provided.
-                if (string.IsNullOrEmpty(processNameHint))
-                    return false;
-            }
-
-            foreach (var game in games)
+            foreach (Game_Manager.GameLauncherItem game in games)
             {
                 // Match by executable path (most reliable).
                 if (!string.IsNullOrWhiteSpace(game.path) && exePath is not null && exePath.Contains(game.path, StringComparison.OrdinalIgnoreCase))
                     return true;
 
-                // Match RTSS hint path against game's install dir.
-                if (!string.IsNullOrWhiteSpace(game.path) && !string.IsNullOrWhiteSpace(processNameHint) && processNameHint.Contains(game.path, StringComparison.OrdinalIgnoreCase))
-                    return true;
-
-                // Match game's install dir exe name (last path segment) against RTSS hint.
-                // game.path is the install dir, but for some launchers it may include the exe.
-                if (!string.IsNullOrWhiteSpace(game.path) && !string.IsNullOrWhiteSpace(processNameHint))
+                // game.path is usually the install dir, but for some launchers it names
+                // the exe; either way its last segment identifies the game.
+                if (!string.IsNullOrWhiteSpace(game.path) && exeName is not null)
                 {
-                    string pathFileName = System.IO.Path.GetFileNameWithoutExtension(game.path);
-                    if (processNameHint.Contains(pathFileName, StringComparison.OrdinalIgnoreCase))
+                    string pathName = FileNameWithoutExtension(game.path);
+                    if (pathName.Length > 0 && exeName.Contains(pathName, StringComparison.OrdinalIgnoreCase))
                         return true;
                 }
 
                 // Match by exe name.
                 if (!string.IsNullOrWhiteSpace(game.exe) && exeName is not null && exeName.Contains(game.exe, StringComparison.OrdinalIgnoreCase))
                     return true;
-
-                // Match RTSS hint file name against game's exe.
-                if (!string.IsNullOrWhiteSpace(game.exe) && !string.IsNullOrWhiteSpace(processNameHint))
-                {
-                    string hintName = System.IO.Path.GetFileNameWithoutExtension(processNameHint);
-                    if (hintName.Contains(game.exe, StringComparison.OrdinalIgnoreCase))
-                        return true;
-                }
             }
 
-            // Debug: log why a process wasn't recognized.
-            string hintDisplay = string.IsNullOrWhiteSpace(processNameHint) ? "(no hint)" : processNameHint;
-            Serilog.Log.Debug("[FPS] IsRecognizedGame pid={Pid} - not recognized exeName={ExeName} exePath={ExePath} hint={Hint} games={GameCount}", processId, exeName, exePath, hintDisplay, games.Count);
             return false;
+        }
+
+        // One acceptance line per (foreground pid, rule): the sampler runs at 4 Hz.
+        private int _lastAcceptPid;
+        private string? _lastAcceptRule;
+
+        private void LogAcceptanceOnce(int pid, string rule, string name, string path)
+        {
+            if (_lastAcceptPid == pid && _lastAcceptRule == rule)
+                return;
+
+            _lastAcceptPid = pid;
+            _lastAcceptRule = rule;
+            Serilog.Log.Debug("[FPS] accepted: {Rule} pid={Pid} exeName={ExeName} exePath={ExePath}", rule, pid, name, path);
         }
 
         private static bool TryGetProcessDetails(int processId, out string name, out string path)

@@ -605,34 +605,14 @@ namespace Uniwill_Control_Utility.Services
                 // Determine whether the target game is currently in focus.
                 // The OSD should only render when the game window is foreground.
                 //
-                // fps.IsAvailable may be false even when a game is running, because
-                // IsRecognizedGame() in FpsMonitoringService blocks processes not in
-                // the installed game library (e.g. Wallpaper Engine). In that case
-                // fall back to a direct RTSS read for the foreground PID so the OSD
-                // still shows hardware metrics for hooked processes outside the
-                // game library.
-                bool gameInFocus = false;
+                // FpsMonitoringService is the single source of truth for that: it reads
+                // only the foreground process's own RTSS entry, refuses the shell and our
+                // own process, and accepts any RTSS-tracked game (the installed list is
+                // not a gate). A second direct RTSS read here used to bypass those rules
+                // and paint the OSD over whatever RTSS happened to hook (Wallpaper
+                // Engine, per the 2026-11-18 log).
                 int foregroundPid = GetForegroundProcessId();
-
-                if (fps.IsAvailable && fps.ProcessId > 0)
-                {
-                    gameInFocus = foregroundPid == fps.ProcessId;
-                }
-                else
-                {
-                    // FpsMonitoringService rejected the process (IsRecognizedGame
-                    // returned false). Fall back to a direct RTSS read for the
-                    // foreground PID — but only accept an exact PID match.
-                    // TryRead has an internal fallback to any hooked process with
-                    // FPS > 0, which would make gameInFocus always true when any
-                    // game is running. We verify the returned PID matches the
-                    // foreground to avoid that.
-                    if (foregroundPid > 0 && RtssReader.TryRead(foregroundPid, out RtssFpsData fallbackData) && fallbackData.Fps > 0
-                        && fallbackData.ProcessId == foregroundPid)
-                    {
-                        gameInFocus = true;
-                    }
-                }
+                bool gameInFocus = fps.IsAvailable && fps.ProcessId > 0 && foregroundPid == fps.ProcessId;
 
                 tFocus = sw.ElapsedMilliseconds;
 
@@ -720,8 +700,7 @@ namespace Uniwill_Control_Utility.Services
                     if (!_rtssOsdWasShowing)
                     {
                         LogOsd(
-                            $"focus ON: game pid={foregroundPid}, " +
-                            $"source={(fps.IsAvailable ? "fps-service" : "rtss-fallback")}, slot {slot}, fps {fps.Fps}");
+                            $"focus ON: game pid={foregroundPid}, slot {slot}, fps {fps.Fps}");
                         _rtssOsdLastBeatUtc = nowUtc;
                     }
                     else if (nowUtc - _rtssOsdLastBeatUtc >= OsdHeartbeatInterval)
@@ -752,8 +731,7 @@ namespace Uniwill_Control_Utility.Services
                 // an update every ~3 ticks). Each stage is timed; a tick over
                 // SlowTickMs names where the time went: fps+settings
                 // (_fps.Latest lock, settings store), focus-detect
-                // (GetForegroundProcessId, RtssReader.TryRead shared memory),
-                // read+enrich (ReadSnapshot, EC fan cache, Hydro UI, Flydigi
+                // (GetForegroundProcessId), read+enrich (ReadSnapshot, EC fan cache, Hydro UI, Flydigi
                 // HID), format+write (RtssOsdWriter shared memory). If the
                 // stages stay fast while the visible OSD hiccups, the cadence
                 // is RTSS's own render/update side, not this chain.
