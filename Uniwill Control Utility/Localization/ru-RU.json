@@ -1186,5 +1186,6 @@
   "Request": "Запрос",
   "Laptop budget": "Бюджет ноутбука",
   "EC ceiling {0} · enforced {1}": "Предел EC {0} · применяется {1}",
-  "the EC is the limit": "предел EC и есть ограничение"
+  "the EC is the limit": "предел EC и есть ограничение",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "TGP профиля должен быть не меньше применяемого значения: GPU фактически получает потолок EC."
 }

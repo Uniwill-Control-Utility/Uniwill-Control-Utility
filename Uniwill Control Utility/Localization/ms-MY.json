@@ -1186,5 +1186,6 @@
   "Request": "Permintaan",
   "Laptop budget": "Belanjawan komputer riba",
   "EC ceiling {0} · enforced {1}": "Had EC {0} · dikuatkuasakan {1}",
-  "the EC is the limit": "EC ialah hadnya"
+  "the EC is the limit": "EC ialah hadnya",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "TGP pratetap mestilah sekurang-kurangnya nilai yang anda gunakan: had atas EC itulah yang sebenarnya diterima GPU."
 }

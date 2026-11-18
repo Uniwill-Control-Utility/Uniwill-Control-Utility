@@ -1,3 +1,4 @@
+using UCU.Contracts;
 using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Tests.UI;
@@ -39,6 +40,33 @@ public sealed class GpuUnlockVerdictTests
         Assert.Equal(250_000, GpuUnlockVerdict.Enforced(250_000, 250_000, 250_000));
         Assert.Equal(250_000, GpuUnlockVerdict.Enforced(250_000, null, null));
         Assert.Null(GpuUnlockVerdict.Enforced(null, null, null));
+    }
+
+    [Fact]
+    public void AReadInsideAHushWindowDoesNotReDeriveTheActions()
+    {
+        // Field, v0.9.14: pressing Apply 200 W briefly enabled Unlock extra GPU power. The read
+        // the post-apply window makes lands on the EC's republish and answers Uncertain, which
+        // counts as unlockable, so the buttons were re-derived from a mid-repair read and the
+        // settled Unlocked read disabled them again.
+        Assert.Equal(
+            GpuRomOverrideStates.Unlocked,
+            GpuUnlockVerdict.Settled(GpuRomOverrideStates.Unlocked, GpuRomOverrideStates.Uncertain, hushing: true));
+
+        // Both hush windows hold the same way, and a failed read inside one changes nothing
+        // either: the card keeps the actions it was already offering.
+        Assert.Equal(
+            GpuRomOverrideStates.Unlocked,
+            GpuUnlockVerdict.Settled(GpuRomOverrideStates.Unlocked, null, hushing: true));
+        Assert.Equal(
+            GpuRomOverrideStates.NotUnlocked,
+            GpuUnlockVerdict.Settled(GpuRomOverrideStates.NotUnlocked, GpuRomOverrideStates.Uncertain, hushing: true));
+
+        // Outside a window the read is the state, so the last verification pass (which closes
+        // the window first) settles the card on what the driver actually answered.
+        Assert.Equal(
+            GpuRomOverrideStates.Uncertain,
+            GpuUnlockVerdict.Settled(GpuRomOverrideStates.Unlocked, GpuRomOverrideStates.Uncertain, hushing: false));
     }
 
     [Fact]

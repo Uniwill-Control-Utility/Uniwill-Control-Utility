@@ -1096,13 +1096,24 @@
                                         Margin="-58,16,-46,0"
                                         Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
+                                <!-- The rule the row under this line follows: a quick set raises the
+                                     unlock's target, but the EC clamps it to the preset's own TGP,
+                                     so a preset below the button's number makes the click look
+                                     like a no-op. Said before the click, in the sliders' own
+                                     tertiary voice, so it never competes with the buttons. -->
+                                <ui:TextBlock Margin="0,16,0,0"
+                                              FontTypography="Caption"
+                                              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                              TextWrapping="Wrap"
+                                              Text="The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets." />
+
                                 <!-- One row, two separate gates: the three quick sets answer to the
                                      unlock and the consent, Apply limits to the rail sliders they
                                      write. Neither dims the other, so each control carries its own
                                      IsEnabled and Opacity and no parent panel is dimmed. The quick
                                      sets wrap inside their own column when the window is narrow;
                                      Apply limits stays pinned to the right. -->
-                                <Grid x:Name="spRomActionRow" Margin="0,20,0,4">
+                                <Grid x:Name="spRomActionRow" Margin="0,8,0,4">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />

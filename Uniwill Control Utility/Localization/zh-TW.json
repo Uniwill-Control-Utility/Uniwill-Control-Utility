@@ -1186,5 +1186,6 @@
   "Request": "請求",
   "Laptop budget": "筆記型電腦預算",
   "EC ceiling {0} · enforced {1}": "EC 上限 {0} · 實際執行 {1}",
-  "the EC is the limit": "EC 上限即為限制"
+  "the EC is the limit": "EC 上限即為限制",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "預設的 TGP 必須不低於你套用的值：GPU 實際得到的是 EC 的上限。"
 }

@@ -1186,5 +1186,6 @@
   "Request": "要求",
   "Laptop budget": "ノートPCのバジェット",
   "EC ceiling {0} · enforced {1}": "EC 上限 {0} · 適用値 {1}",
-  "the EC is the limit": "EC 上限が制限です"
+  "the EC is the limit": "EC 上限が制限です",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "プリセットの TGP は適用する値以上である必要があります。GPU が実際に得られるのは EC の上限です。"
 }

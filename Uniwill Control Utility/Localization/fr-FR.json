@@ -1186,5 +1186,6 @@
   "Request": "Demande",
   "Laptop budget": "Budget du portable",
   "EC ceiling {0} · enforced {1}": "Plafond EC {0} · appliqué {1}",
-  "the EC is the limit": "c'est le plafond EC qui s'applique"
+  "the EC is the limit": "c'est le plafond EC qui s'applique",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "Le TGP du préréglage doit être au moins la valeur appliquée : c'est le plafond de l'EC que la GPU obtient réellement."
 }

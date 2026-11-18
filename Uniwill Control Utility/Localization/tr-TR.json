@@ -1186,5 +1186,6 @@
   "Request": "İstek",
   "Laptop budget": "Dizüstü bütçesi",
   "EC ceiling {0} · enforced {1}": "EC tavanı {0} · uygulanan {1}",
-  "the EC is the limit": "sınır EC tavanıdır"
+  "the EC is the limit": "sınır EC tavanıdır",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "Ön ayarın TGP'si uyguladığınız değerden en az o kadar olmalı: GPU'nun gerçekte aldığı EC'nin üst sınırıdır."
 }

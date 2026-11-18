@@ -1186,5 +1186,6 @@
   "Request": "Anforderung",
   "Laptop budget": "Laptop-Budget",
   "EC ceiling {0} · enforced {1}": "EC-Obergrenze {0} · durchgesetzt {1}",
-  "the EC is the limit": "die EC-Obergrenze ist maßgeblich"
+  "the EC is the limit": "die EC-Obergrenze ist maßgeblich",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "Der TGP des Profils muss mindestens dem angewendeten Wert entsprechen: Was die GPU tatsächlich bekommt, ist die Obergrenze der EC."
 }

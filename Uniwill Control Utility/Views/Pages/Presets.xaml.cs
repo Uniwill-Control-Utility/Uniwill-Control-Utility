@@ -2230,6 +2230,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private bool _budgetRepairing;
 
+        // The state the actions follow: the last read taken outside a hush window, so a read
+        // that lands mid-repair (see <see cref="GpuUnlockVerdict.Settled"/>) cannot change what
+        // the user can do. The numbers below still render from the live read.
+        private string? _settledRomState;
+
         private async Task RefreshRomOverrideAsync()
         {
             _gpuTuning ??= App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
@@ -2263,6 +2268,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 && GpuUnlockVerdict.BudgetShort(_romOverride.RequestedLimitMilliwatts, _romOverride.BudgetMilliwatts))
             {
                 _budgetRepairing = true;
+
+                // The read that opened the window is the last one taken outside it: on a page
+                // load it is the only read the actions can be settled from.
+                _settledRomState ??= _romOverride?.State;
                 _ = RepairBudgetAsync();
             }
 
@@ -2277,10 +2286,17 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             UCU.Contracts.GpuRomOverrideStateDto? state = _romOverride;
             bool busy = _romOverrideBusy;
-            bool unlocked = state?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked;
-            bool uncertain = state?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain;
-            bool blocked = state?.State == UCU.Contracts.GpuRomOverrideStates.Unsupported;
-            bool canUnlock = state != null && !unlocked && !blocked;
+
+            // What the user can do follows the last read taken outside a hush window: inside one
+            // the read can answer Uncertain, which counts as unlockable, and the actions would
+            // flash enabled and back (field, v0.9.14: Apply 200 W briefly enabled Unlock).
+            _settledRomState = GpuUnlockVerdict.Settled(
+                _settledRomState, state?.State, _postApplyVerifying || _budgetRepairing);
+
+            bool unlocked = _settledRomState == UCU.Contracts.GpuRomOverrideStates.Unlocked;
+            bool uncertain = _settledRomState == UCU.Contracts.GpuRomOverrideStates.Uncertain;
+            bool blocked = _settledRomState == UCU.Contracts.GpuRomOverrideStates.Unsupported;
+            bool canUnlock = _settledRomState != null && !unlocked && !blocked;
 
             // Both actions stay visible; each is gated separately and dimmed when off.
             // The acknowledgement survives a restart once given (Settings.Default), so the

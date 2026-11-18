@@ -1186,5 +1186,6 @@
   "Request": "คำขอ",
   "Laptop budget": "งบประมาณแล็ปท็อป",
   "EC ceiling {0} · enforced {1}": "เพดาน EC {0} · บังคับใช้ {1}",
-  "the EC is the limit": "เพดาน EC คือขีดจำกัด"
+  "the EC is the limit": "เพดาน EC คือขีดจำกัด",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "TGP ของพรีเซ็ตต้องไม่น้อยกว่าค่าที่คุณใช้: เพดานของ EC คือสิ่งที่ GPU ได้รับจริง"
 }

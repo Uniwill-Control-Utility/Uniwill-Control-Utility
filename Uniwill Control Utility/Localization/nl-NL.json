@@ -1186,5 +1186,6 @@
   "Request": "Verzoek",
   "Laptop budget": "Laptopbudget",
   "EC ceiling {0} · enforced {1}": "EC-limiet {0} · toegepast {1}",
-  "the EC is the limit": "de EC-limiet is de beperkende"
+  "the EC is the limit": "de EC-limiet is de beperkende",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "De TGP van het profiel moet minstens de waarde zijn die je toepast: wat de GPU echt krijgt, is het plafond van de EC."
 }

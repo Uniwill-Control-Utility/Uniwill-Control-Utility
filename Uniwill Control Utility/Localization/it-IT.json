@@ -1186,5 +1186,6 @@
   "Request": "Richiesta",
   "Laptop budget": "Budget del portatile",
   "EC ceiling {0} · enforced {1}": "Limite EC {0} · applicato {1}",
-  "the EC is the limit": "il limite EC è quello attivo"
+  "the EC is the limit": "il limite EC è quello attivo",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "Il TGP del preset deve essere almeno il valore che applichi: la GPU ottiene davvero il limite massimo dell'EC."
 }

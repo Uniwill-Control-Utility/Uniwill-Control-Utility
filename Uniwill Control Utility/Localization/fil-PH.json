@@ -1186,5 +1186,6 @@
   "Request": "Kahilingan",
   "Laptop budget": "Badyet ng laptop",
   "EC ceiling {0} · enforced {1}": "Hangganan ng EC {0} · ipinatupad {1}",
-  "the EC is the limit": "ang EC ang limitasyon"
+  "the EC is the limit": "ang EC ang limitasyon",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "Dapat hindi bababa sa value na inilalapat mo ang TGP ng preset: ang kisame ng EC ang siyang aktwal na natatanggap ng GPU."
 }

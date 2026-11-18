@@ -1186,5 +1186,6 @@
   "Request": "요청",
   "Laptop budget": "노트북 예산",
   "EC ceiling {0} · enforced {1}": "EC 상한 {0} · 적용 {1}",
-  "the EC is the limit": "EC 상한이 한계입니다"
+  "the EC is the limit": "EC 상한이 한계입니다",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "프리셋의 TGP는 적용하는 값 이상이어야 합니다. GPU가 실제로 받는 것은 EC의 상한입니다."
 }

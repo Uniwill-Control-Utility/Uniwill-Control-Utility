@@ -1186,5 +1186,6 @@
   "Request": "الطلب",
   "Laptop budget": "ميزانية الحاسوب المحمول",
   "EC ceiling {0} · enforced {1}": "سقف EC {0} · المُطبَّق {1}",
-  "the EC is the limit": "حد EC هو الحد"
+  "the EC is the limit": "حد EC هو الحد",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "يجب أن يكون TGP الإعداد المسبق على الأقل بالقيمة التي تطبّقها: سقف EC هو ما تحصل عليه GPU فعليًا."
 }

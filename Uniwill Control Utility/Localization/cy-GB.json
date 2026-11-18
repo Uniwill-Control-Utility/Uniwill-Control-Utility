@@ -1186,5 +1186,6 @@
   "Request": "Cais",
   "Laptop budget": "Cyllideb y gliniadur",
   "EC ceiling {0} · enforced {1}": "Nenfwd EC {0} · gorfodwyd {1}",
-  "the EC is the limit": "yr EC yw'r terfyn"
+  "the EC is the limit": "yr EC yw'r terfyn",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "Rhaid i TGP y rhagosodiad fod o leiaf yn y gwerth a gymhwyswch: nenfwd EC yw'r hyn y mae'r GPU yn ei gael mewn gwirionedd."
 }

@@ -1186,5 +1186,6 @@
   "Request": "Żądanie",
   "Laptop budget": "Budżet laptopa",
   "EC ceiling {0} · enforced {1}": "Limit EC {0} · wymuszane {1}",
-  "the EC is the limit": "limit EC jest wiążący"
+  "the EC is the limit": "limit EC jest wiążący",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "TGP profilu musi wynosić co najmniej tyle, ile stosujesz: GPU dostaje w rzeczywistości limit EC."
 }

@@ -1186,5 +1186,6 @@
   "Request": "अनुरोध",
   "Laptop budget": "लैपटॉप बजट",
   "EC ceiling {0} · enforced {1}": "EC सीमा {0} · लागू {1}",
-  "the EC is the limit": "EC सीमा ही सीमा है"
+  "the EC is the limit": "EC सीमा ही सीमा है",
+  "The preset's TGP must be at least the value you apply: the EC's ceiling is what the GPU actually gets.": "प्रीसेट का TGP कम से कम उस मान के बराबर होना चाहिए जो आप लागू करते हैं: GPU को वास्तव में EC की ऊपरी सीमा ही मिलती है।"
 }
