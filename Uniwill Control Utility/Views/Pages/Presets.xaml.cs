@@ -1532,6 +1532,16 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Update status after apply
                 updateStatus();
+
+                // A live Extra GPU power unlock aims at the preset's TGP, not at the number
+                // the last unlock was given: the slider just applied is the intention, so its
+                // request, F7 raise and cTGP offset move to it without a second click.
+                await PresetProfileApplier.RetargetUnlockAsync(
+                    _currentProfile,
+                    _currentProfile == "Custom" ? (int)Math.Round(sdNvPower.Value * 1000) : null,
+                    "Presets").ConfigureAwait(true);
+
+                await RefreshRomOverrideAsync().ConfigureAwait(true);
             }
             catch (Exception ex)
             {
@@ -2170,11 +2180,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         private string? _railLimitsNote;
         private bool _railBinding;
 
-        // The tested tier and the stock rails, the UI's own copy of what the engine ships
-        // (GpuPowerTiers.ExtraGpuPower and RomOverrideLayout.Stock*MilliAmps in UCU.Hardware,
-        // which this project does not reference). The status row judges a reading against these
-        // without asking the engine what "tested" means, and the slider floor is the stock rail.
-        private const int TestedTargetMilliwatts = 225_000;
+        // The tested tier's rails and the stock rails, the UI's own copy of what the engine
+        // ships (RomOverrideLayout.Stock*MilliAmps in UCU.Hardware, which this project does
+        // not reference). The status row judges a reading against these without asking the
+        // engine what "tested" means, and the slider floor is the stock rail. The TGP side of
+        // that judgement lives in GpuUnlockVerdict, which the tests drive.
         private const int TestedNvvddMilliamps = 250_000;
         private const int TestedMsvddMilliamps = 70_000;
         private const int TestedBoardInputMilliamps = 14_026;
@@ -2273,12 +2283,28 @@ namespace Uniwill_Control_Utility.Views.Pages
                                         ? LocalizationService.Get("Tick the statement above first.")
                                         : null;
 
+            // The card must never claim a number it does not enforce. The driver answers
+            // min(request, budget) and the EC's cTGP caps that again, so a request the
+            // machine does not deliver gets its own line with both numbers — the measured
+            // cause is the EC refusing the cTGP offset.
+            string? shortfall = busy
+                ? null
+                : GpuUnlockVerdict.Shortfall(
+                    state?.RequestedLimitMilliwatts,
+                    GpuUnlockVerdict.Enforced(
+                        state?.RequestedLimitMilliwatts,
+                        state?.BudgetMilliwatts,
+                        state?.CurrentLimitMilliwatts));
+
+            if (shortfall != null)
+                line = line is null ? shortfall : line + "\n" + shortfall;
+
             tbRomOverrideNote.Text = line ?? string.Empty;
             tbRomOverrideNote.Visibility = string.IsNullOrEmpty(line) ? Visibility.Collapsed : Visibility.Visible;
 
             // The colour is decoration on a sentence that already says what is wrong.
             tbRomOverrideNote.Foreground = (System.Windows.Media.Brush)FindResource(
-                !busy && (_romOverrideError != null || blocked || uncertain)
+                !busy && (_romOverrideError != null || blocked || uncertain || shortfall != null)
                     ? "SystemFillColorCautionBrush"
                     : "TextFillColorSecondaryBrush");
 
@@ -2343,12 +2369,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             int? board = state.BoardInputCurrentMilliamps;
 
             SetRomValue(tbRomStatRequest, tbRomStatRequestWord, Watts(request),
-                request is not null, unverified, request is int r && r >= TestedTargetMilliwatts);
+                request is not null, unverified, GpuUnlockVerdict.IsTested(request));
 
             // The driver enforces min(request, budget), so a budget under the request is the
             // laptop's own cap holding the GPU back, not a fault.
             SetRomValue(tbRomStatBudget, tbRomStatBudgetWord, Watts(budget),
-                budget is not null, unverified, budget is int b && b >= (request ?? TestedTargetMilliwatts));
+                budget is not null, unverified, budget is int b && b >= (request ?? GpuUnlockVerdict.TestedTargetMilliwatts));
 
             SetRomValue(tbRomStatNvvdd, tbRomStatNvvddWord, Amps(nvvdd, 0) + " A",
                 nvvdd is not null, unverified, nvvdd is int n && n <= TestedNvvddMilliamps);
@@ -2454,9 +2480,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // monitoring across it (the guard holds the park through the driver
                 // cooldown), or a poll lands on a dead NVML handle and kills the process.
                 UCU.Contracts.Capabilities.IGpuTuningCapability tuning = _gpuTuning;
+
+                // The unlock aims at the TGP the page would apply: a Custom preset's slider
+                // is the owner's intention, while a stock preset hands its TGP to the
+                // firmware, so the engine's measured target stands there. A slider below the
+                // measured 225 W is not the unlock's target either — the unlock is a 225 W
+                // configuration, and the store refuses anything lower rather than promoting it.
+                int? targetTgp = _currentProfile == "Custom"
+                    ? (int)Math.Round(sdNvPower.Value * 1000)
+                    : null;
+
+                if (targetTgp < GpuUnlockVerdict.TestedTargetMilliwatts)
+                    targetTgp = null;
+
                 _romOverride = await GpuDeviceRestartGuard.RunAsync(
                     App.GetService<IHardwareMonitoringService>(),
-                    () => tuning.SetRomOverrideAsync(!restore)).ConfigureAwait(true);
+                    () => tuning.SetRomOverrideAsync(!restore, targetTgp)).ConfigureAwait(true);
                 DebugLog($"GPU ROM override: asked {(!restore ? "unlock" : "restore")}, engine answered {_romOverride.State}");
             }
             catch (Exception ex)

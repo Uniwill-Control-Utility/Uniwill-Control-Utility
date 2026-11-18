@@ -1181,5 +1181,6 @@
   "Restore stock now": "今すぐ元に戻す",
   "Keep Power boost mode on": "パワーブーストモードをオンのままにする",
   "Extra GPU power could not be restored": "GPU の追加電力を元に戻せませんでした",
-  "The extra GPU power override is still applied.": "GPU の追加電力の上書きは適用されたままです。"
+  "The extra GPU power override is still applied.": "GPU の追加電力の上書きは適用されたままです。",
+  "The card enforces {0}, not the requested {1}.": "カードは要求された {1} ではなく {0} を適用しています。"
 }

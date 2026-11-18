@@ -1786,6 +1786,168 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
+    public void Apply_AimsTheEcOffsetTheBudgetRaiseAndTheRequestAtTheRequestedTarget()
+    {
+        // The owner's action (field, 0.9.14): a Custom preset at 250 W with the unlock on.
+        // Every one of the three moves used to be hardcoded to the tier's 225 W, so the card
+        // stayed at 225 W while the slider and the EC said 250 W.
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 250_000 };
+        var ec = new FakeEc(_log) { DefaultTgpWatts = 95 };
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, ec, request, budget)
+            .SetEnabled(true, 250_000);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Equal(250_000, state.TargetTgpMilliwatts);
+        Assert.Equal(250_000, state.RequestedLimitMilliwatts);
+        Assert.Equal(250_000, request.Requests[^1]);
+        Assert.Equal(new GpuPowerBudget(250_000, 525_000), budget.Current);
+        Assert.Equal((155, 0), ec.Activations[^1]);       // 250 W - the EC's 95 W base
+        Assert.Equal("250000", File.ReadAllText(TargetPath));
+    }
+
+    [Fact]
+    public void Apply_WithoutATarget_UsesTheTestedTarget()
+    {
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 225_000 };
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), request, budget)
+            .SetEnabled(true);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, state.State);
+        Assert.Equal(225_000, state.TargetTgpMilliwatts);
+        Assert.Equal(225_000, request.Requests[^1]);
+        Assert.Equal(225_000, budget.Current.F7Milliwatts);
+        Assert.Equal("225000", File.ReadAllText(TargetPath));
+    }
+
+    [Fact]
+    public void Apply_RefusesATargetBelowTheTestedOne_WithoutWritingAnything()
+    {
+        // Refused, not promoted: a preset quieter than the measured target is not the
+        // unlock's configuration, and silently raising it would change what was asked for.
+        var registry = new FakeRomRegistry(_log);
+        var ec = new FakeEc(_log);
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+
+        GpuRomOverrideStateDto state = NewStore(
+            registry, new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 }, ec, request, budget)
+            .SetEnabled(true, 200_000);
+
+        Assert.Equal(GpuRomOverrideStates.Unsupported, state.State);
+        Assert.Contains("200 W", state.Reason!, StringComparison.Ordinal);
+        Assert.Contains("225 W", state.Reason!, StringComparison.Ordinal);
+        Assert.Empty(registry.Writes);
+        Assert.Empty(ec.Activations);
+        Assert.Empty(request.Requests);
+        Assert.Empty(budget.Sets);
+        Assert.False(File.Exists(TargetPath));
+    }
+
+    [Fact]
+    public void Apply_ClampsATargetAboveTheRomCeiling()
+    {
+        var request = new FakeRequest(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 250_000 };
+
+        GpuRomOverrideStateDto state = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), request)
+            .SetEnabled(true, 300_000);
+
+        Assert.Equal(250_000, state.TargetTgpMilliwatts);
+        Assert.Equal(250_000, request.Requests[^1]);
+        Assert.Equal("250000", File.ReadAllText(TargetPath));
+    }
+
+    [Fact]
+    public void StartupReapply_AimsAtTheSavedTarget_NotTheTiers()
+    {
+        // A 250 W unlock must survive a reboot as 250 W: the saved target is what the boot
+        // re-apply and the drift watch read, so nothing falls back to 225 W.
+        var registry = new FakeRomRegistry(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 250_000 };
+        var request = new FakeRequest(_log);
+        var budget = new FakeBudget(_log);
+        var ec = new FakeEc(_log);
+        var rails = new FakeRails(_log);
+        var restarter = new FakeRestarter(_log);
+
+        GpuRomOverrideStore store = NewStore(registry, restarter, ceiling, ec, request, budget, rails);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true, 250_000).State);
+        Assert.Equal("250000", File.ReadAllText(TargetPath));
+
+        request.Forget();
+        budget.Reset();
+        rails.NvVddCurrent = RomOverrideLayout.StockNvVddMilliAmps;
+        rails.MsVddCurrent = RomOverrideLayout.StockMsVddMilliAmps;
+        rails.BoardCurrent = RomOverrideLayout.StockBoardInputMilliAmps;
+        _log.Clear();
+
+        GpuReapplyResult result = store.ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        Assert.Equal(250_000, result.State!.TargetTgpMilliwatts);
+        Assert.Equal(250_000, result.State.RequestedLimitMilliwatts);
+        Assert.Equal(250_000, request.Requests[^1]);
+        Assert.Equal(new GpuPowerBudget(250_000, 525_000), budget.Current);
+        Assert.Equal((155, 0), ec.Activations[^1]);
+        Assert.True(_log.IndexOf("ec.activate:155,0") < _log.IndexOf("request:250000"), string.Join(",", _log));
+    }
+
+    [Fact]
+    public void SetterAndTheWatch_UseTheSavedTarget()
+    {
+        // The settle pass and the 30 s watch re-raise the F7 budget from the captured
+        // baseline; both must use the saved 250 W, or the EC's next publish snaps the card
+        // back to the tier's number.
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 250_000 };
+        var budget = new FakeBudget(_log);
+        var request = new FakeRequest(_log);
+        var rails = new FakeRails(_log);
+
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), request, budget, rails);
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true, 250_000).State);
+
+        // A pass with nothing drifted stays quiet at 250 W.
+        Assert.Equal(GpuSettleVerdict.Settled, store.SettleAtStartup().Verdict);
+
+        // The EC republishes its 150 W budget: both paths must put 250 W back.
+        budget.Reset();
+        GpuSettleResult settled = store.SettleAtStartup();
+        Assert.Equal(GpuSettleVerdict.Reapplied, settled.Verdict);
+        Assert.Equal(new GpuPowerBudget(250_000, 525_000), budget.Current);
+
+        budget.Reset();
+        Assert.Equal(GpuBudgetWatchVerdict.Raised, store.WatchBudget().Verdict);
+        Assert.Equal(new GpuPowerBudget(250_000, 525_000), budget.Current);
+    }
+
+    [Fact]
+    public void Restore_DeletesTheSavedTarget()
+    {
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000, Current = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling, new FakeEc(_log), new FakeRequest(_log));
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true, 250_000).State);
+        Assert.True(File.Exists(TargetPath));
+
+        ceiling.Ceiling = 175_000;
+        ceiling.Current = 150_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+
+        Assert.False(File.Exists(TargetPath));
+    }
+
+    [Fact]
     public void ReUnlock_DoesNotOverwriteASavedRailSelection()
     {
         // The first completed unlock establishes the defaults; a later one must not discard
@@ -1809,6 +1971,8 @@ public sealed class GpuRomOverrideTests : IDisposable
     private string MarkerPath => Path.Combine(Path.GetDirectoryName(OriginalsPath)!, "enabled");
 
     private string RailsPath => Path.Combine(Path.GetDirectoryName(OriginalsPath)!, "rails.txt");
+
+    private string TargetPath => Path.Combine(Path.GetDirectoryName(OriginalsPath)!, "target.txt");
 
     /// <summary>The state a completed unlock leaves on disk, without touching the driver key.</summary>
     private void SeedOriginalsAndMarker(string? tier = null)

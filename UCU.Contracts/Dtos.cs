@@ -775,6 +775,23 @@ namespace UCU.Contracts
     }
 
     /// <summary>
+    /// The <c>gpu.set_rom_override</c> parameters. <see cref="Value"/> keeps the historical
+    /// <c>value</c> name the wire already carries; <see cref="TargetTgpMilliwatts"/> is the
+    /// TGP the unlock aims at, in milliwatts, absent meaning the tier's tested 225 000.
+    /// </summary>
+    public sealed record GpuRomOverrideCommandDto
+    {
+        /// <summary>true applies the unlock, false restores stock.</summary>
+        public bool Value { get; init; }
+
+        /// <summary>
+        /// The target TGP in milliwatts (the preset's slider). Clamped to
+        /// [the tier's tested target .. the ROM ceiling]; a lower value is refused.
+        /// </summary>
+        public int? TargetTgpMilliwatts { get; init; }
+    }
+
+    /// <summary>
     /// The GPU power-ceiling override (the "extra GPU power" unlock). The engine stages
     /// the ROM power-policy records on the GPU's display-driver key and restarts the
     /// adapter; the state names what the key and the driver actually report, never what
@@ -824,6 +841,14 @@ namespace UCU.Contracts
         /// EC-derived limit) or when it could not be read; <see cref="Reason"/> says which.
         /// </summary>
         public int? RequestedLimitMilliwatts { get; init; }
+
+        /// <summary>
+        /// The TGP this unlock aims at, in mW: the preset's slider when the owner unlocked
+        /// with one, otherwise the tier's tested 225 000. The request and the budget raise
+        /// are both aimed at it, so it is what <see cref="RequestedLimitMilliwatts"/> should
+        /// read back as.
+        /// </summary>
+        public int? TargetTgpMilliwatts { get; init; }
 
         /// <summary>True when the driver's reported ceiling is above the stock ROM's.</summary>
         public bool EnforcedLimitMoved { get; init; }

@@ -13,6 +13,9 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
 {
     public bool? LastEnabled { get; private set; }
 
+    /// <summary>The target TGP the verb carried (mW), or null when the request had none.</summary>
+    public int? LastTargetTgpMilliwatts { get; private set; }
+
     /// <summary>How many times the engine's start-up re-apply reached this fake.</summary>
     public int ReapplyCalls { get; private set; }
 
@@ -56,9 +59,10 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
 
     public GpuRomOverrideStateDto GetState() => Answer;
 
-    public GpuRomOverrideStateDto SetEnabled(bool enabled)
+    public GpuRomOverrideStateDto SetEnabled(bool enabled, int? targetTgpMilliwatts = null)
     {
         LastEnabled = enabled;
+        LastTargetTgpMilliwatts = targetTgpMilliwatts;
         return Answer;
     }
 

@@ -1181,5 +1181,6 @@
   "Restore stock now": "अभी मूल स्थिति में लौटाएँ",
   "Keep Power boost mode on": "पावर बूस्ट मोड चालू रखें",
   "Extra GPU power could not be restored": "अतिरिक्त GPU पावर बहाल नहीं की जा सकी",
-  "The extra GPU power override is still applied.": "अतिरिक्त GPU पावर का ओवरराइड अभी भी लागू है।"
+  "The extra GPU power override is still applied.": "अतिरिक्त GPU पावर का ओवरराइड अभी भी लागू है।",
+  "The card enforces {0}, not the requested {1}.": "कार्ड {0} लागू करता है, अनुरोधित {1} नहीं।"
 }

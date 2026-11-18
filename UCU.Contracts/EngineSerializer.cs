@@ -79,6 +79,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(DrsPreferenceDto))]
     [JsonSerializable(typeof(SetClocksDto))]
     [JsonSerializable(typeof(GpuRomOverrideStateDto))]
+    [JsonSerializable(typeof(GpuRomOverrideCommandDto))]
     [JsonSerializable(typeof(GpuRailLimitsDto))]
     [JsonSerializable(typeof(List<UCU.Core.Takeover.TakeoverJournalEntry>))]
     public partial class EngineJsonContext : JsonSerializerContext

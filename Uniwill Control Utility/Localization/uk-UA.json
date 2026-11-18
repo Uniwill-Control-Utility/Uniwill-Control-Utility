@@ -1181,5 +1181,6 @@
   "Restore stock now": "Відновити вихідне зараз",
   "Keep Power boost mode on": "Залишити режим підвищення потужності увімкненим",
   "Extra GPU power could not be restored": "Не вдалося відновити додаткову потужність GPU",
-  "The extra GPU power override is still applied.": "Перевизначення додаткової потужності GPU досі застосоване."
+  "The extra GPU power override is still applied.": "Перевизначення додаткової потужності GPU досі застосоване.",
+  "The card enforces {0}, not the requested {1}.": "Картка застосовує {0}, а не запитані {1}."
 }

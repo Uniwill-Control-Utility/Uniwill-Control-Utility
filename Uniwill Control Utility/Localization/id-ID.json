@@ -1181,5 +1181,6 @@
   "Restore stock now": "Pulihkan asli sekarang",
   "Keep Power boost mode on": "Biarkan mode boost daya tetap menyala",
   "Extra GPU power could not be restored": "Daya GPU tambahan tidak dapat dipulihkan",
-  "The extra GPU power override is still applied.": "Penggantian daya GPU tambahan masih diterapkan."
+  "The extra GPU power override is still applied.": "Penggantian daya GPU tambahan masih diterapkan.",
+  "The card enforces {0}, not the requested {1}.": "Kartu menerapkan {0}, bukan {1} yang diminta."
 }

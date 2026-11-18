@@ -1181,5 +1181,6 @@
   "Restore stock now": "คืนค่าเดิมตอนนี้",
   "Keep Power boost mode on": "เปิดโหมดบูสต์กำลังไฟไว้",
   "Extra GPU power could not be restored": "ไม่สามารถคืนค่ากำลังไฟ GPU เพิ่มเติมได้",
-  "The extra GPU power override is still applied.": "การเขียนทับกำลังไฟ GPU เพิ่มเติมยังถูกใช้งานอยู่"
+  "The extra GPU power override is still applied.": "การเขียนทับกำลังไฟ GPU เพิ่มเติมยังถูกใช้งานอยู่",
+  "The card enforces {0}, not the requested {1}.": "การ์ดบังคับใช้ {0} ไม่ใช่ {1} ที่ร้องขอ"
 }

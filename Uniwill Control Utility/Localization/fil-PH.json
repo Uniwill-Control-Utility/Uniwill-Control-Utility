@@ -1181,5 +1181,6 @@
   "Restore stock now": "Ibalik ang orihinal ngayon",
   "Keep Power boost mode on": "Iwanang naka-on ang mode ng power boost",
   "Extra GPU power could not be restored": "Hindi naibalik ang karagdagang GPU power",
-  "The extra GPU power override is still applied.": "Nakalapat pa rin ang override ng karagdagang GPU power."
+  "The extra GPU power override is still applied.": "Nakalapat pa rin ang override ng karagdagang GPU power.",
+  "The card enforces {0}, not the requested {1}.": "Ipinapatupad ng card ang {0}, hindi ang hiniling na {1}."
 }

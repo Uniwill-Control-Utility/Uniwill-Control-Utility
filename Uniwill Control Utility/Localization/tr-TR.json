@@ -1181,5 +1181,6 @@
   "Restore stock now": "Şimdi özgün ayara dön",
   "Keep Power boost mode on": "Güç artışı modunu açık bırak",
   "Extra GPU power could not be restored": "Ek GPU gücü geri alınamadı",
-  "The extra GPU power override is still applied.": "Ek GPU gücü geçersiz kılması hâlâ uygulanmış durumda."
+  "The extra GPU power override is still applied.": "Ek GPU gücü geçersiz kılması hâlâ uygulanmış durumda.",
+  "The card enforces {0}, not the requested {1}.": "Kart {1} yerine {0} uyguluyor."
 }

@@ -1181,5 +1181,6 @@
   "Restore stock now": "Herstel het origineel nu",
   "Keep Power boost mode on": "Power-boostmodus aan laten staan",
   "Extra GPU power could not be restored": "Extra GPU-vermogen kon niet worden hersteld",
-  "The extra GPU power override is still applied.": "De overschrijving van het extra GPU-vermogen is nog steeds toegepast."
+  "The extra GPU power override is still applied.": "De overschrijving van het extra GPU-vermogen is nog steeds toegepast.",
+  "The card enforces {0}, not the requested {1}.": "De kaart handhaaft {0}, niet de gevraagde {1}."
 }

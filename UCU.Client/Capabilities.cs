@@ -441,10 +441,17 @@ namespace UCU.Client
         public Task<GpuRomOverrideStateDto> GetRomOverrideStateAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<GpuRomOverrideStateDto>(EngineVerbs.Gpu.GetRomOverrideState, cancellationToken);
 
-        public Task<GpuRomOverrideStateDto> SetRomOverrideAsync(bool enabled, CancellationToken cancellationToken = default) =>
+        public Task<GpuRomOverrideStateDto> SetRomOverrideAsync(
+            bool enabled,
+            int? targetTgpMilliwatts = null,
+            CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<GpuRomOverrideStateDto>(
                 EngineVerbs.Gpu.SetRomOverride,
-                EngineSerializer.ToParams(new BoolValueDto { Value = enabled }),
+                EngineSerializer.ToParams(new GpuRomOverrideCommandDto
+                {
+                    Value = enabled,
+                    TargetTgpMilliwatts = targetTgpMilliwatts,
+                }),
                 cancellationToken);
 
         public Task<GpuRailLimitsDto> GetRailLimitsAsync(CancellationToken cancellationToken = default) =>

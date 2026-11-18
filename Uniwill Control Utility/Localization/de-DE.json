@@ -1181,5 +1181,6 @@
   "Restore stock now": "Original jetzt wiederherstellen",
   "Keep Power boost mode on": "Leistungsboost-Modus eingeschaltet lassen",
   "Extra GPU power could not be restored": "Zusätzliche GPU-Leistung konnte nicht wiederhergestellt werden",
-  "The extra GPU power override is still applied.": "Die Überschreibung der zusätzlichen GPU-Leistung ist weiterhin aktiv."
+  "The extra GPU power override is still applied.": "Die Überschreibung der zusätzlichen GPU-Leistung ist weiterhin aktiv.",
+  "The card enforces {0}, not the requested {1}.": "Die Karte erzwingt {0}, nicht die angeforderten {1}."
 }

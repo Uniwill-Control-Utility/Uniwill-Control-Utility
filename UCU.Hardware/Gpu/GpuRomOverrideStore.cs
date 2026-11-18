@@ -126,7 +126,12 @@ namespace UCU.Hardware.Gpu
         GpuRomOverrideStateDto GetState();
 
         /// <summary>true stages the tier's records and restarts the GPU; false restores stock.</summary>
-        GpuRomOverrideStateDto SetEnabled(bool enabled);
+        /// <param name="targetTgpMilliwatts">
+        /// The TGP to aim at, in mW (the preset's slider). Null keeps the target the last
+        /// apply saved, or the tier's tested target when none was ever saved. A value below
+        /// the tier's target is refused; above the ROM ceiling it is clamped.
+        /// </param>
+        GpuRomOverrideStateDto SetEnabled(bool enabled, int? targetTgpMilliwatts = null);
 
         /// <summary>
         /// One attempt at re-applying the live half of a completed unlock, for engine start:
@@ -202,6 +207,7 @@ namespace UCU.Hardware.Gpu
         private readonly string _originalsPath;
         private readonly string _markerPath;
         private readonly string _railsPath;
+        private readonly string _targetPath;
 
         /// <summary>
         /// The last attempt's state (null before one ran, cleared by a completed apply or
@@ -251,6 +257,11 @@ namespace UCU.Hardware.Gpu
             // The owner's rail currents, beside the originals: the sliders' Apply writes it, and
             // every path that sets the rails reads it instead of the tier's numbers.
             _railsPath = Path.Combine(Path.GetDirectoryName(_originalsPath) ?? string.Empty, "rails.txt");
+
+            // The target TGP the last apply was given (the preset's slider), beside the
+            // originals: the boot re-apply, the settle pass and the drift watch all aim at
+            // it instead of the tier's tested number.
+            _targetPath = Path.Combine(Path.GetDirectoryName(_originalsPath) ?? string.Empty, "target.txt");
         }
 
         /// <summary>
@@ -327,6 +338,7 @@ namespace UCU.Hardware.Gpu
             GpuPowerRequestState request = _request.Read();
             GpuPowerBudgetState budget = _budget.Read();
             GpuRailLimits rails = _rails.Read();
+            int target = TargetMilliwatts;
 
             try
             {
@@ -347,13 +359,13 @@ namespace UCU.Hardware.Gpu
                 if (ForeignRecordReason(records, originals) is string foreign)
                     return State(GpuRomOverrideStates.Unsupported, foreign, version, limits, request, budget: budget, rails: rails);
 
-                if (CeilingReason(limits) is string unmoved)
+                if (CeilingReason(limits, target) is string unmoved)
                     return State(GpuRomOverrideStates.Uncertain, unmoved, version, limits, request, budget: budget, rails: rails);
 
-                if (RequestReason(request) is string notAsked)
+                if (RequestReason(request, target) is string notAsked)
                     return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, budget: budget, rails: rails);
 
-                if (BudgetReason(budget) is string capped)
+                if (BudgetReason(budget, target) is string capped)
                     return State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, budget: budget, rails: rails);
 
                 // Every live witness can hold while a start-up attempt still failed (the
@@ -383,7 +395,8 @@ namespace UCU.Hardware.Gpu
             }
         }
 
-        public GpuRomOverrideStateDto SetEnabled(bool enabled) => enabled ? Apply() : Restore();
+        public GpuRomOverrideStateDto SetEnabled(bool enabled, int? targetTgpMilliwatts = null) =>
+            enabled ? Apply(targetTgpMilliwatts) : Restore();
 
         /// <summary>
         /// The sliders' read: the live rail currents and the policy range each is bounded
@@ -429,7 +442,7 @@ namespace UCU.Hardware.Gpu
             Reason = rails.Reason,
         };
 
-        private GpuRomOverrideStateDto Apply()
+        private GpuRomOverrideStateDto Apply(int? targetMilliwatts)
         {
             GpuPowerLimits limits = new(null, null);
             GpuPowerRequestState request = new(null, null, null, null);
@@ -444,6 +457,21 @@ namespace UCU.Hardware.Gpu
                 {
                     return refused;
                 }
+
+                // The target: the preset's slider when one was passed, otherwise what the
+                // last apply saved. Below the tested target it is refused (nothing is
+                // written, so the refusal is clean); above the ROM record's ceiling it is
+                // clamped, because no request can be honoured there.
+                int target = targetMilliwatts ?? TargetMilliwatts;
+                if (target < _tier.TgpTargetMilliwatts)
+                {
+                    return State(
+                        GpuRomOverrideStates.Unsupported,
+                        $"the requested TGP {Watts(target)} is below the {Watts(_tier.TgpTargetMilliwatts)} this unlock was measured at, so nothing was applied",
+                        version, limits);
+                }
+
+                target = Math.Min(target, _tier.PowerMilliwatts);
 
                 // (a) The EC's cTGP offset, against this board's own DefaultTGP. The
                 // declared TgpOffsetMax is not enforced (130 → 225 W was accepted).
@@ -469,8 +497,12 @@ namespace UCU.Hardware.Gpu
                         version, limits, request);
                 }
 
-                int offset = EcSpecCodec.CtgpOffsetForTgp(_tier.TgpTargetWatts, info.DefaultTgpWatts);
+                int offset = EcSpecCodec.CtgpOffsetForTgp(target / 1000, info.DefaultTgpWatts);
                 _ec.ActivateGpuPowerControl(offset, 0);
+
+                // Saved with the first hardware write: a boot re-apply and the drift watch
+                // aim at this same number, not at the tier's, from here on.
+                WriteTarget(target);
 
                 string pinned = version!;
                 IReadOnlyList<(string Name, byte[] Data)> desired = RomOverrideLayout.BuildRecords(_tier, pinned);
@@ -504,7 +536,7 @@ namespace UCU.Hardware.Gpu
                 GpuRomOverrideStateDto state = ApplyLive(
                     "gpu.set_rom_override",
                     staged ? "the records were already staged; the GPU was not restarted" : null,
-                    pinned, restarted, limits, request, budget, rails,
+                    pinned, target, restarted, limits, request, budget, rails,
                     out RailSelection appliedRails,
                     captureBudgetFor: originals?.Budget == null ? pinned : null);
 
@@ -538,7 +570,9 @@ namespace UCU.Hardware.Gpu
         /// this with the records just staged; the start-up re-apply reaches it with them
         /// staged by a previous boot, so the same steps and the same witnesses prove both.
         /// <paramref name="verb"/> is the log prefix, <paramref name="note"/> rides the
-        /// Unlocked answer, <paramref name="requestedRails"/> is the selection the rails
+        /// Unlocked answer, <paramref name="targetMilliwatts"/> is the TGP this apply aims
+        /// at (the budget raise and the driver's request use it), <paramref name="requestedRails"/>
+        /// is the selection the rails
         /// were moved to, and <paramref name="captureBudgetFor"/> is the version to
         /// capture the stock budget into the originals file for (null: never — the
         /// start-up re-apply must not rewrite the recovery file).
@@ -547,6 +581,7 @@ namespace UCU.Hardware.Gpu
             string verb,
             string? note,
             string version,
+            int targetMilliwatts,
             bool restarted,
             GpuPowerLimits limits,
             GpuPowerRequestState request,
@@ -593,9 +628,9 @@ namespace UCU.Hardware.Gpu
             if (captureBudgetFor is string capture)
                 WriteOriginals(capture, current);
 
-            if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
+            if (current.F7Milliwatts < targetMilliwatts)
             {
-                if (!TryTierBudget(verb, current, out GpuPowerBudget raised, out string? overflow))
+                if (!TryTierBudget(verb, targetMilliwatts, current, out GpuPowerBudget raised, out string? overflow))
                 {
                     return State(
                         GpuRomOverrideStates.Uncertain,
@@ -609,7 +644,7 @@ namespace UCU.Hardware.Gpu
                     return State(
                         GpuRomOverrideStates.Uncertain,
                         "the records are staged and the EC is offset, but the laptop power budget " +
-                        $"could not be raised to {Watts(_tier.TgpTargetMilliwatts)}: {set.Reason}",
+                        $"could not be raised to {Watts(targetMilliwatts)}: {set.Reason}",
                         version, limits, request, restarted, set, rails);
                 }
 
@@ -622,7 +657,7 @@ namespace UCU.Hardware.Gpu
 
             // (e) The request: without it the ceiling moves and the card stays on its
             // EC-derived limit, which is the failure this tier shipped with.
-            request = _request.Request(_tier.TgpTargetMilliwatts);
+            request = _request.Request(targetMilliwatts);
             limits = _ceiling.Read();
 
             // (f) The rails read back: the tier's currents are what the card runs.
@@ -648,17 +683,17 @@ namespace UCU.Hardware.Gpu
                 return State(
                     GpuRomOverrideStates.Uncertain,
                     $"the records are staged and the ceiling is {CeilingText(limits)}, " +
-                    $"but the {Watts(_tier.TgpTargetMilliwatts)} power request failed: {refused}",
+                    $"but the {Watts(targetMilliwatts)} power request failed: {refused}",
                     version, limits, request, restarted, budget, rails);
             }
 
-            if (CeilingReason(limits) is string shortfall)
+            if (CeilingReason(limits, targetMilliwatts) is string shortfall)
                 return State(GpuRomOverrideStates.Uncertain, shortfall, version, limits, request, restarted, budget, rails);
 
-            if (RequestReason(request) is string notAsked)
+            if (RequestReason(request, targetMilliwatts) is string notAsked)
                 return State(GpuRomOverrideStates.Uncertain, notAsked, version, limits, request, restarted, budget, rails);
 
-            if (BudgetReason(budget) is string capped)
+            if (BudgetReason(budget, targetMilliwatts) is string capped)
                 return State(GpuRomOverrideStates.Uncertain, capped, version, limits, request, restarted, budget, rails);
 
             return State(GpuRomOverrideStates.Unlocked, note, version, limits, request, restarted, budget, rails);
@@ -724,7 +759,9 @@ namespace UCU.Hardware.Gpu
                         $"the driver key does not carry the {_tier.Id} records", version, none));
 
                 // The EC offset goes first, exactly as in an apply: nothing is written
-                // before it, so a refusal here is clean.
+                // before it, so a refusal here is clean. The target is the one the last
+                // apply saved, so a boot aims at the same TGP the owner chose.
+                int target = TargetMilliwatts;
                 GpuPowerInfoDto info = _ec.GetGpuPowerInfo();
                 if (!info.Supported)
                 {
@@ -734,10 +771,10 @@ namespace UCU.Hardware.Gpu
                         version, none));
                 }
 
-                _ec.ActivateGpuPowerControl(EcSpecCodec.CtgpOffsetForTgp(_tier.TgpTargetWatts, info.DefaultTgpWatts), 0);
+                _ec.ActivateGpuPowerControl(EcSpecCodec.CtgpOffsetForTgp(target / 1000, info.DefaultTgpWatts), 0);
 
                 GpuRomOverrideStateDto state = ApplyLive(
-                    "gpu.startup", null, version, restarted: false,
+                    "gpu.startup", null, version, target, restarted: false,
                     none, new GpuPowerRequestState(null, null, null, null),
                     new GpuPowerBudgetState(null, null, null), GpuRailLimits.None, out _);
 
@@ -774,6 +811,7 @@ namespace UCU.Hardware.Gpu
                     return new(GpuSettleVerdict.Stopped, null, null);
 
                 string version = _registry.ReadVbiosVersion()!;
+                int target = TargetMilliwatts;
                 var drift = new List<string>();
 
                 // The rails: a driver reload leaves the policy maxima, so the requested currents
@@ -791,10 +829,10 @@ namespace UCU.Hardware.Gpu
                 GpuPowerBudgetState budget = _budget.Read();
                 if (budget.Budget is GpuPowerBudget current)
                 {
-                    if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
+                    if (current.F7Milliwatts < target)
                     {
                         drift.Add($"budget {current.F7Milliwatts} mW");
-                        if (TryTierBudget("gpu.settle", current, out GpuPowerBudget raised, out _))
+                        if (TryTierBudget("gpu.settle", target, current, out GpuPowerBudget raised, out _))
                             budget = _budget.Set(raised);
                     }
                 }
@@ -805,16 +843,16 @@ namespace UCU.Hardware.Gpu
 
                 // The driver's own request: cleared by a driver reload.
                 GpuPowerRequestState request = _request.Read();
-                if (RequestReason(request) is not null)
+                if (RequestReason(request, target) is not null)
                 {
                     drift.Add("request");
-                    request = _request.Request(_tier.TgpTargetMilliwatts);
+                    request = _request.Request(target);
                 }
 
                 // The ceiling is the records' witness, so it is read but never written here:
                 // only a restart makes the driver re-read the records.
                 GpuPowerLimits limits = _ceiling.Read();
-                if (CeilingReason(limits) is not null)
+                if (CeilingReason(limits, target) is not null)
                     drift.Add("ceiling");
 
                 if (drift.Count == 0)
@@ -825,7 +863,8 @@ namespace UCU.Hardware.Gpu
 
                 string what = string.Join(", ", drift);
                 string? shortfall =
-                    BudgetReason(budget) ?? RequestReason(request) ?? CeilingReason(limits) ?? RailsReason(rails);
+                    BudgetReason(budget, target) ?? RequestReason(request, target) ??
+                    CeilingReason(limits, target) ?? RailsReason(rails);
 
                 if (shortfall is null)
                 {
@@ -858,17 +897,18 @@ namespace UCU.Hardware.Gpu
                 if (state.Budget is not GpuPowerBudget current)
                     return new(GpuBudgetWatchVerdict.Failed, $"the laptop power budget could not be read: {state.Reason}");
 
-                if (current.F7Milliwatts >= _tier.TgpTargetMilliwatts)
+                int target = TargetMilliwatts;
+                if (current.F7Milliwatts >= target)
                     return new(GpuBudgetWatchVerdict.Holding, null);
 
-                if (!TryTierBudget("gpu.budget_watch", current, out GpuPowerBudget wanted, out string? reason))
+                if (!TryTierBudget("gpu.budget_watch", target, current, out GpuPowerBudget wanted, out string? reason))
                     return new(GpuBudgetWatchVerdict.Failed, reason);
 
                 GpuPowerBudgetState set = _budget.Set(wanted);
                 if (set.Budget is not GpuPowerBudget applied)
                 {
                     return new(GpuBudgetWatchVerdict.Failed,
-                        $"the laptop power budget could not be raised to {Watts(_tier.TgpTargetMilliwatts)}: {set.Reason}");
+                        $"the laptop power budget could not be raised to {Watts(target)}: {set.Reason}");
                 }
 
                 // The raise is the fix, so a stored verdict about the drift must not outlive
@@ -887,13 +927,14 @@ namespace UCU.Hardware.Gpu
         }
 
         /// <summary>
-        /// The raise the tier wants, computed from the baseline captured once in the
+        /// The raise the target wants, computed from the baseline captured once in the
         /// originals file (<c>f7 = max(baseline.f7, target)</c>, <c>platform = baseline.platform
         /// + (f7 - baseline.f7)</c>). Computing from the baseline rather than the current
         /// budget is what makes a repeated apply idempotent. An originals file written before
         /// the capture (no f7 / platform lines) falls back to the current budget, and says so.
         /// </summary>
-        private bool TryTierBudget(string verb, GpuPowerBudget current, out GpuPowerBudget raised, out string? reason)
+        private bool TryTierBudget(
+            string verb, int targetMilliwatts, GpuPowerBudget current, out GpuPowerBudget raised, out string? reason)
         {
             reason = null;
             GpuPowerBudget baseline = current;
@@ -910,7 +951,7 @@ namespace UCU.Hardware.Gpu
                     verb, fileError is null ? string.Empty : $" ({fileError})", current.F7Milliwatts);
             }
 
-            if (!GpuPowerBudget.TryRaise(baseline, _tier.TgpTargetMilliwatts, out raised))
+            if (!GpuPowerBudget.TryRaise(baseline, targetMilliwatts, out raised))
             {
                 reason = "the raised laptop power budget overflows";
                 return false;
@@ -1021,7 +1062,8 @@ namespace UCU.Hardware.Gpu
                 // resets the budget to what the EC publishes.)
                 if (originals?.Budget is GpuPowerBudget baseline)
                 {
-                    GpuPowerBudget applied = GpuPowerBudget.TryRaise(baseline, _tier.TgpTargetMilliwatts, out GpuPowerBudget raised)
+                    int target = TargetMilliwatts;
+                    GpuPowerBudget applied = GpuPowerBudget.TryRaise(baseline, target, out GpuPowerBudget raised)
                         ? raised
                         : baseline;
 
@@ -1046,6 +1088,7 @@ namespace UCU.Hardware.Gpu
                     // a marker whose records a driver reinstall removed would re-apply at
                     // the next boot against a key that carries nothing.
                     DiscardMarker();
+                    DiscardTarget();
 
                     if (originals != null)
                     {
@@ -1188,6 +1231,7 @@ namespace UCU.Hardware.Gpu
             CurrentLimitMilliwatts = limits.CurrentMilliwatts,
             BudgetMilliwatts = budget?.F7Milliwatts,
             RequestedLimitMilliwatts = request?.RequestedMilliwatts,
+            TargetTgpMilliwatts = TargetMilliwatts,
             EnforcedLimitMoved = limits.CeilingMilliwatts is int ceiling && ceiling > RomOverrideLayout.StockPowerMilliwatts,
             Restarted = restarted,
             Enabled = IntentHolds(),
@@ -1227,26 +1271,26 @@ namespace UCU.Hardware.Gpu
         /// number the records raise, so it is the witness the records were consumed; a
         /// null read is unknown, which is reported as such instead of as "not moved".
         /// </summary>
-        private string? CeilingReason(GpuPowerLimits limits) =>
+        private string? CeilingReason(GpuPowerLimits limits, int targetMilliwatts) =>
             limits.CeilingMilliwatts is not int ceiling
                 ? "the driver did not report a power ceiling, so the records could not be confirmed"
-                : ceiling >= _tier.TgpTargetMilliwatts
+                : ceiling >= targetMilliwatts
                     ? null
-                    : $"the driver reports a {Watts(ceiling)} ceiling, not {Watts(_tier.TgpTargetMilliwatts)}";
+                    : $"the driver reports a {Watts(ceiling)} ceiling, not {Watts(targetMilliwatts)}";
 
         /// <summary>
-        /// Why the driver's own request is not the tier's target, or null when it is.
+        /// Why the driver's own request is not the target, or null when it is.
         /// The request is what the driver enforces: a staged ceiling without it leaves
         /// the card on its EC-derived limit.
         /// </summary>
-        private string? RequestReason(GpuPowerRequestState request) =>
+        private string? RequestReason(GpuPowerRequestState request, int targetMilliwatts) =>
             request.Reason is string unread
                 ? $"the driver's power request could not be read: {unread}"
                 : request.RequestedMilliwatts is not int requested
                     ? "the driver carries no power request, so the card stays on its EC-derived limit"
-                    : requested == _tier.TgpTargetMilliwatts
+                    : requested == targetMilliwatts
                         ? null
-                        : $"the driver reports a {Watts(requested)} power request, not {Watts(_tier.TgpTargetMilliwatts)}";
+                        : $"the driver reports a {Watts(requested)} power request, not {Watts(targetMilliwatts)}";
 
         private static string CeilingText(GpuPowerLimits limits) =>
             limits.CeilingMilliwatts is int ceiling ? Watts(ceiling) : "unknown";
@@ -1256,12 +1300,12 @@ namespace UCU.Hardware.Gpu
         /// driver enforces min(request, budget), so a budget below the target would cap
         /// the request no matter what the ceiling says.
         /// </summary>
-        private string? BudgetReason(GpuPowerBudgetState budget) =>
+        private string? BudgetReason(GpuPowerBudgetState budget, int targetMilliwatts) =>
             budget.Budget is not GpuPowerBudget current
                 ? $"the laptop power budget could not be read: {budget.Reason}"
-                : current.F7Milliwatts >= _tier.TgpTargetMilliwatts
+                : current.F7Milliwatts >= targetMilliwatts
                     ? null
-                    : $"the driver reports a {Watts(current.F7Milliwatts)} laptop power budget, not {Watts(_tier.TgpTargetMilliwatts)}";
+                    : $"the driver reports a {Watts(current.F7Milliwatts)} laptop power budget, not {Watts(targetMilliwatts)}";
 
         /// <summary>
         /// Why the rails are not the requested ones, or null when they are. The comparison is
@@ -1495,6 +1539,79 @@ namespace UCU.Hardware.Gpu
             }
         }
 
+        /// <summary>
+        /// The TGP this unlock aims at: the target the last apply was given, saved beside
+        /// the originals so a boot re-apply, the settle pass and the drift watch all aim at
+        /// it, or the tier's tested target when none was ever saved. A stored value outside
+        /// the tier's range is clamped and logged — the range belongs to the tier, not to
+        /// the file.
+        /// </summary>
+        private int TargetMilliwatts
+        {
+            get
+            {
+                if (!File.Exists(_targetPath))
+                    return _tier.TgpTargetMilliwatts;
+
+                try
+                {
+                    if (int.TryParse(
+                        File.ReadAllText(_targetPath).Trim(),
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out int stored))
+                    {
+                        int clamped = Math.Clamp(stored, _tier.TgpTargetMilliwatts, _tier.PowerMilliwatts);
+                        if (clamped != stored)
+                        {
+                            Log.Warning(
+                                "gpu: the saved unlock target {Stored} mW is outside {Floor}-{Ceiling} mW; using {Clamped} mW",
+                                stored, _tier.TgpTargetMilliwatts, _tier.PowerMilliwatts, clamped);
+                        }
+
+                        return clamped;
+                    }
+
+                    Log.Information(
+                        "gpu: the saved unlock target file {Path} is unreadable; using the {Target} mW tested target",
+                        _targetPath, _tier.TgpTargetMilliwatts);
+                }
+                catch (Exception ex)
+                {
+                    Log.Information(
+                        "gpu: the saved unlock target could not be read from {Path}: {Type} {Message}",
+                        _targetPath, ex.GetType().Name, ex.Message);
+                }
+
+                return _tier.TgpTargetMilliwatts;
+            }
+        }
+
+        /// <summary>
+        /// The target, written whole (tmp → move) with the EC offset — the first hardware
+        /// move of an apply: a boot re-apply must aim at the same number the owner asked for.
+        /// </summary>
+        private void WriteTarget(int milliwatts)
+        {
+            string? directory = Path.GetDirectoryName(_targetPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            string temporary = _targetPath + ".tmp";
+            File.WriteAllText(temporary, milliwatts.ToString(CultureInfo.InvariantCulture));
+            File.Move(temporary, _targetPath, overwrite: true);
+            Log.Information("gpu.set_rom_override: the unlock target {Target} mW is saved to {Path}", milliwatts, _targetPath);
+        }
+
+        private void DiscardTarget()
+        {
+            if (File.Exists(_targetPath))
+            {
+                File.Delete(_targetPath);
+                Log.Information("gpu.set_rom_override: the unlock target was removed from {Path}", _targetPath);
+            }
+        }
+
         private static string Watts(int milliwatts) =>
             (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W";
 
@@ -1701,9 +1818,10 @@ namespace UCU.Hardware.Gpu
             if (File.Exists(_originalsPath))
                 File.Delete(_originalsPath);
 
-            // The informational copy and the saved rail selection go with them, and so does a
-            // verdict about a boot that no longer has anything staged.
+            // The informational copy, the saved rail selection and the unlock target go with
+            // them, and so does a verdict about a boot that no longer has anything staged.
             DiscardRailSelection();
+            DiscardTarget();
             DiscardMarker();
             _startup = null;
         }

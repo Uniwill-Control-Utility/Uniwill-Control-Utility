@@ -1181,5 +1181,6 @@
   "Restore stock now": "Adfer y gwreiddiol nawr",
   "Keep Power boost mode on": "Cadw'r modd hwb pŵer ymlaen",
   "Extra GPU power could not be restored": "Nid oedd modd adfer y pŵer GPU ychwanegol",
-  "The extra GPU power override is still applied.": "Mae gorddadiad pŵer GPU ychwanegol yn dal i fod wedi'i osod."
+  "The extra GPU power override is still applied.": "Mae gorddadiad pŵer GPU ychwanegol yn dal i fod wedi'i osod.",
+  "The card enforces {0}, not the requested {1}.": "Mae'r cerdyn yn gorfodi {0}, nid y {1} y gofynnwyd amdano."
 }

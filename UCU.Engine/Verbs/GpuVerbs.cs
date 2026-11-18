@@ -43,8 +43,8 @@ namespace UCU.Engine
 
             add(EngineVerbs.Gpu.SetRomOverride, (p, ct) =>
             {
-                BoolValueDto dto = EngineSerializer.BindParams<BoolValueDto>(p);
-                return Task.FromResult<object?>(romOverrides.SetEnabled(dto.Value));
+                GpuRomOverrideCommandDto dto = EngineSerializer.BindParams<GpuRomOverrideCommandDto>(p);
+                return Task.FromResult<object?>(romOverrides.SetEnabled(dto.Value, dto.TargetTgpMilliwatts));
             });
 
             add(EngineVerbs.Gpu.GetRailLimits, (p, ct) =>

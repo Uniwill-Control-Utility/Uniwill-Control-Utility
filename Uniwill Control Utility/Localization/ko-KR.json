@@ -1181,5 +1181,6 @@
   "Restore stock now": "지금 원래대로 복원",
   "Keep Power boost mode on": "전원 부스트 모드를 켜 둔 상태 유지",
   "Extra GPU power could not be restored": "추가 GPU 전력을 복원하지 못했습니다",
-  "The extra GPU power override is still applied.": "추가 GPU 전력 재정의가 아직 적용되어 있습니다."
+  "The extra GPU power override is still applied.": "추가 GPU 전력 재정의가 아직 적용되어 있습니다.",
+  "The card enforces {0}, not the requested {1}.": "카드는 요청한 {1}이 아니라 {0}을(를) 적용합니다."
 }

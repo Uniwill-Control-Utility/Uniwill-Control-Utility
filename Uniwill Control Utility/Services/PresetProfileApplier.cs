@@ -441,6 +441,77 @@ namespace Uniwill_Control_Utility.Services
                     ApplyFanSettingsFromPreset(presets[customSlot]);
                 }
             }
+
+            // 5. A live Extra GPU power unlock aims at the preset's TGP, not at the tier's:
+            // the slider the owner just applied is the intention, so the unlock's request,
+            // F7 raise and cTGP offset move to it without a second click.
+            await RetargetUnlockAsync(profileName, TargetTgpMilliwatts(profileName), "Preset").ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// The TGP a profile asks for, in milliwatts: a saved Custom slot's own value, the
+        /// legacy Custom settings, or null for a stock preset (whose TGP is the firmware's
+        /// per-mode table, so it is not a number the unlock may chase).
+        /// </summary>
+        public static int? TargetTgpMilliwatts(string profileName)
+        {
+            var (slot, mode) = TryParseCustomSlotExtended(profileName);
+            if (slot >= 0)
+            {
+                var presets = CustomPresetStore.Load(mode);
+                return slot < presets.Length ? (int)Math.Round(presets[slot].GpuTgp * 1000) : null;
+            }
+
+            return string.Equals(profileName, "Custom", StringComparison.OrdinalIgnoreCase)
+                ? (int)Math.Round(Settings.Default.customNvPower * 1000)
+                : null;
+        }
+
+        /// <summary>
+        /// Carries a preset's TGP into a live unlock. The unlock aims one driver request,
+        /// one F7 raise and one cTGP offset at a single target, so a preset applied while it
+        /// is staged must move that target — otherwise the card keeps the number the last
+        /// unlock was given. Nothing runs with no unlock staged, or for a TGP below the
+        /// unlock's measured floor (the store refuses that, and the old target stands).
+        /// </summary>
+        internal static async Task RetargetUnlockAsync(string profileName, int? tgpMilliwatts, string verb)
+        {
+            if (tgpMilliwatts is not int target)
+                return;
+
+            if (target < GpuUnlockVerdict.TestedTargetMilliwatts)
+            {
+                Scripts.Misc.DiagnosticLogger.LogInfo(
+                    $"[{verb}] {profileName} asks {target / 1000.0:0.##} W, below the unlock's measured floor; its target is unchanged");
+                return;
+            }
+
+            UCU.Contracts.Capabilities.IGpuTuningCapability? gpu =
+                App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
+            if (gpu is null)
+                return;
+
+            try
+            {
+                UCU.Contracts.GpuRomOverrideStateDto state = await gpu.GetRomOverrideStateAsync().ConfigureAwait(false);
+                if (!state.Enabled)
+                    return;
+
+                // The records are already staged, so this is the live half only — no restart,
+                // no blank screen — but the guard stays on: a key whose records went missing
+                // does restart the adapter here.
+                _ = await GpuDeviceRestartGuard.RunAsync(
+                    App.GetService<IHardwareMonitoringService>(),
+                    () => gpu.SetRomOverrideAsync(true, target)).ConfigureAwait(false);
+
+                Scripts.Misc.DiagnosticLogger.LogInfo(
+                    $"[{verb}] {profileName} moved the unlock's target to {target / 1000.0:0.##} W");
+            }
+            catch (Exception ex)
+            {
+                Scripts.Misc.DiagnosticLogger.LogInfo(
+                    $"[{verb}] unlock retarget to {target / 1000.0:0.##} W failed: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         /// <summary>

@@ -1181,5 +1181,6 @@
   "Restore stock now": "Vrati izvorno sada",
   "Keep Power boost mode on": "Zadrži način power boosta uključenim",
   "Extra GPU power could not be restored": "Dodatnu snagu GPU-a nije bilo moguće vratiti",
-  "The extra GPU power override is still applied.": "Nadjačavanje dodatne snage GPU-a još je primijenjeno."
+  "The extra GPU power override is still applied.": "Nadjačavanje dodatne snage GPU-a još je primijenjeno.",
+  "The card enforces {0}, not the requested {1}.": "Kartica primjenjuje {0}, a ne traženih {1}."
 }

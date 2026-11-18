@@ -391,8 +391,13 @@ namespace UCU.Contracts.Capabilities
         /// its originals, stages/removes the ROM records, flushes, reads back, restarts
         /// the display adapter and answers the state it can verify — a foreign override
         /// key or an unpinned VBIOS is refused with a reason, never forced.
+        /// <paramref name="targetTgpMilliwatts"/> is the TGP to aim at (the preset's
+        /// slider); null keeps the tier's tested target.
         /// </summary>
-        Task<GpuRomOverrideStateDto> SetRomOverrideAsync(bool enabled, CancellationToken cancellationToken = default);
+        Task<GpuRomOverrideStateDto> SetRomOverrideAsync(
+            bool enabled,
+            int? targetTgpMilliwatts = null,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// The three runtime rail currents and the live policy range each is bounded by —

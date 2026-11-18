@@ -225,6 +225,26 @@ public sealed class GpuVerbsTests
     }
 
     [Fact]
+    public async Task SetRomOverride_CarriesTheTargetTgpToTheStore()
+    {
+        // The unlock's request, F7 raise and cTGP offset all aim at one target, so the
+        // preset's TGP has to reach the store over the wire; absent means the tier's own.
+        var overrides = new FakeGpuRomOverrideService();
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { GpuRomOverrideOverride = overrides });
+
+        await host.Gpu.SetRomOverrideAsync(enabled: true, targetTgpMilliwatts: 250_000);
+
+        Assert.True(overrides.LastEnabled);
+        Assert.Equal(250_000, overrides.LastTargetTgpMilliwatts);
+
+        await host.Gpu.SetRomOverrideAsync(enabled: true);
+
+        Assert.Null(overrides.LastTargetTgpMilliwatts);
+    }
+
+    [Fact]
     public async Task SetRomOverride_Restore_ReachesTheClientAsTheRestoredState()
     {
         var overrides = new FakeGpuRomOverrideService
