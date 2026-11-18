@@ -797,6 +797,12 @@ namespace Uniwill_Control_Utility
                 phase1Tasks.Add(Task.Run(async () =>
                 {
                     await SyncGameLibraryWithBudgetAsync();
+
+                    // Keep the list from going stale for the rest of the run: a game
+                    // installed while the app is running (the 2026-11-18 Resident Evil 9
+                    // report) must reach the overlay and Adaptive Mode without a restart.
+                    Game_Manager.StartGameLibraryWatcher();
+
                     _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
                 }));
 
@@ -1855,7 +1861,7 @@ namespace Uniwill_Control_Utility
             try
             {
                 if (scan.IsCompletedSuccessfully && scan.Result is not null)
-                    Game_Manager.installedGames = scan.Result;
+                    Game_Manager.ApplyGameLibraryScan(scan.Result);
                 else if (scan.IsFaulted || scan.IsCanceled)
                     Log.Logger.Error(scan.Exception?.GetBaseException(),
                         "Failed to sync game library during startup");
@@ -2061,6 +2067,7 @@ namespace Uniwill_Control_Utility
 
             _showListenerCts?.Cancel();
             _showEvent?.Dispose();
+            Game_Manager.StopGameLibraryWatcher();
             mutex?.Dispose();
 
             if (Family.TYPE != Family.ProcessorType.Intel)

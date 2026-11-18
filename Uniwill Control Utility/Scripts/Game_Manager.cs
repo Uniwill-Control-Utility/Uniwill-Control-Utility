@@ -5,12 +5,15 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using GameLib;
 using GameLib.Core;
+using Microsoft.Win32;
 using Windows.ApplicationModel;
 using Windows.Management.Deployment;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
+using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Scripts
 {
@@ -39,6 +42,162 @@ namespace Uniwill_Control_Utility.Scripts
         {
             get => _installedGames;
             set => _installedGames = value;
+        }
+
+        private static GameLibraryRefresh? _libraryRefresh;
+        private static readonly object _libraryRefreshGate = new object();
+
+        /// <summary>
+        /// Starts the manifest watcher that keeps the installed list fresh for the rest of
+        /// the run. Called once after the startup scan; a later call is a no-op (each
+        /// completed refresh adds any watch location that appeared since).
+        /// </summary>
+        internal static void StartGameLibraryWatcher()
+        {
+            lock (_libraryRefreshGate)
+                (_libraryRefresh ??= CreateGameLibraryRefresh()).StartWatching();
+        }
+
+        internal static void StopGameLibraryWatcher()
+        {
+            lock (_libraryRefreshGate)
+            {
+                _libraryRefresh?.Dispose();
+                _libraryRefresh = null;
+            }
+        }
+
+        /// <summary>
+        /// On-demand refresh for a surface that shows the list (the Adaptive page opening).
+        /// True when a scan ran; false when the debounce cap says the list is fresh enough.
+        /// </summary>
+        internal static Task<bool> RefreshGameLibraryAsync(string reason, bool force = false)
+        {
+            GameLibraryRefresh refresh;
+            lock (_libraryRefreshGate)
+                refresh = _libraryRefresh ??= CreateGameLibraryRefresh();
+
+            return refresh.RefreshAsync(reason, force);
+        }
+
+        private static GameLibraryRefresh CreateGameLibraryRefresh()
+        {
+            // isAdaptive: true is the superset - it carries the emulator entries the
+            // Adaptive picker offers - so a refresh cannot drop them from a list an
+            // Adaptive scan published.
+            return new GameLibraryRefresh(
+                () => syncGame_Library(isAdaptive: true),
+                ApplyGameLibraryScan,
+                ManifestWatchTargets);
+        }
+
+        /// <summary>
+        /// Publishes a completed scan. The reference is swapped rather than the live list
+        /// cleared and refilled: the Adaptive detection pass and the FPS overlay enumerate
+        /// it from other threads, and mutating it under an enumerator throws. A failed or
+        /// empty scan keeps the list that is already published - null means "no games" to
+        /// both readers.
+        /// </summary>
+        internal static (int Total, int Added) ApplyGameLibraryScan(List<GameLauncherItem>? scan)
+        {
+            List<GameLauncherItem>? previous = _installedGames;
+            if (scan is null || (scan.Count == 0 && previous is { Count: > 0 }))
+                return (previous?.Count ?? 0, 0);
+
+            var comparer = new GameLauncherItemEqualityComparer();
+            int added = previous is null
+                ? scan.Count
+                : scan.Count(item => !previous.Contains(item, comparer));
+
+            _installedGames = scan;
+            return (scan.Count, added);
+        }
+
+        /// <summary>
+        /// The Adaptive page's game picker is a plain string list led by its Default entry.
+        /// Rebuilding it after a refresh keeps the owner's selection when that game survived,
+        /// and falls back to Default when it is gone.
+        /// </summary>
+        internal static (List<string> Items, int SelectedIndex) BuildGamePickerItems(
+            IEnumerable<GameLauncherItem>? games, string? previousSelection, string defaultEntry)
+        {
+            var items = new List<string> { defaultEntry };
+            items.AddRange((games ?? Enumerable.Empty<GameLauncherItem>()).Select(item => item.gameName));
+
+            int selected = previousSelection is null ? 0 : items.IndexOf(previousSelection);
+            return (items, selected < 0 ? 0 : selected);
+        }
+
+        /// <summary>
+        /// The launcher manifest locations the scan reads, watched for additions and
+        /// removals. A launcher that is not installed simply has no directory; the
+        /// watcher treats that as a debug no-op.
+        /// </summary>
+        internal static IEnumerable<GameLibraryRefresh.ManifestWatch> ManifestWatchTargets()
+        {
+            var targets = new List<GameLibraryRefresh.ManifestWatch>();
+
+            foreach (string steamApps in SteamAppsRoots(_installedGames, SteamInstallPath()))
+                targets.Add(new GameLibraryRefresh.ManifestWatch(steamApps, "appmanifest_*.acf"));
+
+            string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            targets.Add(new GameLibraryRefresh.ManifestWatch(
+                Path.Combine(programData, "Epic", "EpicGamesLauncher", "Data", "Manifests"), "*.item"));
+            targets.Add(new GameLibraryRefresh.ManifestWatch(
+                Path.Combine(programData, "Battle.net", "Agent"), "product.db"));
+            targets.Add(new GameLibraryRefresh.ManifestWatch(
+                Path.Combine(programData, "GOG.com", "Galaxy", "storage"), "galaxy-2.0.db"));
+
+            return targets;
+        }
+
+        /// <summary>
+        /// The steamapps directories implied by the installed Steam games (each InstallDir
+        /// is &lt;library&gt;\steamapps\common\&lt;game&gt;) plus the primary Steam install's.
+        /// Reuses the scan's own discovery instead of a second Steam library reader.
+        /// </summary>
+        internal static IEnumerable<string> SteamAppsRoots(
+            IEnumerable<GameLauncherItem>? games, string? steamInstallPath)
+        {
+            var roots = new List<string>();
+
+            if (!string.IsNullOrEmpty(steamInstallPath))
+                AddRoot(roots, Path.Combine(steamInstallPath!, "steamapps"));
+
+            foreach (GameLauncherItem game in games ?? Enumerable.Empty<GameLauncherItem>())
+            {
+                if (game.appType != "Steam" || string.IsNullOrEmpty(game.path))
+                    continue;
+
+                string? common = Path.GetDirectoryName(game.path);
+                string? steamApps = string.IsNullOrEmpty(common) ? null : Path.GetDirectoryName(common);
+                if (steamApps is not null
+                    && string.Equals(Path.GetFileName(steamApps), "steamapps", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddRoot(roots, steamApps);
+                }
+            }
+
+            return roots;
+        }
+
+        private static void AddRoot(List<string> roots, string directory)
+        {
+            if (!roots.Contains(directory, StringComparer.OrdinalIgnoreCase))
+                roots.Add(directory);
+        }
+
+        private static string? SteamInstallPath()
+        {
+            try
+            {
+                return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) as string;
+            }
+            catch (Exception ex)
+            {
+                Misc.DiagnosticLogger.LogDebug($"Steam install path unavailable: {ex.Message}");
+                return null;
+            }
         }
 
         public static List<GameLauncherItem>? syncGame_Library(bool isAdaptive = false)

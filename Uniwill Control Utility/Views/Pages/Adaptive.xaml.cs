@@ -372,12 +372,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 cbExcludeFromSwitching.IsChecked = false;
 
-                await Task.Run(() => Game_Manager.installedGames = Game_Manager.syncGame_Library(true));
-
-                cbxPowerPreset.Items.Add("Default");
-                foreach (GameLauncherItem item in Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>()) cbxPowerPreset.Items.Add(item.gameName);
-
-                cbxPowerPreset.SelectedIndex = 0;
+                // The startup scan ran with the base list; this page's list also carries
+                // the emulator entries, so it re-scans once here.
+                await Game_Manager.RefreshGameLibraryAsync("Adaptive page setup", force: true);
+                RebuildGamePicker(keepSelection: false);
 
                 IEnumerable<string> presetNames = adaptivePresetManager.GetPresetNames();
 
@@ -1290,16 +1288,49 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                cbxPowerPreset.ItemsSource = new List<string>();
-                await Task.Run(() => Game_Manager.installedGames = Game_Manager.syncGame_Library(true));
-                cbxPowerPreset.Items.Clear();
-                cbxPowerPreset.Items.Add("Default");
-                foreach (GameLauncherItem item in Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>()) cbxPowerPreset.Items.Add(item.gameName);
-                cbxPowerPreset.SelectedIndex = 0;
+                // The button exists to pull in games installed since the last scan, so it
+                // bypasses the debounce cap.
+                await Game_Manager.RefreshGameLibraryAsync("Adaptive reload button", force: true);
+                RebuildGamePicker(keepSelection: false);
             }
             catch (Exception ex)
             {
                 DiagnosticLogger.LogError(ex, "Failed to reload game apps");
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds the game picker from the published list. The owner's selection is kept
+        /// when that game survived the refresh (a game installed mid-session must appear
+        /// without losing the preset being edited), and falls back to Default when it is gone.
+        /// </summary>
+        private void RebuildGamePicker(bool keepSelection)
+        {
+            (List<string> items, int selectedIndex) = Game_Manager.BuildGamePickerItems(
+                Game_Manager.installedGames,
+                keepSelection ? cbxPowerPreset.SelectedItem as string : null,
+                DefaultProfileName);
+
+            cbxPowerPreset.Items.Clear();
+            foreach (string item in items)
+                cbxPowerPreset.Items.Add(item);
+            cbxPowerPreset.SelectedIndex = selectedIndex;
+        }
+
+        /// <summary>
+        /// A page open is the signal that the list matters now, so refresh it then - capped,
+        /// so navigating back and forth cannot re-walk every volume.
+        /// </summary>
+        private async Task RefreshGameLibraryOnOpenAsync()
+        {
+            try
+            {
+                if (await Game_Manager.RefreshGameLibraryAsync("Adaptive page shown") && IsLoaded)
+                    RebuildGamePicker(keepSelection: true);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to refresh the game library");
             }
         }
 
@@ -2160,6 +2191,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if ((bool)e.NewValue)
             {
                 Dispatcher.InvokeAsync(new Action(RestoreAdaptiveButtonState), DispatcherPriority.Normal);
+                _ = RefreshGameLibraryOnOpenAsync();
             }
         }
 
