@@ -904,17 +904,48 @@
                                               Visibility="Collapsed"
                                               Text="Extra GPU power is applied but Power boost mode is off. Restore stock to turn it off, or turn Power boost mode on." />
 
-                                <!-- The statement is asked for when there is something to unlock, and
-                                     while the quick configurations need it on an already-unlocked
-                                     card, so its divider lives in the row and goes with it. -->
-                                <StackPanel x:Name="spRomConsentRow" Visibility="Collapsed">
-                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- One row: the statement on the left, both actions on the right,
+                                     because the statement is what gates them. Both actions stay on
+                                     the card - the irrelevant one is disabled and explained, never
+                                     hidden and never a silent no-op. The "still applied, feature
+                                     off" state has nothing to state, so the checkbox and the rule
+                                     above it go and Restore stock stands alone in the row. -->
+                                <StackPanel>
+                                    <Border x:Name="brRomConsent" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                                    <CheckBox x:Name="chkRomConsent"
-                                              FontSize="12"
-                                              Checked="chkRomConsent_Changed"
-                                              Unchecked="chkRomConsent_Changed"
-                                              Content="I understand this changes driver-level settings and restarts the GPU" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox x:Name="chkRomConsent"
+                                                  Grid.Column="0"
+                                                  Margin="0,0,16,0"
+                                                  VerticalAlignment="Center"
+                                                  FontSize="12"
+                                                  Checked="chkRomConsent_Changed"
+                                                  Unchecked="chkRomConsent_Changed">
+                                            <TextBlock TextWrapping="Wrap"
+                                                       Text="I understand this changes driver-level settings and restarts the GPU" />
+                                        </CheckBox>
+
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                            <ui:Button x:Name="btnRomUnlock"
+                                                       Padding="16,6"
+                                                       Appearance="Primary"
+                                                       Click="btnRomUnlock_Click"
+                                                       Content="Unlock extra GPU power" />
+                                            <ui:Button x:Name="btnRomRestore"
+                                                       Margin="8,0,0,0"
+                                                       Padding="16,6"
+                                                       Appearance="Secondary"
+                                                       Click="btnRomRestore_Click"
+                                                       Content="Restore stock" />
+                                        </StackPanel>
+                                    </Grid>
                                 </StackPanel>
 
                                 <!-- Divider -->
@@ -922,74 +953,82 @@
 
                                 <!-- Three measured configurations, one click each, for a card that is
                                      already unlocked: they set the target and that tier's three rail
-                                     currents, and 250 W also sets this unit's clock offsets. They are
-                                     not a replacement for Unlock/Restore below, which stay the manual
-                                     pair. The two sets that leave the clocks alone say so, and the
-                                     250 W set carries the rails block's adapter caution beside it. -->
+                                     currents, and 250 W also sets this unit's clock offsets. Each
+                                     button's caption is its tooltip, so the row is one line and the
+                                     numbers stay one hover - or one Tab stop - away. The 250 W set's
+                                     adapter caution keeps a visible marker on the button itself: a
+                                     caution may not live only in a tooltip. -->
                                 <StackPanel x:Name="spQuickApply">
                                     <ui:TextBlock FontTypography="BodyStrong" Text="Quick configurations" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   TextWrapping="Wrap"
-                                                   Text="For an unlocked card: one click sets the target, the three rail currents, and for 250 W this unit's clock offsets. Unlock and Restore stock stay below." />
 
-                                    <Grid Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <ui:Button x:Name="btnApply200"
+                                                   Margin="0,0,8,0"
+                                                   Padding="16,6"
+                                                   Appearance="Secondary"
+                                                   Click="btnApply200_Click"
+                                                   ToolTipService.ShowDuration="60000"
+                                                   ToolTipService.ShowOnDisabled="True"
+                                                   Content="Apply 200 W">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock x:Name="tbQuick200Tip"
+                                                               MaxWidth="400"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                </ToolTip>
+                                            </ToolTipService.ToolTip>
+                                        </ui:Button>
 
-                                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                            <ui:Button x:Name="btnApply200"
-                                                       HorizontalAlignment="Left"
-                                                       Padding="16,6"
-                                                       Appearance="Secondary"
-                                                       Click="btnApply200_Click"
-                                                       Content="Apply 200 W" />
-                                            <TextBlock Margin="0,6,0,0"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone." />
-                                        </StackPanel>
+                                        <ui:Button x:Name="btnApply225"
+                                                   Margin="0,0,8,0"
+                                                   Padding="16,6"
+                                                   Appearance="Secondary"
+                                                   Click="btnApply225_Click"
+                                                   ToolTipService.ShowDuration="60000"
+                                                   ToolTipService.ShowOnDisabled="True"
+                                                   Content="Apply 225 W (tested)">
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock x:Name="tbQuick225Tip"
+                                                               MaxWidth="400"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                </ToolTip>
+                                            </ToolTipService.ToolTip>
+                                        </ui:Button>
 
-                                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                                            <ui:Button x:Name="btnApply225"
-                                                       HorizontalAlignment="Left"
-                                                       Padding="16,6"
-                                                       Appearance="Secondary"
-                                                       Click="btnApply225_Click"
-                                                       Content="Apply 225 W (tested)" />
-                                            <TextBlock Margin="0,6,0,0"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone." />
-                                        </StackPanel>
-
-                                        <StackPanel Grid.Column="2">
-                                            <ui:Button x:Name="btnApply250"
-                                                       HorizontalAlignment="Left"
-                                                       Padding="16,6"
-                                                       Appearance="Secondary"
-                                                       Click="btnApply250_Click"
-                                                       Content="Apply 250 W (measured on our unit)" />
-                                            <TextBlock Margin="0,6,0,0"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card." />
-                                            <!-- The same caution the rails block carries: this set ends at
-                                                 16.971 A of board input, above 14 A. -->
-                                            <TextBlock Margin="0,6,0,0"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{DynamicResource SystemFillColorCautionBrush}"
-                                                       Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
-                                        </StackPanel>
-                                    </Grid>
+                                        <ui:Button x:Name="btnApply250"
+                                                   Padding="16,6"
+                                                   Appearance="Secondary"
+                                                   Click="btnApply250_Click"
+                                                   ToolTipService.ShowDuration="60000"
+                                                   ToolTipService.ShowOnDisabled="True">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- The caution the rails block carries, as the one
+                                                     visible part of it that cannot be hovered away. -->
+                                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                             Glyph="&#xE7BA;"
+                                                             FontSize="14"
+                                                             Margin="0,0,6,0"
+                                                             VerticalAlignment="Center"
+                                                             Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Text="Apply 250 W (measured on our unit)" />
+                                            </StackPanel>
+                                            <ToolTipService.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock x:Name="tbQuick250Tip"
+                                                               MaxWidth="400"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                </ToolTip>
+                                            </ToolTipService.ToolTip>
+                                        </ui:Button>
+                                    </StackPanel>
 
                                     <!-- Why the three are dimmed, when they are: the same one line the
                                          card uses for its own actions. -->
@@ -1002,22 +1041,6 @@
 
                                     <!-- Divider -->
                                     <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                </StackPanel>
-
-                                <!-- Both actions stay on the card: the irrelevant one is disabled
-                                     and explained, never hidden and never a silent no-op. -->
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:Button x:Name="btnRomUnlock"
-                                               Padding="16,6"
-                                               Appearance="Primary"
-                                               Click="btnRomUnlock_Click"
-                                               Content="Unlock extra GPU power" />
-                                    <ui:Button x:Name="btnRomRestore"
-                                               Margin="8,0,0,0"
-                                               Padding="16,6"
-                                               Appearance="Secondary"
-                                               Click="btnRomRestore_Click"
-                                               Content="Restore stock" />
                                 </StackPanel>
 
                                 <!-- One line, and only for a state that needs explaining: a refusal,
@@ -1044,11 +1067,13 @@
                                 <!-- Divider -->
                                 <Border x:Name="brRailDivider" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                                <!-- The runtime rail currents. A separate, live NVAPI write (no
-                                     restart, no blank screen, no consent), so it follows the
-                                     unlock's state: inert and explained until it is applied.
-                                     One block with its divider, because the card's "override is
-                                     still live" state shows no sliders at all. -->
+                                <!-- The runtime rail currents. A live NVAPI write (no restart, no
+                                     blank screen, no consent), so it follows the unlock's state:
+                                     inert and explained until it is applied. The page's Apply writes
+                                     them, in the same act that applies the preset, because this write
+                                     is what keeps the owner's choice for the next boot. One block
+                                     with its divider, because the card's "override is still live"
+                                     state shows no sliders at all. -->
                                 <StackPanel x:Name="spRailSection">
                                     <ui:TextBlock FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -1179,14 +1204,6 @@
                                                    Visibility="Collapsed"
                                                    Foreground="{DynamicResource SystemFillColorCautionBrush}"
                                                    Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
-
-                                        <ui:Button x:Name="btnRailApply"
-                                                   Margin="0,20,0,4"
-                                                   Padding="16,6"
-                                                   HorizontalAlignment="Right"
-                                                   Appearance="Primary"
-                                                   Click="btnRailApply_Click"
-                                                   Content="Apply limits" />
                                     </StackPanel>
 
                                     <!-- Outside the disabled group: a reason a dimmed control

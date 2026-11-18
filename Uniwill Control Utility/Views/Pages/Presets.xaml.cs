@@ -1541,7 +1541,18 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _currentProfile == "Custom" ? (int)Math.Round(sdNvPower.Value * 1000) : null,
                     "Presets").ConfigureAwait(true);
 
+                // The rails are the same act, and they travel before the read-back below because
+                // that read re-binds the sliders to what the driver reports: written after it,
+                // the owner's move would be overwritten and never reach the hardware.
+                (string? railNote, string? railError) = await WriteRailLimitsAsync().ConfigureAwait(true);
+
                 await RefreshRomOverrideAsync().ConfigureAwait(true);
+
+                // The read-back clears the refusals it did not ask for, so this write's own
+                // outcome goes back on screen after it. A declined rail write is never silent.
+                _railLimitsError = railError ?? _railLimitsError;
+                _railLimitsNote = railNote ?? _railLimitsNote;
+                RenderRomOverride();
             }
             catch (Exception ex)
             {
@@ -2269,12 +2280,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             btnRomRestore.IsEnabled = restoreEnabled;
             btnRomRestore.Opacity = restoreEnabled ? 1.0 : 0.5;
 
-            // The three quick configurations configure an already-unlocked card, and they need
-            // the same statement the unlock does, so the statement stays on the card while they
-            // are the ones it gates.
-            spRomConsentRow.Visibility = (canUnlock || unlocked || uncertain) && !appliedWhileOff
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            // The statement is what gates the actions beside it, so it is one row: the checkbox
+            // on the left, the unlock pair on the right. The "still applied, feature off" state
+            // has nothing to state, so the checkbox and the rule above it go and Restore stock
+            // stands alone in that row.
+            bool statement = (canUnlock || unlocked || uncertain) && !appliedWhileOff;
+            chkRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;
+            brRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;
             chkRomConsent.IsEnabled = !busy;
 
             bool quickEnabled = !busy && !_railLimitsBusy && (unlocked || uncertain) && powerBoost && consent;
@@ -2356,6 +2368,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             RenderRomStatusRow();
             RenderRailLimits();
             setRomInfoTooltip();
+            setQuickApplyTooltips();
         }
 
         /// <summary>
@@ -2503,6 +2516,28 @@ namespace Uniwill_Control_Utility.Views.Pages
                 LocalizationService.Get("With a +233 MHz core offset we measured 214 W board power at 0.975-0.985 V, PerfCap VRel — power was no longer the binding limit. The offset is per card and yours to set on this page, so another unit may take more or crash well below it, and we have not measured a wattage without one. Hotspot 58-63 °C at 215 W with the liquid cooler connected, 81.7 °C without it."),
                 string.Empty,
                 LocalizationService.Get("Overrides the driver's power policy only: the GPU's firmware is unchanged, and Restore stock undoes it."));
+        }
+
+        /// <summary>
+        /// The three quick configurations' captions, in each button's tooltip instead of under the
+        /// row: the numbers are one hover — or one Tab stop — away, and the row stays one line.
+        /// Built here for the same reason the measurement tooltip is: a tooltip's content is not in
+        /// the visual tree until it opens, so nothing else would translate it.
+        /// </summary>
+        private void setQuickApplyTooltips()
+        {
+            tbQuick200Tip.Text = LocalizationService.Get(
+                "Not measured as a target: it uses the tested 225 W rail currents, which are caps well above what 200 W needs. The clocks are left alone.");
+
+            tbQuick225Tip.Text = LocalizationService.Get(
+                "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.");
+
+            // The 250 W set's board input sits above 14 A, so the caution that must not go
+            // invisible travels in the same tooltip - with a glyph on the button itself.
+            tbQuick250Tip.Text =
+                LocalizationService.Get("Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.")
+                + "\n\n"
+                + LocalizationService.Get("Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here.");
         }
 
         private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>
@@ -2857,15 +2892,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             tbRailReason.Text = RomReasonLine(refusal);
             tbRailReason.Visibility = string.IsNullOrEmpty(tbRailReason.Text) ? Visibility.Collapsed : Visibility.Visible;
 
+            // There is no button of their own any more, so the row says how a moved slider
+            // reaches the hardware - and that the page's Apply is what keeps it for the next boot.
             tbRailNote.Text = !applied
                 ? LocalizationService.Get("Available once Extra GPU power is unlocked.")
                 : !bounded
                     ? LocalizationService.Get("The current limits could not be read.")
-                    : _railLimitsNote ?? string.Empty;
+                    : _railLimitsNote ?? LocalizationService.Get("Written when you press Apply, and kept for the next boot.");
 
             UpdateRailReadouts();
             UpdateRailCaution();
-            UpdateRailApply(applied && bounded);
         }
 
         /// <summary>
@@ -2919,21 +2955,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             // (which needs a bigger record, i.e. a different policy maximum).
             tbRailCaution.Visibility = sdRailBoardInput.Value > TestedBoardInputMilliamps ? Visibility.Visible : Visibility.Collapsed;
 
-        private void UpdateRailApply(bool canApply)
-        {
-            UCU.Contracts.GpuRailLimitsDto? rails = _railLimits;
-            bool changed = rails != null &&
-                (Changed(sdRailNvvdd, rails.NvvddMilliamps, 0) |
-                 Changed(sdRailMsvdd, rails.MsvddMilliamps, 0) |
-                 Changed(sdRailBoardInput, rails.BoardInputMilliamps, 3));
-
-            // Primary while it would do something, dimmed while it would not: the caption
-            // above says why the group can be off, the button says why it is.
-            bool enabled = canApply && !_railLimitsBusy && changed;
-            btnRailApply.IsEnabled = enabled;
-            btnRailApply.Opacity = enabled ? 1.0 : 0.5;
-        }
-
         /// <summary>The value a slider stands for, snapped to the precision it displays.</summary>
         private static int Quantize(double milliAmps, int decimals) => decimals switch
         {
@@ -2941,9 +2962,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             1 => (int)Math.Round(milliAmps / 100.0) * 100,
             _ => (int)Math.Round(milliAmps),
         };
-
-        private static bool Changed(Slider slider, int? current, int decimals) =>
-            current is int value && Quantize(slider.Value, decimals) != Quantize(value, decimals);
 
         private static string AmpsFormat(int decimals) => decimals switch
         {
@@ -2958,91 +2976,76 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void RailSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            // Bounds are set while the card renders too, so this handler must not react to
-            // its own bind: only a user's move clears the note and re-gates the button.
-            if (_railBinding || btnRailApply == null)
+            // Bounds are set while the card renders too, so this handler must not react to its
+            // own bind: only a user's move clears the note. The null check covers the XAML load,
+            // where the row below the slider may not exist yet.
+            if (_railBinding || tbRailCaution == null)
                 return;
 
             _railLimitsNote = null;
             UpdateRailReadouts();
             UpdateRailCaution();
-            UpdateRailApply(_railLimits is { Reason: null } &&
-                            (_romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked ||
-                             _romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Uncertain));
         }
 
-        private async void btnRailApply_Click(object sender, RoutedEventArgs e) => await ApplyRailLimitsAsync();
-
-        private async Task ApplyRailLimitsAsync()
+        /// <summary>
+        /// The rails as part of the page's Apply: the sliders are the owner's choice, and this
+        /// write is what carries it to the driver and keeps it for the next boot. It is scoped to
+        /// <see cref="UCU.Contracts.GpuRomOverrideStateDto.Enabled"/> — the rails live in the policy
+        /// the unlock raises, so with no unlock applied nothing is written and nothing is said —
+        /// and it runs after the preset's own apply, so one Apply is one act. A refusal or a
+        /// transport failure comes back for the card's reason line: never a silent Apply.
+        /// </summary>
+        private async Task<(string? Note, string? Error)> WriteRailLimitsAsync()
         {
-            // Live: no restart, no blank screen, and no consent box — the consent belongs to
-            // the unlock. The gates the card renders are re-checked so a stale frame cannot
-            // fire a write it was showing as unavailable.
-            if (_railLimitsBusy || _gpuTuning == null || _railLimits is not { Reason: null } || !spRailControls.IsEnabled)
+            // A rail row whose numbers were never read, or whose bounds did not bind, is not
+            // written: its sliders would carry defaults. The card already says why it is inert.
+            if (_gpuTuning == null || _romOverride?.Enabled != true
+                || _railLimits is not { Reason: null } || _railLimitsBusy || !spRailControls.IsEnabled)
             {
-                return;
+                return (null, null);
             }
-
-            UCU.Contracts.GpuRailLimitsDto rails = _railLimits;
-
-            // Only the rails that moved are sent; null means "leave this one alone".
-            int? nvvdd = Changed(sdRailNvvdd, rails.NvvddMilliamps, 0) ? Quantize(sdRailNvvdd.Value, 0) : null;
-            int? msvdd = Changed(sdRailMsvdd, rails.MsvddMilliamps, 0) ? Quantize(sdRailMsvdd.Value, 0) : null;
-            int? board = Changed(sdRailBoardInput, rails.BoardInputMilliamps, 3) ? Quantize(sdRailBoardInput.Value, 3) : null;
-
-            if (nvvdd == null && msvdd == null && board == null)
-                return;
 
             _railLimitsBusy = true;
             _railLimitsError = null;
             _railLimitsNote = null;
             RenderRailLimits();
 
+            string? note = null;
+            string? error = null;
+
             try
             {
-                UCU.Contracts.GpuRailLimitsDto answer =
-                    await _gpuTuning.SetRailLimitsAsync(nvvdd, msvdd, board).ConfigureAwait(true);
+                UCU.Contracts.GpuRailLimitsDto answer = await _gpuTuning.SetRailLimitsAsync(
+                    Quantize(sdRailNvvdd.Value, 0),
+                    Quantize(sdRailMsvdd.Value, 0),
+                    Quantize(sdRailBoardInput.Value, 3)).ConfigureAwait(true);
 
                 if (answer.Reason == null)
                 {
                     _railLimits = answer;
-                    _railLimitsNote = LocalizationService.Format(
+                    note = LocalizationService.Format(
                         "Applied: {0} A GPU, {1} A memory, {2} A board input",
                         Amps(answer.NvvddMilliamps, 0), Amps(answer.MsvddMilliamps, 0), Amps(answer.BoardInputMilliamps, 3));
                 }
                 else
                 {
                     // A refusal carries no numbers: keep the ones on screen and say why.
-                    _railLimitsError = answer.Reason;
+                    error = answer.Reason;
                 }
             }
             catch (Exception ex)
             {
-                // A transport failure is not a verdict, so read back what the rails carry now
-                // and keep the exception on screen either way.
+                // A transport failure is not a verdict: report it, and let the caller's read-back
+                // show what the rails carry now.
                 DebugLog($"GPU rail limits write failed: {ex.Message}");
-                _railLimitsError = ex.Message;
-
-                try
-                {
-                    _railLimits = await _gpuTuning.GetRailLimitsAsync().ConfigureAwait(true);
-                }
-                catch (Exception reread)
-                {
-                    DebugLog($"GPU rail limits re-read failed: {reread.Message}");
-                }
+                error = ex.Message;
             }
             finally
             {
                 _railLimitsBusy = false;
-                RenderRailLimits();
             }
 
-            // The status card shows the rails the driver reports, and it reads them from the
-            // override state: refresh it after a successful write, and leave a failure's own
-            // message on screen untouched.
-            if (_railLimitsError == null)
-                await RefreshRomOverrideAsync();
+            return (note, error);
         }
 
         #endregion

@@ -66,9 +66,16 @@ public sealed class PresetsQuickApplyTests
             "bool measuredEnabled = quickEnabled && Settings.Default.EnableGpuClockControl;",
             body, StringComparison.Ordinal);
 
-        // The statement the buttons need stays on the card while the unlock is applied.
+        // The statement the buttons need stays on the card while the unlock is applied - and it
+        // shares its row with the unlock pair, so with nothing to state the row keeps Restore.
         Assert.Contains(
-            "spRomConsentRow.Visibility = (canUnlock || unlocked || uncertain) && !appliedWhileOff",
+            "bool statement = (canUnlock || unlocked || uncertain) && !appliedWhileOff;",
+            body, StringComparison.Ordinal);
+        Assert.Contains(
+            "chkRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;",
+            body, StringComparison.Ordinal);
+        Assert.Contains(
+            "brRomConsent.Visibility = statement ? Visibility.Visible : Visibility.Collapsed;",
             body, StringComparison.Ordinal);
 
         string reason = MethodBody(ReadPresetsPage(), "private string? QuickApplyReason()");
@@ -76,12 +83,19 @@ public sealed class PresetsQuickApplyTests
         Assert.Contains("Tick the statement above first.", reason, StringComparison.Ordinal);
         Assert.Contains("GPU clock control on in Settings", reason, StringComparison.Ordinal);
 
-        // The 250 W set's board input sits above 14 A, so the rails block's caution sits beside it.
+        // The captions are the buttons' tooltips, so the row is one line; the 250 W set's
+        // board input sits above 14 A, so its caution keeps a visible marker on the button.
         string xaml = ReadPresetsXaml();
         Assert.Contains("<ui:Button x:Name=\"btnApply250\"", xaml, StringComparison.Ordinal);
-        Assert.Contains(
-            "Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded",
-            xaml, StringComparison.Ordinal);
+        Assert.Contains("<ToolTipService.ToolTip>", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"tbQuick250Tip\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"Wrap\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Glyph=\"&#xE7BA;\"", xaml, StringComparison.Ordinal);
+
+        string tooltips = MethodBody(ReadPresetsPage(), "private void setQuickApplyTooltips()");
+        Assert.Contains("Above 14.0 A the GPU can outdraw", tooltips, StringComparison.Ordinal);
+        Assert.Contains("tbQuick200Tip.Text", tooltips, StringComparison.Ordinal);
+        Assert.Contains("tbQuick225Tip.Text", tooltips, StringComparison.Ordinal);
     }
 
     [Fact]
