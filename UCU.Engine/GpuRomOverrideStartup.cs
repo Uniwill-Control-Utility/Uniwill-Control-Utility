@@ -23,7 +23,10 @@ namespace UCU.Engine
     ///
     /// An Applied attempt is followed by a bounded settle phase (see <see cref="SettleSchedule"/>):
     /// the EC publishes its own F7 budget asynchronously after a boot, so the raise can be
-    /// rewritten seconds after it read back exactly.
+    /// rewritten seconds after it read back exactly. After that a drift watch keeps reading the
+    /// budget every <see cref="WatchInterval"/> for as long as the unlock is enabled: the EC
+    /// republishes its F7 whenever the power mode changes, and the raise is redone from the
+    /// captured baseline instead of the owner having to apply again.
     /// </summary>
     public sealed class GpuRomOverrideStartup : IHostedService
     {
@@ -54,10 +57,22 @@ namespace UCU.Engine
             TimeSpan.FromSeconds(120),
         };
 
+        /// <summary>
+        /// How often the drift watch reads the laptop budget. The EC republishes its own F7
+        /// whenever the machine's power mode changes (measured 2026-11-18: a 225 W budget at
+        /// 10:27 and the EC's 150 W minutes later), so one read every half minute keeps the
+        /// card at the tier without polling the driver hard.
+        /// </summary>
+        internal static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(30);
+
+        /// <summary>Consecutive failed watch ticks that end the watch; a success resets the count.</summary>
+        internal const int WatchFailureLimit = 5;
+
         private readonly IGpuRomOverrideService _overrides;
         private readonly ILogger<GpuRomOverrideStartup> _log;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
         private readonly CancellationTokenSource _stopping = new();
+        private int _watching;
 
         public GpuRomOverrideStartup(IGpuRomOverrideService overrides, ILogger<GpuRomOverrideStartup> log)
             : this(overrides, log, (delay, token) => Task.Delay(delay, token))
@@ -76,14 +91,49 @@ namespace UCU.Engine
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
+            // An apply made while the engine runs is watched too, not just the one a boot
+            // found already staged.
+            _overrides.Unlocked += StartWatch;
+
             GpuReapplyVerdict verdict = Attempt();
 
             if (verdict == GpuReapplyVerdict.Applied)
-                Background = Task.Run(() => SettleAsync(_stopping.Token));
+                Background = Task.Run(() => SettleThenWatchAsync(_stopping.Token));
             else if (verdict == GpuReapplyVerdict.Transient)
-                Background = Task.Run(() => RetryAsync(_stopping.Token));
+                Background = Task.Run(() => RetryThenWatchAsync(_stopping.Token));
 
             return Task.CompletedTask;
+        }
+
+        private async Task SettleThenWatchAsync(CancellationToken cancellationToken)
+        {
+            await SettleAsync(cancellationToken).ConfigureAwait(false);
+            await WatchAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task RetryThenWatchAsync(CancellationToken cancellationToken)
+        {
+            await RetryAsync(cancellationToken).ConfigureAwait(false);
+            await WatchAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>Starts the drift watch unless one is already running (a second apply is not a second timer).</summary>
+        private void StartWatch()
+        {
+            if (Interlocked.Exchange(ref _watching, 1) == 1)
+                return;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await WatchAsync(_stopping.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    Volatile.Write(ref _watching, 0);
+                }
+            });
         }
 
         /// <summary>The background phase (retry, then settle): what <see cref="StopAsync"/> stops.</summary>
@@ -192,6 +242,73 @@ namespace UCU.Engine
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "GPU unlock settle failed");
+            }
+        }
+
+        /// <summary>
+        /// The drift watch after the settle phase: one budget read per
+        /// <see cref="WatchInterval"/>, and at most one write per tick, so a wrong value
+        /// cannot turn this into a spin. A clean tick logs nothing; a tick that found the EC
+        /// had republished a lower F7 re-raises it from the captured baseline (the store logs
+        /// the old → new numbers). <see cref="WatchFailureLimit"/> consecutive failed ticks
+        /// end the watch with a warning, a restore ends it at once, and the engine stopping
+        /// cancels it.
+        /// </summary>
+        internal async Task WatchAsync(CancellationToken cancellationToken)
+        {
+            int failures = 0;
+
+            try
+            {
+                while (true)
+                {
+                    await _delay(WatchInterval, cancellationToken).ConfigureAwait(false);
+
+                    GpuBudgetWatchResult result = Watch();
+                    if (result.Verdict == GpuBudgetWatchVerdict.Stopped)
+                    {
+                        _log.LogInformation(
+                            "GPU unlock budget watch: the unlock is no longer staged; the watch ends");
+                        return;
+                    }
+
+                    if (result.Verdict != GpuBudgetWatchVerdict.Failed)
+                    {
+                        failures = 0;
+                        continue;
+                    }
+
+                    failures++;
+                    if (failures < WatchFailureLimit)
+                        continue;
+
+                    _log.LogWarning(
+                        "GPU unlock budget watch: {Failures} consecutive ticks failed, the last: {Reason}; the watch ends and the state verb reports the budget",
+                        failures, result.Reason);
+                    return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // The engine is stopping: no line, the host is going down.
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "GPU unlock budget watch failed");
+            }
+        }
+
+        /// <summary>One watch tick. An exception is a failed tick, never a re-apply loop.</summary>
+        private GpuBudgetWatchResult Watch()
+        {
+            try
+            {
+                return _overrides.WatchBudget();
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "GPU ROM override budget watch pass failed");
+                return new(GpuBudgetWatchVerdict.Failed, ex.Message);
             }
         }
 

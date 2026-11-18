@@ -1516,6 +1516,136 @@ public sealed class GpuRomOverrideTests : IDisposable
     }
 
     [Fact]
+    public void Apply_RepeatedAppliesDoNotGrowThePlatform()
+    {
+        // The measured defect (2026-11-18): every Apply computed the raise from the current
+        // budget, so the platform half grew by one delta per press — 500000 → 575000 → …
+        // → 865000 mW. From the baseline captured once, five applies leave one write behind.
+        var budget = new FakeBudget(_log) { Original = new GpuPowerBudget(150_000, 500_000) };
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling,
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        for (int i = 0; i < 5; i++)
+            Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        Assert.Equal(new GpuPowerBudget(225_000, 575_000), budget.Current);
+        Assert.Single(budget.Sets);   // the later applies found the tier already there
+        Assert.Equal(575_000, budget.Sets[0].PlatformMilliwatts);
+
+        // And a restore still puts both halves back to the captured baseline.
+        ceiling.Ceiling = 175_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+        Assert.Equal(new GpuPowerBudget(150_000, 500_000), budget.LastRestored);
+    }
+
+    [Fact]
+    public void Settle_AfterAnAccumulatedPlatform_RaisesFromTheBaselineOnce()
+    {
+        // The live machine's state when the fix lands: f7 back at the EC's 150 W and the
+        // platform at 865000 from the old cumulative math. One raise from the baseline puts
+        // both where the reference would: 225000 / 575000, not 650000.
+        var budget = new FakeBudget(_log) { Original = new GpuPowerBudget(150_000, 500_000) };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        budget.Current = new GpuPowerBudget(150_000, 865_000);   // the accumulated platform
+
+        Assert.Equal(GpuSettleVerdict.Reapplied, store.SettleAtStartup().Verdict);
+
+        Assert.Equal(new GpuPowerBudget(225_000, 575_000), budget.Current);
+        Assert.Equal(new GpuPowerBudget(225_000, 575_000), budget.Sets[^1]);
+    }
+
+    [Fact]
+    public void Reapply_WithoutACapturedBudget_FallsBackToTheCurrentAndSaysSo()
+    {
+        // An originals file from before the budget capture: the raise has no baseline to
+        // compute from, so it falls back to the live budget and the log names it.
+        var budget = new FakeBudget(_log) { Original = new GpuPowerBudget(150_000, 500_000) };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+
+        string[] lines = File.ReadAllLines(OriginalsPath)
+            .Where(line => !line.StartsWith("f7=", StringComparison.Ordinal) &&
+                           !line.StartsWith("platform=", StringComparison.Ordinal))
+            .ToArray();
+        File.WriteAllLines(OriginalsPath, lines);
+        budget.Reset();
+
+        using var capture = new LogCapture();
+        GpuReapplyResult result = store.ReapplyAtStartup();
+
+        Assert.Equal(GpuReapplyVerdict.Applied, result.Verdict);
+        Assert.Equal(new GpuPowerBudget(225_000, 575_000), budget.Current);
+        Assert.Contains(capture.Lines, line => line.Contains(
+            "no captured power budget in the originals file; the raise is computed from the current 150000 mW",
+            StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Watch_RaisesWhatTheEcRepublished_AndTheStateRecoversOnItsOwn()
+    {
+        // The measured defect (2026-11-18): the EC republishes its own F7 after a power-mode
+        // change, the card falls back to 150 W, and nothing re-raises it until the owner
+        // presses Apply. The watch is that re-raise, and the state must clear by itself.
+        var budget = new FakeBudget(_log) { Original = new GpuPowerBudget(150_000, 500_000) };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), new FakeCeiling(_log) { Ceiling = 250_000 },
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        budget.Reset();
+
+        // The card reads Uncertain over the 150 W the driver enforces against the 225 W request.
+        Assert.Equal(GpuRomOverrideStates.Uncertain, store.GetState().State);
+        Assert.Contains("150 W", store.GetState().Reason!, StringComparison.Ordinal);
+        Assert.Contains("225 W", store.GetState().Reason!, StringComparison.Ordinal);
+
+        int sets = budget.Sets.Count;
+        using var capture = new LogCapture();
+        Assert.Equal(GpuBudgetWatchVerdict.Raised, store.WatchBudget().Verdict);
+
+        Assert.Equal(sets + 1, budget.Sets.Count);
+        Assert.Equal(new GpuPowerBudget(225_000, 575_000), budget.Sets[^1]);   // the baseline, once
+        Assert.Contains(capture.Lines, line =>
+            line.Contains("the EC republished the laptop budget 150000 -> 225000 mW", StringComparison.Ordinal));
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.GetState().State);   // recovered without a re-apply
+
+        // At the target a tick writes nothing and logs nothing.
+        capture.Lines.Clear();
+        Assert.Equal(GpuBudgetWatchVerdict.Holding, store.WatchBudget().Verdict);
+        Assert.Equal(sets + 1, budget.Sets.Count);
+        Assert.DoesNotContain(capture.Lines, line => line.Contains("laptop budget", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Watch_StopsWhenTheUnlockIsGone()
+    {
+        var budget = new FakeBudget(_log);
+        var ceiling = new FakeCeiling(_log) { Ceiling = 250_000 };
+        GpuRomOverrideStore store = NewStore(
+            new FakeRomRegistry(_log), new FakeRestarter(_log), ceiling,
+            new FakeEc(_log), new FakeRequest(_log), budget);
+
+        Assert.Equal(GpuRomOverrideStates.Unlocked, store.SetEnabled(true).State);
+        ceiling.Ceiling = 175_000;
+        Assert.Equal(GpuRomOverrideStates.NotUnlocked, store.SetEnabled(false).State);
+
+        budget.Reset();
+        int sets = budget.Sets.Count;
+
+        Assert.Equal(GpuBudgetWatchVerdict.Stopped, store.WatchBudget().Verdict);
+        Assert.Equal(sets, budget.Sets.Count);   // a restore is never fought
+    }
+
+    [Fact]
     public void StartupReapply_UsesTheSavedRailSelection_NotTheTier()
     {
         // Field 0.9.12: every boot put the tier's 250000/70000/14026 mA over the owner's

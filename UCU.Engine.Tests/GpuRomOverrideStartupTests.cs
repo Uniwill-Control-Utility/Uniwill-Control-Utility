@@ -166,6 +166,60 @@ public sealed class GpuRomOverrideStartupTests
         Assert.Contains(_lines, line => line.Contains("a restore ran", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Watch_ReRaisesOncePerDrift_AndLogsNothingWhileItHolds()
+    {
+        // The EC republished a lower F7 once, then the budget held: one raise, then silent
+        // ticks until the owner restores — the watch must not log a line per tick.
+        var overrides = new FakeGpuRomOverrideService();
+        overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Raised, null));
+        overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Holding, null));
+        overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Holding, null));
+        overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Stopped, null));
+
+        await Startup(overrides).WatchAsync(CancellationToken.None);
+
+        Assert.Equal(4, overrides.WatchCalls);
+        Assert.Equal(4, _waits.Count);
+        Assert.All(_waits, wait => Assert.Equal(30, wait.TotalSeconds));
+        Assert.Single(_lines);   // only the restore that ended it
+        Assert.Contains("no longer staged", _lines[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Watch_EndsAfterTheConsecutiveFailureCap()
+    {
+        var overrides = new FakeGpuRomOverrideService
+        {
+            WatchAnswer = new(GpuBudgetWatchVerdict.Failed, "the EC refused the F7 write"),
+        };
+
+        await Startup(overrides).WatchAsync(CancellationToken.None);
+
+        Assert.Equal(GpuRomOverrideStartup.WatchFailureLimit, overrides.WatchCalls);
+        Assert.Contains(_lines, line =>
+            line.Contains($"{GpuRomOverrideStartup.WatchFailureLimit} consecutive ticks failed", StringComparison.Ordinal) &&
+            line.Contains("the EC refused the F7 write", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Watch_ResetsTheFailureCountOnASuccessfulTick()
+    {
+        // Four failures, one clean tick, four more: the cap is consecutive, not cumulative.
+        var overrides = new FakeGpuRomOverrideService();
+        for (int i = 0; i < 4; i++)
+            overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Failed, "unreadable"));
+        overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Holding, null));
+        for (int i = 0; i < 4; i++)
+            overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Failed, "unreadable"));
+        overrides.Watches.Enqueue(new(GpuBudgetWatchVerdict.Stopped, null));
+
+        await Startup(overrides).WatchAsync(CancellationToken.None);
+
+        Assert.Equal(10, overrides.WatchCalls);
+        Assert.DoesNotContain(_lines, line => line.Contains("consecutive ticks failed", StringComparison.Ordinal));
+    }
+
     private GpuRomOverrideStartup Startup(FakeGpuRomOverrideService overrides) =>
         new(overrides, new ListLogger(_lines), (delay, _) =>
         {

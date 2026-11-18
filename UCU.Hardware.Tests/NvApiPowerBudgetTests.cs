@@ -19,25 +19,34 @@ public sealed class NvApiPowerBudgetTests
     private const uint SetMethod = NvApiF7Layout.SetMethod;
 
     [Fact]
-    public void Raise_TakesTheTargetAndGrowsThePlatformByTheSameDelta()
+    public void Raise_ComputesBothHalvesFromTheBaseline_SoRepeatingItIsIdempotent()
     {
         // Measured 2026-11-15: f7 150000 + platform 425000, raise to 225 W -> 225000 / 500000.
         var baseline = new GpuPowerBudget(150_000, 425_000);
 
-        Assert.True(baseline.TryRaise(225_000, out GpuPowerBudget raised));
+        Assert.True(GpuPowerBudget.TryRaise(baseline, 225_000, out GpuPowerBudget raised));
         Assert.Equal(new GpuPowerBudget(225_000, 500_000), raised);
+
+        // The field case after ~5 applies (2026-11-18): the platform had accumulated to
+        // 865000 because each apply added its delta to the *current* value. From the
+        // captured baseline the same target always lands on the same numbers.
+        var field = new GpuPowerBudget(150_000, 500_000);
+        Assert.True(GpuPowerBudget.TryRaise(field, 225_000, out GpuPowerBudget first));
+        Assert.Equal(new GpuPowerBudget(225_000, 575_000), first);
+        Assert.True(GpuPowerBudget.TryRaise(field, 225_000, out GpuPowerBudget again));
+        Assert.Equal(first, again);
 
         // Already above the target: neither half moves (raising is never a lowering).
         var higher = new GpuPowerBudget(250_000, 500_000);
-        Assert.True(higher.TryRaise(225_000, out GpuPowerBudget unchanged));
+        Assert.True(GpuPowerBudget.TryRaise(higher, 225_000, out GpuPowerBudget unchanged));
         Assert.Equal(higher, unchanged);
 
         // Overflow is a refusal, never a wrap: the two halves are one shared budget.
         var huge = new GpuPowerBudget(150_000, int.MaxValue);
-        Assert.False(huge.TryRaise(225_000, out _));
+        Assert.False(GpuPowerBudget.TryRaise(huge, 225_000, out _));
 
-        Assert.False(baseline.TryRaise(0, out _));
-        Assert.False(baseline.TryRaise(-1, out _));
+        Assert.False(GpuPowerBudget.TryRaise(baseline, 0, out _));
+        Assert.False(GpuPowerBudget.TryRaise(baseline, -1, out _));
     }
 
     [Fact]

@@ -66,20 +66,22 @@ namespace UCU.Hardware.Gpu
     public readonly record struct GpuPowerBudget(int F7Milliwatts, int PlatformMilliwatts)
     {
         /// <summary>
-        /// The reference's <c>Budget::raise</c>: the F7 budget is the target when that is
-        /// a raise, and the platform budget grows by exactly the same delta (never more —
-        /// the two together are one shared budget). False when the sum overflows, which is
-        /// a refusal, not a clamp.
+        /// The reference's <c>Budget::raise</c>: both halves are computed from the baseline
+        /// captured once, so applying the same target again lands on the same numbers
+        /// (<c>f7 = max(baseline.f7, target)</c>, <c>platform = baseline.platform + (f7 -
+        /// baseline.f7)</c>). Computing from the current budget instead added the delta at
+        /// every apply — the field case went 500000 → 575000 → … → 865000 mW of platform.
+        /// False when the sum overflows, which is a refusal, not a clamp.
         /// </summary>
-        public bool TryRaise(int targetMilliwatts, out GpuPowerBudget raised)
+        public static bool TryRaise(GpuPowerBudget baseline, int targetMilliwatts, out GpuPowerBudget raised)
         {
-            raised = this;
+            raised = baseline;
 
             if (targetMilliwatts <= 0)
                 return false;
 
-            int f7 = Math.Max(F7Milliwatts, targetMilliwatts);
-            long platform = (long)PlatformMilliwatts + (f7 - F7Milliwatts);
+            int f7 = Math.Max(baseline.F7Milliwatts, targetMilliwatts);
+            long platform = (long)baseline.PlatformMilliwatts + (f7 - baseline.F7Milliwatts);
             if (platform > int.MaxValue)
                 return false;
 

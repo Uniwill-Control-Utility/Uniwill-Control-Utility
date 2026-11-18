@@ -101,6 +101,25 @@ namespace UCU.Hardware.Gpu
     /// </summary>
     public sealed record GpuSettleResult(GpuSettleVerdict Verdict, string? Drift, string? Reason);
 
+    /// <summary>What one drift-watch tick found.</summary>
+    public enum GpuBudgetWatchVerdict
+    {
+        /// <summary>The unlock is no longer staged (a restore ran): the watch ends.</summary>
+        Stopped,
+
+        /// <summary>The budget already carries the tier target: nothing was written.</summary>
+        Holding,
+
+        /// <summary>The EC had republished a lower budget and it was raised again.</summary>
+        Raised,
+
+        /// <summary>The read or the raise failed; <see cref="GpuBudgetWatchResult.Reason"/> says why.</summary>
+        Failed,
+    }
+
+    /// <summary>One drift-watch tick: the verdict and, for a failure, the reason.</summary>
+    public sealed record GpuBudgetWatchResult(GpuBudgetWatchVerdict Verdict, string? Reason);
+
     /// <summary>The four gpu.* ROM/rail verbs' target.</summary>
     public interface IGpuRomOverrideService
     {
@@ -124,6 +143,19 @@ namespace UCU.Hardware.Gpu
         /// back at the EC's value seconds later. Only the parts that drifted are written.
         /// </summary>
         GpuSettleResult SettleAtStartup();
+
+        /// <summary>
+        /// One drift-watch tick while the unlock is enabled: reads the laptop budget and
+        /// re-raises it from the captured baseline when the EC has republished a lower F7.
+        /// <see cref="GpuBudgetWatchVerdict.Stopped"/> when the intent is gone.
+        /// </summary>
+        GpuBudgetWatchResult WatchBudget();
+
+        /// <summary>
+        /// Raised when a completed apply lands. Only a notification: the engine starts its
+        /// drift watch from it, and nothing in the store reads it back.
+        /// </summary>
+        event Action? Unlocked;
 
         /// <summary>The three runtime rail currents and the live policy ranges the sliders are bounded by.</summary>
         GpuRailLimitsDto GetRailLimits();
@@ -179,6 +211,9 @@ namespace UCU.Hardware.Gpu
         /// <see cref="GetState"/> would call wrong.
         /// </summary>
         private volatile GpuRomOverrideStateDto? _startup;
+
+        /// <summary>Fires when a completed apply lands; see <see cref="IGpuRomOverrideService.Unlocked"/>.</summary>
+        public event Action? Unlocked;
 
         public GpuRomOverrideStore(
             IGpuRomRegistry registry,
@@ -486,6 +521,7 @@ namespace UCU.Hardware.Gpu
 
                 _startup = null;
                 WriteMarker();
+                NotifyUnlocked();
                 return state;
             }
             catch (Exception ex)
@@ -559,11 +595,11 @@ namespace UCU.Hardware.Gpu
 
             if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
             {
-                if (!current.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised))
+                if (!TryTierBudget(verb, current, out GpuPowerBudget raised, out string? overflow))
                 {
                     return State(
                         GpuRomOverrideStates.Uncertain,
-                        "the records are staged and the EC is offset, but the raised laptop power budget overflows",
+                        $"the records are staged and the EC is offset, but {overflow}",
                         version, limits, request, restarted, budget, rails);
                 }
 
@@ -750,14 +786,15 @@ namespace UCU.Hardware.Gpu
                     rails = _rails.Set(requested.NvVdd, requested.MsVdd, requested.BoardInput);
                 }
 
-                // The laptop budget: the measured drift.
+                // The laptop budget: the measured drift. Raised from the baseline captured
+                // once, so a second settle pass lands on the same numbers.
                 GpuPowerBudgetState budget = _budget.Read();
                 if (budget.Budget is GpuPowerBudget current)
                 {
                     if (current.F7Milliwatts < _tier.TgpTargetMilliwatts)
                     {
                         drift.Add($"budget {current.F7Milliwatts} mW");
-                        if (current.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised))
+                        if (TryTierBudget("gpu.settle", current, out GpuPowerBudget raised, out _))
                             budget = _budget.Set(raised);
                     }
                 }
@@ -807,6 +844,91 @@ namespace UCU.Hardware.Gpu
             {
                 Log.Information("gpu.settle: {Type} {Message}", ex.GetType().Name, ex.Message);
                 return new(GpuSettleVerdict.Drifted, null, ex.Message);
+            }
+        }
+
+        public GpuBudgetWatchResult WatchBudget()
+        {
+            try
+            {
+                if (!IntentHolds())
+                    return new(GpuBudgetWatchVerdict.Stopped, null);
+
+                GpuPowerBudgetState state = _budget.Read();
+                if (state.Budget is not GpuPowerBudget current)
+                    return new(GpuBudgetWatchVerdict.Failed, $"the laptop power budget could not be read: {state.Reason}");
+
+                if (current.F7Milliwatts >= _tier.TgpTargetMilliwatts)
+                    return new(GpuBudgetWatchVerdict.Holding, null);
+
+                if (!TryTierBudget("gpu.budget_watch", current, out GpuPowerBudget wanted, out string? reason))
+                    return new(GpuBudgetWatchVerdict.Failed, reason);
+
+                GpuPowerBudgetState set = _budget.Set(wanted);
+                if (set.Budget is not GpuPowerBudget applied)
+                {
+                    return new(GpuBudgetWatchVerdict.Failed,
+                        $"the laptop power budget could not be raised to {Watts(_tier.TgpTargetMilliwatts)}: {set.Reason}");
+                }
+
+                // The raise is the fix, so a stored verdict about the drift must not outlive
+                // it: the state verb then reads the live machine and the owner sees the card
+                // recover without re-applying. Every other witness is still checked there.
+                _startup = null;
+                Log.Information(
+                    "gpu.budget_watch: the EC republished the laptop budget {FromF7} -> {F7} mW, platform {Platform} mW",
+                    current.F7Milliwatts, applied.F7Milliwatts, applied.PlatformMilliwatts);
+                return new(GpuBudgetWatchVerdict.Raised, null);
+            }
+            catch (Exception ex)
+            {
+                return new(GpuBudgetWatchVerdict.Failed, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The raise the tier wants, computed from the baseline captured once in the
+        /// originals file (<c>f7 = max(baseline.f7, target)</c>, <c>platform = baseline.platform
+        /// + (f7 - baseline.f7)</c>). Computing from the baseline rather than the current
+        /// budget is what makes a repeated apply idempotent. An originals file written before
+        /// the capture (no f7 / platform lines) falls back to the current budget, and says so.
+        /// </summary>
+        private bool TryTierBudget(string verb, GpuPowerBudget current, out GpuPowerBudget raised, out string? reason)
+        {
+            reason = null;
+            GpuPowerBudget baseline = current;
+
+            if (TryReadOriginals(out Originals? originals, out string? fileError) &&
+                originals?.Budget is GpuPowerBudget captured)
+            {
+                baseline = captured;
+            }
+            else
+            {
+                Log.Information(
+                    "{Verb}: no captured power budget in the originals file{Error}; the raise is computed from the current {F7} mW",
+                    verb, fileError is null ? string.Empty : $" ({fileError})", current.F7Milliwatts);
+            }
+
+            if (!GpuPowerBudget.TryRaise(baseline, _tier.TgpTargetMilliwatts, out raised))
+            {
+                reason = "the raised laptop power budget overflows";
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>An unlock listener's failure must not turn a completed apply into Uncertain.</summary>
+        private void NotifyUnlocked()
+        {
+            try
+            {
+                Unlocked?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                Log.Information("gpu.set_rom_override: the unlock listener failed: {Type} {Message}", ex.GetType().Name, ex.Message);
             }
         }
 
@@ -899,7 +1021,7 @@ namespace UCU.Hardware.Gpu
                 // resets the budget to what the EC publishes.)
                 if (originals?.Budget is GpuPowerBudget baseline)
                 {
-                    GpuPowerBudget applied = baseline.TryRaise(_tier.TgpTargetMilliwatts, out GpuPowerBudget raised)
+                    GpuPowerBudget applied = GpuPowerBudget.TryRaise(baseline, _tier.TgpTargetMilliwatts, out GpuPowerBudget raised)
                         ? raised
                         : baseline;
 

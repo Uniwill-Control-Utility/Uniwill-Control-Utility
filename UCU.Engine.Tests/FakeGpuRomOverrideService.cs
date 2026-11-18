@@ -86,6 +86,31 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
         return Settles.Count > 0 ? Settles.Dequeue() : SettleAnswer;
     }
 
+    /// <summary>How many drift-watch ticks reached this fake.</summary>
+    public int WatchCalls { get; private set; }
+
+    /// <summary>The next watch ticks, in order; then <see cref="WatchAnswer"/>.</summary>
+    public Queue<GpuBudgetWatchResult> Watches { get; } = new();
+
+    /// <summary>
+    /// What a watch tick answers once the scripted ones are used up. Stopped by default so a
+    /// test that is not about the watch ends it on its first tick.
+    /// </summary>
+    public GpuBudgetWatchResult WatchAnswer { get; set; } = new(GpuBudgetWatchVerdict.Stopped, null);
+
+    public GpuBudgetWatchResult WatchBudget()
+    {
+        WatchCalls++;
+        return Watches.Count > 0 ? Watches.Dequeue() : WatchAnswer;
+    }
+
+    /// <summary>Never raised by this fake: the engine starts its watch from StartAsync as well.</summary>
+    public event Action? Unlocked
+    {
+        add { }
+        remove { }
+    }
+
     public GpuRailLimitsDto SetRailLimits(int? nvvddMilliamps, int? msvddMilliamps, int? boardInputMilliamps)
     {
         LastRailSet = (nvvddMilliamps, msvddMilliamps, boardInputMilliamps);
