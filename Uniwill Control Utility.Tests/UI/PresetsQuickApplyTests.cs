@@ -136,6 +136,72 @@ public sealed class PresetsQuickApplyTests
         Assert.DoesNotContain("Measured on our test unit", ReadPresetsXaml(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TheTgpSliderFollowsTheUnlockTarget_WithoutSavingThePreset()
+    {
+        // Field, 0.9.14: the 225 W quick configuration wrote the EC's cTGP offset (744=130) and
+        // the TGP slider stayed at the preset's 200 W, so the slider - the owner's model of the
+        // EC - was wrong about the machine. Every apply with a target moves it onto that target.
+        string unlock = MethodBody(ReadPresetsPage(), "private async Task RunRomOverrideAsync(bool restore)");
+        Assert.Contains("if (!restore && targetTgp is int target", unlock, StringComparison.Ordinal);
+        Assert.Contains("ShowUnlockTarget(target);", unlock, StringComparison.Ordinal);
+
+        string quick = MethodBody(ReadPresetsPage(), "private async Task ApplyQuickSetAsync(");
+        Assert.Contains("ShowUnlockTarget(targetMilliwatts);", quick, StringComparison.Ordinal);
+
+        // The sync touches the slider only. The slot is written by SaveCustomPreset (Save, Clear
+        // and the slot switch), which this never calls, and the applied-profile readout keeps the
+        // preset's TGP instead of being restamped.
+        string sync = MethodBody(ReadPresetsPage(), "private void ShowUnlockTarget(int milliwatts)");
+        Assert.Contains("sdNvPower.Value = target;", sync, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaveCustomPreset", sync, StringComparison.Ordinal);
+        Assert.DoesNotContain("CustomPresetStore", sync, StringComparison.Ordinal);
+        Assert.DoesNotContain("Settings.Default.Save", sync, StringComparison.Ordinal);
+        Assert.DoesNotContain("_profileGpuTgp", sync, StringComparison.Ordinal);
+
+        // And the decoupling holds the other way: a preset apply never moves the slider onto the
+        // unlock's target, and never retargets the unlock.
+        string preset = MethodBody(ReadPresetsPage(), "private async Task applyProfileAsync()");
+        Assert.DoesNotContain("ShowUnlockTarget", preset, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRomOverrideAsync", preset, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void APostApplyVerificationReReadsAndHushesTheTransientShortfall()
+    {
+        string page = ReadPresetsPage();
+
+        // The EC republishes its own F7 seconds after the write, so one short pass is enough:
+        // two reads, three and eight seconds in, then it is done.
+        int schedule = page.IndexOf("private static readonly TimeSpan[] PostApplyVerifySchedule =", StringComparison.Ordinal);
+        Assert.True(schedule >= 0, "The verification schedule is missing.");
+        string scheduleBlock = Handler(page, "private static readonly TimeSpan[] PostApplyVerifySchedule =", "};");
+        Assert.Contains("TimeSpan.FromSeconds(3),", scheduleBlock, StringComparison.Ordinal);
+        Assert.Contains("TimeSpan.FromSeconds(8),", scheduleBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("FromSeconds(30)", scheduleBlock, StringComparison.Ordinal);
+
+        // Both applies start it, and it is only the state read plus a render: the write paths
+        // stay the ones that already exist.
+        Assert.Contains("BeginPostApplyVerify();", MethodBody(page, "private async Task RunRomOverrideAsync(bool restore)"), StringComparison.Ordinal);
+        Assert.Contains("BeginPostApplyVerify();", MethodBody(page, "private async Task ApplyQuickSetAsync("), StringComparison.Ordinal);
+
+        string verify = MethodBody(page, "private async Task VerifyAfterApplyAsync(int run)");
+        Assert.Contains("await RefreshRomOverrideAsync()", verify, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRomOverrideAsync", verify, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRailLimitsAsync", verify, StringComparison.Ordinal);
+        Assert.DoesNotContain("WriteRailLimitsAsync", verify, StringComparison.Ordinal);
+
+        // While the window is open the shortfall line is quiet; the pass closes it before the
+        // last render, so a gap that survived is still said.
+        string render = MethodBody(page, "private void RenderRomOverride()");
+        Assert.Contains("_postApplyVerifying);", render, StringComparison.Ordinal);
+        Assert.Contains("_postApplyVerifying = i < PostApplyVerifySchedule.Length - 1;", verify, StringComparison.Ordinal);
+
+        // The apply's own read-back may have rendered the republished budget already, so the
+        // window renders once when it opens.
+        Assert.Contains("RenderRomOverride();", MethodBody(page, "private void BeginPostApplyVerify()"), StringComparison.Ordinal);
+    }
+
     private static string Handler(string source, string from, string to)
     {
         int start = source.IndexOf(from, StringComparison.Ordinal);

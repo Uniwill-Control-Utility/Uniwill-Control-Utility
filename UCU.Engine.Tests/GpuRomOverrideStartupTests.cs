@@ -180,10 +180,43 @@ public sealed class GpuRomOverrideStartupTests
         await Startup(overrides).WatchAsync(CancellationToken.None);
 
         Assert.Equal(4, overrides.WatchCalls);
-        Assert.Equal(4, _waits.Count);
-        Assert.All(_waits, wait => Assert.Equal(30, wait.TotalSeconds));
+
+        // The first tick is the one that catches the EC's own republish after an apply, so it
+        // lands on the short interval; every later tick is the standing watch.
+        Assert.Equal(GpuRomOverrideStartup.FirstWatchInterval.TotalSeconds, _waits[0].TotalSeconds);
+        Assert.All(_waits.Skip(1), wait => Assert.Equal(30, wait.TotalSeconds));
         Assert.Single(_lines);   // only the restore that ended it
         Assert.Contains("no longer staged", _lines[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnApplyCutsTheWatchesSleepShort_SoTheRepairDoesNotWaitTheInterval()
+    {
+        // Field, 0.9.14: the apply raised the budget to 225 W and the EC republished its own
+        // 150 W, but the watch was already asleep in its interval, so the card read the
+        // republish for up to half a minute. A second apply must cut that sleep short.
+        var overrides = new FakeGpuRomOverrideService();
+
+        var asleep = new SemaphoreSlim(0);
+        var sleeps = new List<CancellationToken>();
+        GpuRomOverrideStartup startup = new(overrides, new ListLogger(_lines), async (_, token) =>
+        {
+            sleeps.Add(token);
+            asleep.Release();
+            await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+        });
+
+        await startup.StartAsync(CancellationToken.None);   // NoIntent: no background watch
+        Assert.Empty(sleeps);
+
+        overrides.RaiseUnlocked();                          // the first apply starts the watch
+        Assert.True(await asleep.WaitAsync(TimeSpan.FromSeconds(5)), "the watch never slept");
+
+        overrides.RaiseUnlocked();                          // a second apply nudges it
+        Assert.True(sleeps[0].WaitHandle.WaitOne(TimeSpan.FromSeconds(5)),
+            "an apply must cut the watch's sleep short");
+
+        await startup.StopAsync(CancellationToken.None);
     }
 
     [Fact]

@@ -108,12 +108,14 @@ public sealed class FakeGpuRomOverrideService : IGpuRomOverrideService
         return Watches.Count > 0 ? Watches.Dequeue() : WatchAnswer;
     }
 
-    /// <summary>Never raised by this fake: the engine starts its watch from StartAsync as well.</summary>
-    public event Action? Unlocked
-    {
-        add { }
-        remove { }
-    }
+    /// <summary>
+    /// What the store raises after an apply. Scripted rather than automatic: a test that is
+    /// about the apply's nudge raises it by hand, and every other test keeps its own timing.
+    /// </summary>
+    public event Action? Unlocked;
+
+    /// <summary>Raises the apply notification, so the watch's nudge can be exercised.</summary>
+    public void RaiseUnlocked() => Unlocked?.Invoke();
 
     public GpuRailLimitsDto SetRailLimits(int? nvvddMilliamps, int? msvddMilliamps, int? boardInputMilliamps)
     {

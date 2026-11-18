@@ -2205,6 +2205,20 @@ namespace Uniwill_Control_Utility.Views.Pages
         // the card must say, never a success with two of three parts in force.
         private string? _quickApplyNote;
 
+        // An apply is followed by one short re-read pass: the EC republishes its own F7 budget
+        // seconds after the write (measured 2026-11-18: 150 W back while the request stood at
+        // 225 W), so the card would read the republish and name a shortfall the feature recovers
+        // from by itself. While the pass runs the shortfall line stays quiet; its last read
+        // renders with the window closed, so a shortfall that survived is still said.
+        private static readonly TimeSpan[] PostApplyVerifySchedule =
+        {
+            TimeSpan.FromSeconds(3),
+            TimeSpan.FromSeconds(8),
+        };
+
+        private int _postApplyVerifyRun;
+        private bool _postApplyVerifying;
+
         private async Task RefreshRomOverrideAsync()
         {
             _gpuTuning ??= App.GetService<UCU.Contracts.Capabilities.IGpuTuningCapability>();
@@ -2343,7 +2357,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     GpuUnlockVerdict.Enforced(
                         state?.RequestedLimitMilliwatts,
                         state?.BudgetMilliwatts,
-                        state?.CurrentLimitMilliwatts));
+                        state?.CurrentLimitMilliwatts),
+                    _postApplyVerifying);
 
             if (shortfall != null)
                 line = line is null ? shortfall : line + "\n" + shortfall;
@@ -2473,6 +2488,60 @@ namespace Uniwill_Control_Utility.Views.Pages
                 "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.");
         }
 
+        /// <summary>
+        /// The unlock writes the EC's cTGP offset from its target, so the TGP slider follows that
+        /// target: the slider is the owner's model of the EC, and a card that reads 200 W while
+        /// the EC runs 225 W is wrong about the machine. Nothing is saved here — the slot is only
+        /// rewritten by Save, Clear and the slot switch (SaveCustomPreset), and the applied-
+        /// profile readout keeps the preset's own TGP — so a sync never stamps a preset.
+        /// </summary>
+        private void ShowUnlockTarget(int milliwatts)
+        {
+            double target = milliwatts / 1000.0;
+
+            // The unlock takes up to the tier ceiling, which the SKU's own GPU baseline does not
+            // offer: a slider capped at the baseline would clamp the target and read as the lie
+            // this fixes. 250 W is what the boost path writes, so that is the cap.
+            if (sdNvPower.Maximum < target)
+                sdNvPower.Maximum = Math.Min(target, NvTuning.MaxPowerLimitWatts);
+
+            sdNvPower.Value = target;
+            updateAllLabels();
+        }
+
+        /// <summary>
+        /// The re-read pass after a successful apply. Bounded (the schedule) and idempotent: each
+        /// pass is the same state read a navigation makes, so a newer apply owns the window and
+        /// the older pass stops asking.
+        /// </summary>
+        private void BeginPostApplyVerify()
+        {
+            int run = ++_postApplyVerifyRun;
+            _postApplyVerifying = true;
+
+            // The apply's own read-back has already rendered and may have read the republished
+            // budget. Rendering once more inside the window keeps that line off the card — same
+            // dispatcher turn, so the paint never sees it.
+            RenderRomOverride();
+            _ = VerifyAfterApplyAsync(run);
+        }
+
+        private async Task VerifyAfterApplyAsync(int run)
+        {
+            for (int i = 0; i < PostApplyVerifySchedule.Length; i++)
+            {
+                await Task.Delay(PostApplyVerifySchedule[i]).ConfigureAwait(true);
+
+                if (run != _postApplyVerifyRun)
+                    return;   // a newer apply owns the window
+
+                // The last pass is the verdict: with the window closed, a shortfall that survived
+                // the recovery shows instead of being hushed.
+                _postApplyVerifying = i < PostApplyVerifySchedule.Length - 1;
+                await RefreshRomOverrideAsync().ConfigureAwait(true);
+            }
+        }
+
         private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>
             await RunRomOverrideAsync(restore: false);
 
@@ -2536,6 +2605,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                     App.GetService<IHardwareMonitoringService>(),
                     () => tuning.SetRomOverrideAsync(!restore, targetTgp)).ConfigureAwait(true);
                 DebugLog($"GPU ROM override: asked {(!restore ? "unlock" : "restore")}, engine answered {_romOverride.State}");
+
+                // The EC now runs at the target, so the slider is moved onto it — on a real
+                // apply only: a restore leaves the preset's TGP standing, as a preset apply
+                // leaves the unlock's target standing.
+                if (!restore && targetTgp is int target
+                    && _romOverride.State == UCU.Contracts.GpuRomOverrideStates.Unlocked)
+                {
+                    ShowUnlockTarget(target);
+                }
             }
             catch (Exception ex)
             {
@@ -2563,6 +2641,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // and stay inert until the page was reloaded.
                 await RefreshRailLimitsAsync();
             }
+
+            // The apply recovered from before this pass ends; the card reads it back instead of
+            // naming the EC's republish a shortfall.
+            if (!restore && _romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked)
+                BeginPostApplyVerify();
         }
 
         private async void btnApply200_Click(object sender, RoutedEventArgs e) =>
@@ -2630,6 +2713,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     App.GetService<IHardwareMonitoringService>(),
                     () => tuning.SetRomOverrideAsync(true, targetMilliwatts)).ConfigureAwait(true);
                 _romOverride = state;
+
+                // The grant is what the EC now asks for, so the TGP slider follows it; a target
+                // that did not land leaves the slider where the owner left it.
+                if (state.State == UCU.Contracts.GpuRomOverrideStates.Unlocked)
+                    ShowUnlockTarget(targetMilliwatts);
 
                 // The rails are bounded by the policy the restart just raised, so they follow it;
                 // a target that did not land leaves the rails alone.
@@ -2707,6 +2795,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _railLimitsError = railsRefusal;
 
             RenderRomOverride();
+
+            if (_romOverride?.State == UCU.Contracts.GpuRomOverrideStates.Unlocked)
+                BeginPostApplyVerify();
         }
 
         private static string QuickApplyQuestion(int targetMilliwatts) => targetMilliwatts switch

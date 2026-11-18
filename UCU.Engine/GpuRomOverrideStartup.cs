@@ -65,6 +65,14 @@ namespace UCU.Engine
         /// </summary>
         internal static readonly TimeSpan WatchInterval = TimeSpan.FromSeconds(30);
 
+        /// <summary>
+        /// The watch's first tick, and the one an apply cuts to: the EC republishes its own F7
+        /// seconds after a write (measured 2026-11-18: the 225 W raise read back at 150 W by the
+        /// time the card asked), so the repair must not wait out the interval — the card would
+        /// read the republish and call a successful apply a shortfall.
+        /// </summary>
+        internal static readonly TimeSpan FirstWatchInterval = TimeSpan.FromSeconds(3);
+
         /// <summary>Consecutive failed watch ticks that end the watch; a success resets the count.</summary>
         internal const int WatchFailureLimit = 5;
 
@@ -72,6 +80,8 @@ namespace UCU.Engine
         private readonly ILogger<GpuRomOverrideStartup> _log;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
         private readonly CancellationTokenSource _stopping = new();
+        private readonly object _wakeLock = new();
+        private CancellationTokenSource? _sleep;
         private int _watching;
 
         public GpuRomOverrideStartup(IGpuRomOverrideService overrides, ILogger<GpuRomOverrideStartup> log)
@@ -120,8 +130,13 @@ namespace UCU.Engine
         /// <summary>Starts the drift watch unless one is already running (a second apply is not a second timer).</summary>
         private void StartWatch()
         {
+            // A write that lands while the watch sleeps would otherwise wait out the interval
+            // before anything looked at the budget it just moved: cut the sleep short instead.
             if (Interlocked.Exchange(ref _watching, 1) == 1)
+            {
+                Nudge();
                 return;
+            }
 
             _ = Task.Run(async () =>
             {
@@ -257,12 +272,16 @@ namespace UCU.Engine
         internal async Task WatchAsync(CancellationToken cancellationToken)
         {
             int failures = 0;
+            bool first = true;
 
             try
             {
                 while (true)
                 {
-                    await _delay(WatchInterval, cancellationToken).ConfigureAwait(false);
+                    // The first tick is the one that covers the EC's own republish after an
+                    // apply; every later one is the standing watch.
+                    await WaitAsync(first ? FirstWatchInterval : WatchInterval, cancellationToken).ConfigureAwait(false);
+                    first = false;
 
                     GpuBudgetWatchResult result = Watch();
                     if (result.Verdict == GpuBudgetWatchVerdict.Stopped)
@@ -296,6 +315,41 @@ namespace UCU.Engine
             {
                 _log.LogWarning(ex, "GPU unlock budget watch failed");
             }
+        }
+
+        /// <summary>
+        /// One sleep between ticks, through the same delay seam the rest of the phase uses. A
+        /// nudge (<see cref="Nudge"/>) cuts it short; the engine stopping still cancels it.
+        /// </summary>
+        private async Task WaitAsync(TimeSpan span, CancellationToken cancellationToken)
+        {
+            using CancellationTokenSource sleep = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            lock (_wakeLock)
+                _sleep = sleep;
+
+            try
+            {
+                await _delay(span, sleep.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The nudge, not the engine stopping: the tick runs now.
+            }
+            finally
+            {
+                lock (_wakeLock)
+                {
+                    if (ReferenceEquals(_sleep, sleep))
+                        _sleep = null;
+                }
+            }
+        }
+
+        /// <summary>Cuts the current sleep short, so the tick after an apply runs at once.</summary>
+        private void Nudge()
+        {
+            lock (_wakeLock)
+                _sleep?.Cancel();
         }
 
         /// <summary>One watch tick. An exception is a failed tick, never a re-apply loop.</summary>

@@ -51,4 +51,22 @@ public sealed class GpuUnlockVerdictTests
         Assert.Contains("150 W", line, StringComparison.Ordinal);
         Assert.Contains("250 W", line, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AShortfallIsHushedWhileThePostApplyVerificationIsOpen_AndSaidOnceItCloses()
+    {
+        // Field, 0.9.14: the 225 W apply succeeded, then the EC republished its own 150 W
+        // budget for a few seconds and the card reported "Partly applied ... enforces 150 W".
+        // The transient gap is the recovery, so the verification window keeps it quiet.
+        Assert.Null(GpuUnlockVerdict.Shortfall(225_000, 150_000, midRecovery: true));
+
+        // The re-read that clears the transient: the budget is back at the request.
+        Assert.Null(GpuUnlockVerdict.Shortfall(225_000, 225_000, midRecovery: true));
+
+        // The last verification pass renders with the window closed: a gap that survived it is
+        // still said, so the hush never hides a real shortfall.
+        string line = GpuUnlockVerdict.Shortfall(225_000, 150_000)!;
+        Assert.Contains("150 W", line, StringComparison.Ordinal);
+        Assert.Contains("225 W", line, StringComparison.Ordinal);
+    }
 }

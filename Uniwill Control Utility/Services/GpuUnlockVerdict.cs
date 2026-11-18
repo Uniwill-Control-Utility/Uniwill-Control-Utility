@@ -52,11 +52,21 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// The one line the card owes when the machine enforces less than it was asked for
         /// (the EC refusing the cTGP offset is the measured cause), or null when it delivers.
+        /// Nothing while a post-apply verification is open: the EC republishes its own F7
+        /// budget for a few seconds after a write (measured 2026-11-18: the applied 225 W read
+        /// back at 150 W), so the gap the card would name there is the feature recovering, not
+        /// a failure. The last verification pass renders with the window closed, so a shortfall
+        /// that survived it is still said.
         /// </summary>
-        public static string? Shortfall(int? requestedMilliwatts, int? enforcedMilliwatts) =>
-            requestedMilliwatts is int asked && enforcedMilliwatts is int got && got < asked
+        public static string? Shortfall(int? requestedMilliwatts, int? enforcedMilliwatts, bool midRecovery = false)
+        {
+            if (midRecovery)
+                return null;
+
+            return requestedMilliwatts is int asked && enforcedMilliwatts is int got && got < asked
                 ? LocalizationService.Format("The card enforces {0}, not the requested {1}.", Watts(got), Watts(asked))
                 : null;
+        }
 
         private static string Watts(int milliwatts) =>
             (milliwatts / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " W";
