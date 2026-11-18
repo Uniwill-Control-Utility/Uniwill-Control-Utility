@@ -192,9 +192,9 @@
 
                             <!-- The unlock's numbers, read back from the driver. It exists only
                                  while the unlock is applied; with it off the card already says
-                                 what the GPU is running on. The colour carries the verdict; a
-                                 number the driver could not be asked for stays a dash pair,
-                                 and the card's reason line says why. -->
+                                 what the GPU is running on. The values carry no verdict colour:
+                                 a number the driver could not be asked for stays a dash pair,
+                                 and the card's reason line and shortfall line carry the words. -->
                             <StackPanel x:Name="spRomStatusRow" Visibility="Collapsed">
                                 <Border Height="1"
                                         Margin="0,12,0,10"
@@ -1054,13 +1054,18 @@
 
                                 <!-- The runtime rail currents. A live NVAPI write (no restart, no
                                      blank screen, no consent), so it follows the unlock's state:
-                                     inert and explained until it is applied. The page's Apply writes
-                                     them, in the same act that applies the preset, and the slot
-                                     carries them, so a preset switch moves them with the rest of its
-                                     values. One block with its divider, because the card's "override
-                                     is still live" state shows no sliders at all. -->
+                                     inert and explained until it is applied. They stand on their
+                                     own - an Apply of their own under the sliders, and no preset
+                                     carries them - because they are a machine-wide choice. One
+                                     block with its divider, because the card's "override is still
+                                     live" state shows no sliders at all. -->
                                 <StackPanel x:Name="spRailSection">
-                                    <StackPanel x:Name="spRailControls">
+                                    <ui:TextBlock FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Text="Standalone: these currents are not saved with a preset." />
+
+                                    <StackPanel x:Name="spRailControls" Margin="0,12,0,0">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -1184,6 +1189,17 @@
                                                    Visibility="Collapsed"
                                                    Foreground="{DynamicResource SystemFillColorCautionBrush}"
                                                    Text="Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here." />
+
+                                        <!-- The rails' own act. Inside the dimmed group, so an
+                                             unlock that is not applied disables it with the reason
+                                             the note below states. -->
+                                        <ui:Button x:Name="btnRailApply"
+                                                   Margin="0,20,0,4"
+                                                   Padding="16,6"
+                                                   HorizontalAlignment="Right"
+                                                   Appearance="Primary"
+                                                   Click="btnRailApply_Click"
+                                                   Content="Apply limits" />
                                     </StackPanel>
 
                                     <!-- Outside the disabled group: a reason a dimmed control

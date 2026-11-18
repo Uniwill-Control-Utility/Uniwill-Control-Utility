@@ -1181,5 +1181,7 @@
   "Apply the 250 W configuration measured on our unit?": "Aplicar a configuração de 250 W medida na nossa unidade?",
   "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "Isto define a meta do driver em {0} e as correntes de trilho em {1} A núcleo da GPU, {2} A memória e {3} A entrada da placa. Os clocks não são alterados.",
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Isto define a meta do driver em {0}, as correntes de trilho em {1} A núcleo da GPU, {2} A memória e {3} A entrada da placa, e os deslocamentos de clock em {4} MHz de núcleo e {5} MHz de memória.",
-  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Aplicado, exceto os deslocamentos de clock: o driver não os confirmou. A meta e as correntes de trilho estão em vigor."
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Aplicado, exceto os deslocamentos de clock: o driver não os confirmou. A meta e as correntes de trilho estão em vigor.",
+  "Apply limits": "Aplicar limites",
+  "Standalone: these currents are not saved with a preset.": "Independente: estas correntes não são salvas com um preset."
 }

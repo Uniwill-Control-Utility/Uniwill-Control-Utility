@@ -87,10 +87,10 @@ public sealed class PresetsQuickApplyTests
         // above the buttons. The behaviour stays - the buttons are still gated on it.
         Assert.DoesNotContain("Tick the statement above first.", reason, StringComparison.Ordinal);
 
-        // The captions are the buttons' tooltips, so the row is one line; the 250 W set's board
-        // input sits above 14 A, so its caution lives in that tooltip and in the rails block,
-        // which states it whenever the board input is above the tested current. No glyph on the
-        // button, and no 1 px border whose brush differs from its own text.
+        // The captions are the buttons' tooltips, so the row is one line. The 250 W set's board
+        // input sits above 14 A, but that caution belongs to the rails block, which renders it
+        // whenever the board input is above the tested current - so the tooltip does not repeat
+        // it, and there is no glyph on the button either.
         string xaml = ReadPresetsXaml();
         Assert.Contains("<ui:Button x:Name=\"btnApply250\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<ToolTipService.ToolTip>", xaml, StringComparison.Ordinal);
@@ -117,9 +117,13 @@ public sealed class PresetsQuickApplyTests
         Assert.DoesNotContain("Apply 225 W (tested)", xaml, StringComparison.Ordinal);
 
         string tooltips = MethodBody(ReadPresetsPage(), "private void setQuickApplyTooltips()");
-        Assert.Contains("Above 14.0 A the GPU can outdraw", tooltips, StringComparison.Ordinal);
         Assert.Contains("tbQuick200Tip.Text", tooltips, StringComparison.Ordinal);
         Assert.Contains("tbQuick225Tip.Text", tooltips, StringComparison.Ordinal);
+
+        // The 250 W tooltip drops the adapter sentence: the rails block carries it for exactly
+        // the state this button leaves behind, so the tooltip is the measurement alone.
+        Assert.DoesNotContain("Above 14.0 A the GPU can outdraw", tooltips, StringComparison.Ordinal);
+        Assert.Contains("tbQuick250Tip.Text", tooltips, StringComparison.Ordinal);
     }
 
     [Fact]

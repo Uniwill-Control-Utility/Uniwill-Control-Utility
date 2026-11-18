@@ -1181,5 +1181,7 @@
   "Apply the 250 W configuration measured on our unit?": "Применить конфигурацию 250 Вт, измеренную на нашем экземпляре?",
   "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "Это задаёт цель драйвера {0} и токи шин {1} А ядро GPU, {2} А память и {3} А вход платы. Частоты не затрагиваются.",
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Это задаёт цель драйвера {0}, токи шин {1} А ядро GPU, {2} А память и {3} А вход платы и смещения частоты {4} МГц ядра и {5} МГц памяти.",
-  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Применено, кроме смещений частоты: драйвер их не подтвердил. Цель и токи шин действуют."
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Применено, кроме смещений частоты: драйвер их не подтвердил. Цель и токи шин действуют.",
+  "Apply limits": "Применить пределы",
+  "Standalone: these currents are not saved with a preset.": "Отдельно: эти токи не сохраняются с профилем."
 }

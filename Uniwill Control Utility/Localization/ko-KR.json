@@ -1181,5 +1181,7 @@
   "Apply the 250 W configuration measured on our unit?": "당사 장치에서 측정한 250 W 구성을 적용할까요?",
   "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "드라이버 목표를 {0}(으)로, 레일 전류를 {1} A GPU 코어, {2} A 메모리, {3} A 보드 입력으로 설정합니다. 클럭은 건드리지 않습니다.",
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "드라이버 목표를 {0}(으)로, 레일 전류를 {1} A GPU 코어, {2} A 메모리, {3} A 보드 입력으로, 클럭 오프셋을 코어 {4} MHz, 메모리 {5} MHz로 설정합니다.",
-  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "적용되었으나 클럭 오프셋은 제외되었습니다: 드라이버가 확인하지 않았습니다. 목표와 레일 전류는 적용되어 있습니다."
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "적용되었으나 클럭 오프셋은 제외되었습니다: 드라이버가 확인하지 않았습니다. 목표와 레일 전류는 적용되어 있습니다.",
+  "Apply limits": "한계 적용",
+  "Standalone: these currents are not saved with a preset.": "독립 설정: 이 전류 값은 프리셋에 저장되지 않습니다."
 }

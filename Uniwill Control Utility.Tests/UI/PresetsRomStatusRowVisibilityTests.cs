@@ -7,7 +7,7 @@ namespace Uniwill_Control_Utility.Tests.UI;
 /// the feature since booting. With the staged records and UCU's originals file, the row is
 /// absent until the unlock has been completed at least once, and once enabled it renders
 /// whatever the numbers are — a number the driver could not be asked for stays a dash pair
-/// and is painted critical while the re-apply is still settling.
+/// while the re-apply is still settling, and the card's lines say what is wrong.
 /// </summary>
 public sealed class PresetsRomStatusRowVisibilityTests
 {

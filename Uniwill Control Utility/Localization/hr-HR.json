@@ -1181,5 +1181,7 @@
   "Apply the 250 W configuration measured on our unit?": "Primijeniti konfiguraciju od 250 W izmjerenu na našoj jedinici?",
   "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "Ovo postavlja cilj upravljačkog programa na {0}, a struje tračnica na {1} A jezgra GPU-a, {2} A memorija i {3} A ulaz ploče. Takt se ne dira.",
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Ovo postavlja cilj upravljačkog programa na {0}, struje tračnica na {1} A jezgra GPU-a, {2} A memorija i {3} A ulaz ploče te pomake takta na {4} MHz jezgre i {5} MHz memorije.",
-  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Primijenjeno, osim pomaka takta: upravljački program ih nije potvrdio. Cilj i struje tračnica su na snazi."
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Primijenjeno, osim pomaka takta: upravljački program ih nije potvrdio. Cilj i struje tračnica su na snazi.",
+  "Apply limits": "Primijeni ograničenja",
+  "Standalone: these currents are not saved with a preset.": "Samostalno: ove struje ne spremaju se uz profil."
 }

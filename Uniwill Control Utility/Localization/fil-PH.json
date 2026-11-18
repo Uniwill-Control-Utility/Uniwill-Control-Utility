@@ -1181,5 +1181,7 @@
   "Apply the 250 W configuration measured on our unit?": "Ilapat ang 250 W configuration na sinukat sa aming unit?",
   "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "Itinatakda nito ang target ng driver sa {0} at ang rail current sa {1} A GPU core, {2} A memory at {3} A board input. Hindi ginagalaw ang mga clock.",
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Itinatakda nito ang target ng driver sa {0}, ang rail current sa {1} A GPU core, {2} A memory at {3} A board input, at ang clock offset sa {4} MHz core at {5} MHz memory.",
-  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Nailapat, maliban sa clock offset: hindi ito kinumpirma ng driver. Aktibo ang target at mga rail current."
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Nailapat, maliban sa clock offset: hindi ito kinumpirma ng driver. Aktibo ang target at mga rail current.",
+  "Apply limits": "Ilapat ang mga limitasyon",
+  "Standalone: these currents are not saved with a preset.": "Hiwalay: hindi naka-save ang mga agos na ito sa isang preset."
 }

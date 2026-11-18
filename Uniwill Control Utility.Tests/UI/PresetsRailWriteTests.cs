@@ -3,71 +3,97 @@ using System.Text.RegularExpressions;
 namespace Uniwill_Control_Utility.Tests.UI;
 
 /// <summary>
-/// The rail currents have no Apply of their own any more: the page's Apply writes them, in the
-/// same act that applies the preset. The rules that keep that honest are pinned here:
+/// The rail currents stand on their own: the sliders' own Apply writes them, no preset carries
+/// them, and a preset apply leaves the unlock's target and rails untouched. The rules that keep
+/// that honest are pinned here:
 ///
-///   - the write happens after the preset's own apply and before the read-back, because that
-///     read re-binds the sliders to what the driver reports;
-///   - it is scoped to the unlock being applied, and says nothing when it is not;
-///   - a refusal or a transport failure comes back for the card's reason line, never silence;
-///   - the sliders keep their row and their gating note, and one rule separates them from the
-///     quick configurations.
+///   - the preset apply writes neither (no rail write, no retarget);
+///   - the rails' Apply is the only writer, it sends the three slider values through the verb
+///     that persists them (the engine saves a successful write for the next boot), and it reads
+///     no preset;
+///   - the sliders keep their row, their gating note and their caution, with one rule separating
+///     them from the quick configurations.
 /// </summary>
 public sealed class PresetsRailWriteTests
 {
     [Fact]
-    public void ThePageApplyWritesTheRailsAfterThePresetAndBeforeTheReadBack()
+    public void APresetApplyLeavesTheUnlockTargetAndTheRailsAlone()
     {
         string body = MethodBody(ReadPresetsPage(), "private async Task applyProfileAsync()");
 
-        int preset = body.IndexOf("RetargetUnlockAsync(", StringComparison.Ordinal);
-        int rails = body.IndexOf("await WriteRailLimitsAsync()", StringComparison.Ordinal);
-        int readBack = body.IndexOf("await RefreshRomOverrideAsync()", StringComparison.Ordinal);
+        Assert.DoesNotContain("WriteRailLimitsAsync", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRailLimitsAsync", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("RetargetUnlockAsync", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRomOverrideAsync", body, StringComparison.Ordinal);
 
-        Assert.True(preset >= 0 && rails > preset,
-            "The rails are written as part of the preset's apply, not before it.");
-        Assert.True(readBack > rails,
-            "The read-back re-binds the sliders to the driver's numbers, so it may not run before the write.");
+        // The card is only re-read, so a preset that moved the EC's GPU ceiling still shows the
+        // driver's numbers.
+        Assert.Contains("await RefreshRomOverrideAsync()", body, StringComparison.Ordinal);
 
-        // The read clears the refusals it did not ask for, so this write's own outcome goes back.
-        Assert.Contains("_railLimitsError = railError ?? _railLimitsError;", body, StringComparison.Ordinal);
-        Assert.Contains("_railLimitsNote = railNote ?? _railLimitsNote;", body, StringComparison.Ordinal);
+        // The same holds on the boot / tray / watcher path, which has one apply for all of them.
+        string applier = ReadApplier();
+        Assert.DoesNotContain("RetargetUnlockAsync", applier, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApplyRailsFromPresetAsync", applier, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetRailLimitsAsync", applier, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TheRailWriteIsScopedToTheUnlockAndReportsItsOwnFailure()
+    public void TheRailsApplyWritesAndPersistsWithoutAPreset()
     {
-        string body = MethodBody(ReadPresetsPage(), "private async Task<(string? Note, string? Error)> WriteRailLimitsAsync()");
+        string body = MethodBody(ReadPresetsPage(), "private async Task ApplyRailLimitsAsync()");
 
-        // Scoped to the unlock: no unlock, no write and no line about it.
-        Assert.Contains("_romOverride?.Enabled != true", body, StringComparison.Ordinal);
-        Assert.Contains("return (null, null);", body, StringComparison.Ordinal);
-
-        // The same capability call the card's own button used.
-        Assert.Contains("SetRailLimitsAsync(", body, StringComparison.Ordinal);
+        // The same capability call the write has always been: three slider values, the verb that
+        // saves a successful selection beside the originals for the next boot.
+        Assert.Contains("_gpuTuning.SetRailLimitsAsync(", body, StringComparison.Ordinal);
         Assert.Contains("Quantize(sdRailNvvdd.Value, 0)", body, StringComparison.Ordinal);
         Assert.Contains("Quantize(sdRailMsvdd.Value, 0)", body, StringComparison.Ordinal);
         Assert.Contains("Quantize(sdRailBoardInput.Value, 3)", body, StringComparison.Ordinal);
 
-        // Never silent: a refusal and a transport failure both come back for the reason line.
-        Assert.Contains("error = answer.Reason;", body, StringComparison.Ordinal);
-        Assert.Contains("error = ex.Message;", body, StringComparison.Ordinal);
+        // No preset is read and none is saved: the currents are not part of one.
+        Assert.DoesNotContain("CustomPreset", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaveCustomPreset", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("_currentProfile", body, StringComparison.Ordinal);
+
+        // Scoped to the unlock, and never silent: a refusal and a transport failure both land on
+        // the row's reason line.
+        Assert.Contains("_romOverride?.Enabled != true", body, StringComparison.Ordinal);
+        Assert.Contains("_railLimitsError = answer.Reason;", body, StringComparison.Ordinal);
+        Assert.Contains("_railLimitsError = ex.Message;", body, StringComparison.Ordinal);
+
+        // The button that fires it, and the handler behind it.
+        string xaml = ReadPresetsXaml();
+        string tag = Handler(xaml, "<ui:Button x:Name=\"btnRailApply\"", "</ui:Button>");
+        Assert.Contains("Content=\"Apply limits\"", tag, StringComparison.Ordinal);
+        Assert.Contains("Appearance=\"Primary\"", tag, StringComparison.Ordinal);
+        Assert.Contains("Click=\"btnRailApply_Click\"", tag, StringComparison.Ordinal);
+
+        // Inside the group the card dims, so an unlock that is not applied disables it with the
+        // note below.
+        int group = xaml.IndexOf("x:Name=\"spRailControls\"", StringComparison.Ordinal);
+        int button = xaml.IndexOf("x:Name=\"btnRailApply\"", StringComparison.Ordinal);
+        int groupEnd = xaml.IndexOf("x:Name=\"tbRailNote\"", StringComparison.Ordinal);
+        Assert.True(group >= 0 && button > group && groupEnd > button,
+            "Apply limits belongs to the row that is dimmed with it.");
+
+        Assert.Contains("private async void btnRailApply_Click(", ReadPresetsPage(), StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TheCardNoLongerCarriesItsOwnApplyButton()
+    public void TheSlidersSayTheyStandOnTheirOwn()
     {
-        Assert.DoesNotContain("btnRailApply", ReadPresetsXaml(), StringComparison.Ordinal);
-        Assert.DoesNotContain("btnRailApply", ReadPresetsPage(), StringComparison.Ordinal);
+        string xaml = ReadPresetsXaml();
+        Assert.Contains("Text=\"Standalone: these currents are not saved with a preset.\"",
+            xaml, StringComparison.Ordinal);
 
-        // The sliders explain themselves: why they are inert. There is no second line about how a
-        // move is kept either - the sliders move with the preset slot, and the card says so only
-        // where the gating note already is.
-        string source = ReadPresetsPage();
-        Assert.Contains("Available once Extra GPU power is unlocked.", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Written when you press Apply, and kept for the next boot.", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Written when you press Apply, and kept for the next boot.", ReadPresetsXaml(), StringComparison.Ordinal);
-        Assert.DoesNotContain("The rail currents are saved with the profile.", ReadPresetsXaml(), StringComparison.Ordinal);
+        // The gating note and the adapter caution stay as they were.
+        string page = ReadPresetsPage();
+        Assert.Contains("Available once Extra GPU power is unlocked.", page, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Above 14.0 A the GPU can outdraw", xaml, StringComparison.Ordinal);
+        Assert.Contains("sdRailBoardInput.Value > TestedBoardInputMilliamps", page, StringComparison.Ordinal);
+
+        // Nothing claims the values travel with a profile any more.
+        Assert.DoesNotContain("saved with the profile", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("saved with the profile", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -88,36 +114,14 @@ public sealed class PresetsRailWriteTests
         Assert.True(rules == 1, $"The gap between the quick row and the rails carries {rules} rules, not one.");
     }
 
-    [Fact]
-    public void TheRailsTravelWithTheSlot()
+    private static string Handler(string source, string from, string to)
     {
-        string page = ReadPresetsPage();
+        int start = source.IndexOf(from, StringComparison.Ordinal);
+        int end = start < 0 ? -1 : source.IndexOf(to, start, StringComparison.Ordinal);
 
-        // Save stamps the three sliders into the slot it saves.
-        string save = MethodBody(page, "private void SaveCustomPreset(int slotIndex)");
-        Assert.Contains("GpuRailNvvddMilliamps = Quantize(sdRailNvvdd.Value, 0)", save, StringComparison.Ordinal);
-        Assert.Contains("GpuRailMsvddMilliamps = Quantize(sdRailMsvdd.Value, 0)", save, StringComparison.Ordinal);
-        Assert.Contains("GpuRailBoardInputMilliamps = Quantize(sdRailBoardInput.Value, 3)", save, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, $"Could not slice {from} up to {to}.");
 
-        // Load reads them back, and the card's render puts them on the sliders once the driver's
-        // policy has bounded them (a value assigned earlier would clamp to the placeholder range).
-        string load = MethodBody(page, "private void LoadCustomPreset(int slotIndex)");
-        Assert.Contains("_presetRails = (preset.GpuRailNvvddMilliamps", load, StringComparison.Ordinal);
-        Assert.Contains("ApplyPresetRailsToSliders();", page, StringComparison.Ordinal);
-
-        // The write itself keeps reading the sliders: after a load they hold the slot's values,
-        // and an unsaved move is this session's value.
-        Assert.Contains("Quantize(sdRailNvvdd.Value, 0)", MethodBody(page,
-            "private async Task<(string? Note, string? Error)> WriteRailLimitsAsync()"), StringComparison.Ordinal);
-
-        // The boot / tray / watcher apply carries the slot's rails the same way, scoped to the unlock.
-        string applier = File.ReadAllText(Path.Combine(RepositoryRoot(), "Uniwill Control Utility", "Services", "PresetProfileApplier.cs"));
-        Assert.Contains("await ApplyRailsFromPresetAsync(customSlot, customMode)", applier, StringComparison.Ordinal);
-        string rails = MethodBody(applier, "private static async Task ApplyRailsFromPresetAsync(");
-        Assert.Contains("preset.GpuRailNvvddMilliamps", rails, StringComparison.Ordinal);
-        Assert.Contains("preset.GpuRailMsvddMilliamps", rails, StringComparison.Ordinal);
-        Assert.Contains("preset.GpuRailBoardInputMilliamps", rails, StringComparison.Ordinal);
-        Assert.Contains("if (!state.Enabled)", rails, StringComparison.Ordinal);
+        return source.Substring(start, end - start);
     }
 
     private static string MethodBody(string source, string signature)
@@ -136,6 +140,9 @@ public sealed class PresetsRailWriteTests
 
     private static string ReadPresetsXaml() =>
         File.ReadAllText(Path.Combine(RepositoryRoot(), "Uniwill Control Utility", "Views", "Pages", "Presets.xaml"));
+
+    private static string ReadApplier() =>
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "Uniwill Control Utility", "Services", "PresetProfileApplier.cs"));
 
     private static string RepositoryRoot()
     {

@@ -102,30 +102,6 @@ namespace Uniwill_Control_Utility.Models
         /// <summary> V-F curve offsets: pointIndex → frequencyOffsetMHz </summary>
         public Dictionary<int, int> VfCurveOffsets { get; set; } = new();
 
-        /// <summary>
-        /// The Extra GPU power rail currents this slot carries, in mA — the NVVDD (GPU core),
-        /// MSVDD (memory) and board input rails. Their defaults are the tested 250 W tier's
-        /// runtime values (the same numbers the page's <c>Tested*Milliamps</c> constants hold),
-        /// so a preset file written before the fields existed loads with the tier's rails and
-        /// keeps working.
-        /// </summary>
-        public const int DefaultRailNvvddMilliamps = 250_000;
-
-        /// <inheritdoc cref="DefaultRailNvvddMilliamps"/>
-        public const int DefaultRailMsvddMilliamps = 70_000;
-
-        /// <inheritdoc cref="DefaultRailNvvddMilliamps"/>
-        public const int DefaultRailBoardInputMilliamps = 14_026;
-
-        /// <inheritdoc cref="DefaultRailNvvddMilliamps"/>
-        public int GpuRailNvvddMilliamps { get; set; } = DefaultRailNvvddMilliamps;
-
-        /// <inheritdoc cref="DefaultRailNvvddMilliamps"/>
-        public int GpuRailMsvddMilliamps { get; set; } = DefaultRailMsvddMilliamps;
-
-        /// <inheritdoc cref="DefaultRailNvvddMilliamps"/>
-        public int GpuRailBoardInputMilliamps { get; set; } = DefaultRailBoardInputMilliamps;
-
         #region Fan Control Settings
         /// <summary> Whether Unified Fan Curve mode is enabled (stored per-preset). </summary>
         public bool FanUnifiedMode { get; set; }
@@ -207,15 +183,6 @@ namespace Uniwill_Control_Utility.Models
             CpuCoUnifiedValue = ClampCo(CpuCoUnifiedValue);
             CpuCoCcd0 = ClampCo(CpuCoCcd0);
             CpuCoCcd1 = ClampCo(CpuCoCcd1);
-
-            // A hand-edited file must not leave a rail at zero or below: the tier's value stands,
-            // which is also what an absent field already means.
-            if (GpuRailNvvddMilliamps <= 0)
-                GpuRailNvvddMilliamps = DefaultRailNvvddMilliamps;
-            if (GpuRailMsvddMilliamps <= 0)
-                GpuRailMsvddMilliamps = DefaultRailMsvddMilliamps;
-            if (GpuRailBoardInputMilliamps <= 0)
-                GpuRailBoardInputMilliamps = DefaultRailBoardInputMilliamps;
 
             if (CpuCoPerCore is null || CpuCoPerCore.Length == 0)
             {
@@ -300,7 +267,9 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>
         /// Loads 5 preset slots from one file. The path-taking half exists so a test can drive the
-        /// real read over a temporary file instead of the owner's presets.
+        /// real read over a temporary file instead of the owner's presets. A file from an older
+        /// build that still carries fields this model no longer has (the rail currents) loads
+        /// without error: <see cref="JsonSerializer"/> ignores members it does not know.
         /// </summary>
         internal static CustomPreset[] LoadFrom(string path)
         {

@@ -4,15 +4,13 @@ using System.Globalization;
 namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
-    /// The Extra GPU power status row's judgement, kept out of the WPF page so a test can
-    /// drive it: the badge is a comparison with the one target the unlock was measured at,
-    /// and a request the machine does not deliver is a sentence, never a success.
+    /// The Extra GPU power card's judgement, kept out of the WPF page so a test can drive it: the
+    /// range a target may occupy, what the machine actually enforces, and the one sentence a
+    /// shortfall owes. The status row shows numbers without a verdict colour, so the sentence is
+    /// where a failure surfaces.
     /// </summary>
     public static class GpuUnlockVerdict
     {
-        /// <summary>The target the unlock was measured at (225 W), the only "Tested" one.</summary>
-        public const int TestedTargetMilliwatts = 225_000;
-
         /// <summary>
         /// The range the unlock accepts, mirrored from UCU.Hardware (which this project does not
         /// reference): <c>RomOverrideLayout.StockPowerMilliwatts</c> up to
@@ -24,22 +22,14 @@ namespace Uniwill_Control_Utility.Services
         public const int MaxTargetMilliwatts = 250_000;
 
         /// <summary>
-        /// The target a preset carries into a live unlock, or null when it carries none (a stock
-        /// preset's firmware-owned TGP, or a slider the engine would refuse). 200 W is a supported
-        /// configuration, so the measured target is not the floor.
+        /// The target the unlock takes, or null when the number cannot be one (outside the range
+        /// the engine accepts). 200 W is a supported configuration, so the measured 225 W is not
+        /// the floor.
         /// </summary>
         public static int? UnlockTarget(int? milliwatts) =>
             milliwatts is int value && value >= MinTargetMilliwatts && value <= MaxTargetMilliwatts
                 ? value
                 : null;
-
-        /// <summary>
-        /// Tested only at the measured target: a higher request (250 W, the ROM ceiling) is
-        /// legal to make but outside the measured configuration, and a shortfall is its own
-        /// state, so neither may carry the badge.
-        /// </summary>
-        public static bool IsTested(int? requestedMilliwatts) =>
-            requestedMilliwatts == TestedTargetMilliwatts;
 
         /// <summary>
         /// What the card can enforce: the smallest of the request, the laptop budget and the

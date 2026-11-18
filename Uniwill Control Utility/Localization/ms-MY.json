@@ -1181,5 +1181,7 @@
   "Apply the 250 W configuration measured on our unit?": "Laksanakan konfigurasi 250 W yang diukur pada unit kami?",
   "This sets the driver's target to {0} and the rail currents to {1} A GPU core, {2} A memory and {3} A board input. The clocks are left alone.": "Ini menetapkan sasaran pemacu kepada {0} dan arus rel kepada {1} A teras GPU, {2} A memori dan {3} A input papan. Jam tidak diubah.",
   "This sets the driver's target to {0}, the rail currents to {1} A GPU core, {2} A memory and {3} A board input, and the clock offsets to {4} MHz core and {5} MHz memory.": "Ini menetapkan sasaran pemacu kepada {0}, arus rel kepada {1} A teras GPU, {2} A memori dan {3} A input papan, serta offset jam kepada {4} MHz teras dan {5} MHz memori.",
-  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Dilaksanakan, kecuali offset jam: pemacu tidak mengesahkannya. Sasaran dan arus rel berkuat kuasa."
+  "Applied, except the clock offsets: the driver did not confirm them. The target and the rails are in force.": "Dilaksanakan, kecuali offset jam: pemacu tidak mengesahkannya. Sasaran dan arus rel berkuat kuasa.",
+  "Apply limits": "Gunakan had",
+  "Standalone: these currents are not saved with a preset.": "Berdiri sendiri: arus ini tidak disimpan bersama pratetap."
 }

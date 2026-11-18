@@ -3,30 +3,21 @@ using Uniwill_Control_Utility.Services;
 namespace Uniwill_Control_Utility.Tests.UI;
 
 /// <summary>
-/// The Extra GPU power status row's judgement. Field, 0.9.14: the owner set the Custom
-/// preset to 250 W and the row still said "225 W · Tested" while the GPU TGP line above it
-/// read 250 W — the badge compared "at least the target" and nothing said the card was not
-/// delivering what was asked. So: the badge is the measured target and nothing else, and a
-/// shortfall is its own sentence with both numbers.
+/// The Extra GPU power card's judgement. Field, 0.9.14: the owner set the Custom preset to 250 W
+/// and the card still reported 225 W — the target was pinned to the measured tier and nothing said
+/// the card was not delivering what was asked. So: the accepted range is the stock ceiling up to the
+/// tier ceiling, and a shortfall is its own sentence with both numbers. The status row shows the
+/// numbers without a verdict colour now, which makes that sentence the only place a failure speaks.
 /// </summary>
 public sealed class GpuUnlockVerdictTests
 {
     [Fact]
-    public void OnlyTheMeasuredTargetCarriesTheTestedBadge()
-    {
-        Assert.True(GpuUnlockVerdict.IsTested(225_000));
-        Assert.False(GpuUnlockVerdict.IsTested(250_000));
-        Assert.False(GpuUnlockVerdict.IsTested(200_000));
-        Assert.False(GpuUnlockVerdict.IsTested(null));
-    }
-
-    [Fact]
     public void APresetBelowTheStockCeilingCarriesNoTargetAndTheRestOfTheAcceptedRangeDoes()
     {
-        // The retarget guard: the engine accepts the stock ceiling (175 W) up to its tier
-        // ceiling (250 W), so 200 W is a target - the bug was a floor at the measured 225 W,
-        // which left a 200 W preset aiming at 225 W. Below the stock ceiling the preset carries
-        // nothing and the old target stands.
+        // The range guard: the engine accepts the stock ceiling (175 W) up to its tier ceiling
+        // (250 W), so 200 W is a target - the bug was a floor at the measured 225 W, which
+        // refused a 200 W request. Outside the range there is no target at all, and the old one
+        // stands.
         Assert.Equal(200_000, GpuUnlockVerdict.UnlockTarget(200_000));
         Assert.Equal(175_000, GpuUnlockVerdict.UnlockTarget(175_000));
         Assert.Equal(225_000, GpuUnlockVerdict.UnlockTarget(225_000));

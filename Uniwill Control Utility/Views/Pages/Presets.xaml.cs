@@ -1532,26 +1532,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Update status after apply
                 updateStatus();
 
-                // A live Extra GPU power unlock aims at the preset's TGP, not at the number
-                // the last unlock was given: the slider just applied is the intention, so its
-                // request, F7 raise and cTGP offset move to it without a second click.
-                await PresetProfileApplier.RetargetUnlockAsync(
-                    _currentProfile,
-                    _currentProfile == "Custom" ? (int)Math.Round(sdNvPower.Value * 1000) : null,
-                    "Presets").ConfigureAwait(true);
-
-                // The rails are the same act, and they travel before the read-back below because
-                // that read re-binds the sliders to what the driver reports: written after it,
-                // the owner's move would be overwritten and never reach the hardware.
-                (string? railNote, string? railError) = await WriteRailLimitsAsync().ConfigureAwait(true);
-
+                // The Extra GPU power unlock is the unlock's own: a preset apply leaves its
+                // target and its rail currents alone (Unlock, the quick configurations and the
+                // rails' Apply write those). The card is only re-read, so a preset that moved
+                // the EC's GPU ceiling still shows what the driver reports now.
                 await RefreshRomOverrideAsync().ConfigureAwait(true);
-
-                // The read-back clears the refusals it did not ask for, so this write's own
-                // outcome goes back on screen after it. A declined rail write is never silent.
-                _railLimitsError = railError ?? _railLimitsError;
-                _railLimitsNote = railNote ?? _railLimitsNote;
-                RenderRomOverride();
             }
             catch (Exception ex)
             {
@@ -1659,16 +1644,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             presets[slotIndex].CpuCoPerCore = (int[])_coPerCore.Clone();
             presets[slotIndex].CpuCoUnifiedValue = sdCoUnified.Value;
 
-            // The rail currents travel with the slot. Stamped only while the rail row is bound and
-            // usable: with the unlock off (or a failed read) the sliders carry no owner choice, and
-            // the slot keeps the values it already has.
-            if (spRailControls.IsEnabled)
-            {
-                presets[slotIndex].GpuRailNvvddMilliamps = Quantize(sdRailNvvdd.Value, 0);
-                presets[slotIndex].GpuRailMsvddMilliamps = Quantize(sdRailMsvdd.Value, 0);
-                presets[slotIndex].GpuRailBoardInputMilliamps = Quantize(sdRailBoardInput.Value, 3);
-            }
-
             // Also save V-F curve offsets from editor if active
             if (_vfActivePreset >= 0)
             {
@@ -1742,11 +1717,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _coPerCore = preset.CpuCoPerCore ?? Array.Empty<int>();
                 sdCoUnified.Value = preset.CpuCoUnifiedValue;
 
-                // The slot's rail currents: recorded here and rendered by RenderRailLimits once
-                // the driver's policy bounds the sliders (a value assigned before the bounds are
-                // read would be clamped to the slider's placeholder range).
-                _presetRails = (preset.GpuRailNvvddMilliamps, preset.GpuRailMsvddMilliamps, preset.GpuRailBoardInputMilliamps);
-
                 // Sync CO visibility after programmatic IsChecked change (events don't fire)
                 updateCoVisibility();
 
@@ -1780,7 +1750,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
-                _presetRails = null;
                 DebugLog($"LoadCustomPreset: slot {slotIndex + 1} is empty, skipping");
             }
         }
@@ -2206,11 +2175,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private string? _railLimitsNote;
         private bool _railBinding;
 
-        // The loaded Custom slot's rail currents. Set on a slot load and preferred over the
-        // driver's live reading while it stands, because the slot is the owner's saved choice;
-        // a slider move clears it (that move is the session's value, remembered only by Save).
-        private (int Nvvdd, int Msvdd, int Board)? _presetRails;
-
         // The tested tier's rails and the stock rails, the UI's own copy of what the engine
         // ships (RomOverrideLayout.Stock*MilliAmps in UCU.Hardware, which this project does
         // not reference). The status row judges a reading against these without asking the
@@ -2429,16 +2393,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// named in the slider's own vocabulary - TGP - while the driver's 250 W ceiling is
         /// permission, not a target, and is explained in the section's tooltip instead.
         ///
-        /// The colour is the verdict, stated once here; the words that used to sit beside it are
-        /// gone, so the card's reason line carries the failure text:
-        ///   success   — applied and inside the measured configuration: request at or above the
-        ///               225 W target, budget at or above the request, and every rail at or below
-        ///               250 / 70 / 14.026 A.
-        ///   caution   — applied but outside it: budget below the request, request below the
-        ///               target, or a rail above the tested value. Above 14.026 A on the board
-        ///               input that is also the adapter-overload case.
-        ///   critical  — refused or unverified (Unsupported / Uncertain), or a number that could
-        ///               not be read, which is not the same as a number that is fine.
+        /// The values carry no verdict colour: they are read-backs, and the failure text sits on
+        /// the card's reason line (a refusal or an unverified state) and on the shortfall line
+        /// (the machine enforcing less than was asked), so nothing here has to be decoded from a
+        /// hue. A number that could not be read stays "--".
         /// </summary>
         private void RenderRomStatusRow()
         {
@@ -2458,42 +2416,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!powerBoost)
                 return;
 
-            // A partial apply is not a verdict: the numbers can read right and still be unverified.
-            bool unverified = state!.State != UCU.Contracts.GpuRomOverrideStates.Unlocked;
-
-            int? request = state.RequestedLimitMilliwatts;
-            int? budget = state.BudgetMilliwatts;
-            int? nvvdd = state.NvvddCurrentMilliamps;
-            int? msvdd = state.MsvddCurrentMilliamps;
-            int? board = state.BoardInputCurrentMilliamps;
-
-            SetRomValue(tbRomStatRequest, Watts(request),
-                request is not null, unverified, GpuUnlockVerdict.IsTested(request));
-
-            // The driver enforces min(request, budget), so a budget under the request is the
-            // laptop's own cap holding the GPU back, not a fault.
-            SetRomValue(tbRomStatBudget, Watts(budget),
-                budget is not null, unverified, budget is int b && b >= (request ?? GpuUnlockVerdict.TestedTargetMilliwatts));
-
-            SetRomValue(tbRomStatNvvdd, Amps(nvvdd, 0) + " A",
-                nvvdd is not null, unverified, nvvdd is int n && n <= TestedNvvddMilliamps);
-            SetRomValue(tbRomStatMsvdd, Amps(msvdd, 0) + " A",
-                msvdd is not null, unverified, msvdd is int m && m <= TestedMsvddMilliamps);
-            SetRomValue(tbRomStatBoard, Amps(board, 3) + " A",
-                board is not null, unverified, board is int i && i <= TestedBoardInputMilliamps);
-        }
-
-        private void SetRomValue(TextBlock valueText, string text, bool read, bool unverified, bool tested)
-        {
-            valueText.Text = text;
-
-            string brush = !read || unverified
-                ? "SystemFillColorCriticalBrush"
-                : tested
-                    ? "SystemFillColorSuccessBrush"
-                    : "SystemFillColorCautionBrush";
-
-            valueText.Foreground = (System.Windows.Media.Brush)FindResource(brush);
+            tbRomStatRequest.Text = Watts(state!.RequestedLimitMilliwatts);
+            tbRomStatBudget.Text = Watts(state.BudgetMilliwatts);
+            tbRomStatNvvdd.Text = Amps(state.NvvddCurrentMilliamps, 0) + " A";
+            tbRomStatMsvdd.Text = Amps(state.MsvddCurrentMilliamps, 0) + " A";
+            tbRomStatBoard.Text = Amps(state.BoardInputCurrentMilliamps, 3) + " A";
         }
 
         private static string Watts(int? milliwatts) =>
@@ -2515,12 +2442,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             tbQuick225Tip.Text = LocalizationService.Get(
                 "The tested tier: 214 W board power, hotspot 58-63 °C with the liquid cooler connected. The clocks are left alone.");
 
-            // The 250 W set's board input sits above 14 A, so the caution that must not go
-            // invisible travels in the same tooltip - with a glyph on the button itself.
-            tbQuick250Tip.Text =
-                LocalizationService.Get("Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.")
-                + "\n\n"
-                + LocalizationService.Get("Above 14.0 A the GPU can outdraw what the laptop's power adapter supplies once the CPU is also loaded — we have seen this machine fail with an out-of-memory error. Nothing is clamped here.");
+            // The 250 W set's board input sits above 14 A; that caution is the rails block's, which
+            // renders it whenever the board input is above the tested current - exactly the state
+            // this button leaves the sliders in - so the tooltip does not repeat it.
+            tbQuick250Tip.Text = LocalizationService.Get(
+                "Our unit measured 248.5 W peak and 236 W average, 183 W chip at 0.985-0.995 V and 2947 MHz, with +245 MHz core and +1500 MHz memory. Those clock offsets are this sample's result and may be unstable on another card.");
         }
 
         private async void btnRomUnlock_Click(object sender, RoutedEventArgs e) =>
@@ -2868,11 +2794,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             // controls that happen to be off.
             spRailControls.IsEnabled = applied && bounded && !_railLimitsBusy;
 
-            // A loaded slot's rails are what the row shows: bounds above are set, so the values
-            // land inside the driver's policy instead of the slider's placeholder range.
-            if (bounded)
-                ApplyPresetRailsToSliders();
-
             string? refusal = _railLimitsError ?? rails?.Reason;
             tbRailReason.Text = RomReasonLine(refusal);
             tbRailReason.Visibility = string.IsNullOrEmpty(tbRailReason.Text) ? Visibility.Collapsed : Visibility.Visible;
@@ -2888,28 +2809,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             UpdateRailReadouts();
             UpdateRailCaution();
-        }
-
-        /// <summary>
-        /// Moves the three sliders to the loaded slot's rail currents, inside the bounds
-        /// <see cref="BindRail"/> just set. Silent while no slot is loaded or the row is unbound.
-        /// </summary>
-        private void ApplyPresetRailsToSliders()
-        {
-            if (_currentProfile != "Custom" || _presetRails is not (int nvvdd, int msvdd, int board))
-                return;
-
-            _railBinding = true;
-            try
-            {
-                sdRailNvvdd.Value = Math.Clamp(nvvdd, sdRailNvvdd.Minimum, sdRailNvvdd.Maximum);
-                sdRailMsvdd.Value = Math.Clamp(msvdd, sdRailMsvdd.Minimum, sdRailMsvdd.Maximum);
-                sdRailBoardInput.Value = Math.Clamp(board, sdRailBoardInput.Minimum, sdRailBoardInput.Maximum);
-            }
-            finally
-            {
-                _railBinding = false;
-            }
         }
 
         /// <summary>
@@ -2991,36 +2890,36 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             _railLimitsNote = null;
-            _presetRails = null;   // a move is this session's value; only Save remembers it
             UpdateRailReadouts();
             UpdateRailCaution();
         }
 
+        private async void btnRailApply_Click(object sender, RoutedEventArgs e) => await ApplyRailLimitsAsync();
+
         /// <summary>
-        /// The rails as part of the page's Apply: the sliders are the owner's choice, and this
-        /// write is what carries it to the driver and keeps it for the next boot. It is scoped to
-        /// <see cref="UCU.Contracts.GpuRomOverrideStateDto.Enabled"/> — the rails live in the policy
-        /// the unlock raises, so with no unlock applied nothing is written and nothing is said —
-        /// and it runs after the preset's own apply, so one Apply is one act. A refusal or a
-        /// transport failure comes back for the card's reason line: never a silent Apply.
+        /// The rails' own Apply: the sliders are the owner's choice, and this write is what carries
+        /// it to the driver. It is the whole act - no preset is read and none is saved, because the
+        /// three currents are machine-wide and stand on their own. The driver keeps a successful
+        /// write for the next boot (the engine's <c>rails.txt</c>), which is the existing path.
+        ///
+        /// Scoped to the unlock: the rails live in the policy it raises, so with no unlock applied
+        /// the row is dimmed and the note under it says why. A refusal goes on the row's reason
+        /// line, a transport failure too — never a silent Apply.
         /// </summary>
-        private async Task<(string? Note, string? Error)> WriteRailLimitsAsync()
+        private async Task ApplyRailLimitsAsync()
         {
             // A rail row whose numbers were never read, or whose bounds did not bind, is not
             // written: its sliders would carry defaults. The card already says why it is inert.
             if (_gpuTuning == null || _romOverride?.Enabled != true
                 || _railLimits is not { Reason: null } || _railLimitsBusy || !spRailControls.IsEnabled)
             {
-                return (null, null);
+                return;
             }
 
             _railLimitsBusy = true;
             _railLimitsError = null;
             _railLimitsNote = null;
             RenderRailLimits();
-
-            string? note = null;
-            string? error = null;
 
             try
             {
@@ -3032,29 +2931,33 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (answer.Reason == null)
                 {
                     _railLimits = answer;
-                    note = LocalizationService.Format(
+                    _railLimitsNote = LocalizationService.Format(
                         "Applied: {0} A GPU, {1} A memory, {2} A board input",
                         Amps(answer.NvvddMilliamps, 0), Amps(answer.MsvddMilliamps, 0), Amps(answer.BoardInputMilliamps, 3));
                 }
                 else
                 {
                     // A refusal carries no numbers: keep the ones on screen and say why.
-                    error = answer.Reason;
+                    _railLimitsError = answer.Reason;
                 }
             }
             catch (Exception ex)
             {
-                // A transport failure is not a verdict: report it, and let the caller's read-back
+                // A transport failure is not a verdict: report it, and let the read-back below
                 // show what the rails carry now.
                 DebugLog($"GPU rail limits write failed: {ex.Message}");
-                error = ex.Message;
+                _railLimitsError = ex.Message;
             }
             finally
             {
                 _railLimitsBusy = false;
+                RenderRailLimits();
             }
 
-            return (note, error);
+            // The status card's row reads the rails from the override state, so it follows a
+            // successful write. A failure keeps its own line, which that read would clear.
+            if (_railLimitsError == null)
+                await RefreshRomOverrideAsync().ConfigureAwait(true);
         }
 
         #endregion
