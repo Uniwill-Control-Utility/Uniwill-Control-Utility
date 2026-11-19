@@ -56,28 +56,35 @@ And truth be told, a local AI agent/model was a game-changer when it came to dis
 
 ## AI Disclaimer
 
-For those who want to know, **Qwen3.6-27B** (Qwen Code harness) was used for the majority of the project, but recently there was a switch to **Qwen3.8 Flash Next** (Claude Code harness).
+For those who want to know, **Qwen3.8 Flash Next** and **DeepSeek V4.1 Flash** (OpenCode harness) were used for the majority of the project.
 
 AI was used to:
  - reverse-engineer closed-source software from the Credits section
  - research open-source software from the Credits section
  - implement a fair amount of the backend
  - set up initial skeletons of the UI
-
-## Pull Requests
-
-PRs with additional (well-structured and tested) features and bug fixes are more than welcome.
-
-Especially since I use (local) AI myself, I honestly do not mind features/code created with the assistance of it as long as:
-- it's thoroughly tested by the owner of said code
-- it doesn't break any of the existing features or UI
-- the code is not of ***horrible*** quality
+ - write documentation
 
 ## What UCU does that the OEM utility does not
 
-**Parity with XMG's Control Center** — performance profiles, keyboard global/per-key RGB, light bar, liquid cooler, CPU and GPU fan curves, battery charge limit, MiniLED local dimming, panel refresh rate and colour calibration (Default / sRGB / DCI-P3 / Adobe RGB), the GPU MUX switch (Hybrid / dGPU Only / iGPU Only), GPU Power Saving (On / Off / Auto), the physical Performance/Q-key button, the Wi-Fi / Bluetooth / webcam / touchpad switches, and the BIOS Advanced Performance Menu unlock (Intel only). **Parity with Flydigi Space Center** for the cooler: BS1, BS2, BS2 Pro, BS3 and BS3 Pro, preset and custom fan curves, RGB, and auto power-on.
+**Parity with the OEM utilities**
 
-**Beyond both:**
+- Performance profiles
+- Keyboard global and per-key RGB control
+- Light bar RGB control
+- Liquid cooler control
+- CPU and GPU fan curves
+- Battery charge limit
+- MiniLED local dimming
+- Panel refresh rate and colour calibration (Default / sRGB / DCI-P3 / Adobe RGB)
+- GPU MUX switch (Hybrid / dGPU Only / iGPU Only)
+- GPU Power Saving (On / Off / Auto)
+- The physical Performance / Q-key button
+- Wi-Fi, Bluetooth, webcam and touchpad switches
+- BIOS Advanced Performance Menu unlock (Intel only)
+- Flydigi cooler: BS1, BS2, BS2 Pro, BS3 and BS3 Pro, preset and custom fan curves, RGB, auto power-on
+
+**Beyond both**
 
 - Per-game presets of everything above except the battery, plus automatic preset, GPU-preference and refresh-rate changes when the charger is (un)plugged or the system resumes
 - **Extra GPU power** (Power boost mode) — a driver-level GPU power ceiling above the EC's stock TGP, which neither OEM utility offers
