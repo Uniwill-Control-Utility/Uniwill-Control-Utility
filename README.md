@@ -353,7 +353,7 @@ If the file exists, you're good to go. If it doesn't, install the official Contr
 
 ### Pawn.IO
 
-[Pawn.IO](https://github.com/JamesCJ60/Pawn.IO) is required for AMD Ryzen CPU tuning features (power limits, Curve Optimizer, TjMax). Download and install it from the [releases page](https://github.com/JamesCJ60/Pawn.IO/releases).
+[Pawn.IO](https://github.com/namazso/PawnIO) is required for AMD Ryzen CPU tuning features (power limits, Curve Optimizer, TjMax). Download and install it from the [official site](https://pawnio.eu/).
 
 ### RivaTuner Statistics Server (RTSS)
 
@@ -373,7 +373,7 @@ There is no zip download. The engine runs as a machine-wide Windows service (`UC
 
 ### Upgrading
 
-Install the newer **Uniwill-Control-Utility-win.msi** (or the `Setup` bootstrapper) over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`).
+Install the newer **Uniwill-Control-Utility-win.msi** (or the `Setup` bootstrapper) over the installed copy - no need to uninstall the previous version. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`).
 
 Settings are carried forward per version: anything the new version's config does not yet hold is adopted from the newest older one, so an update does not reset your toggles, Power boost mode state, or opt-ins. Presets, adaptive profiles and rail limits live outside the config and are never rewritten by an update.
 
