@@ -6,7 +6,7 @@ Its purpose is to serve as an open-source alternative to the official XMG/PCSpec
 
 UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ60/Universal-x86-Tuning-Utility) (Universal x86 Tuning Utility), reworking/extending its capabilities with Uniwill EC integration, Flydigi cooler support, watercooler control, and a modern Fluent Design interface in order to provide a tailored software for the hardware used by the likes of XMG Neo A25/E25, PCSpecialist Recoil 3 16 (Intel/AMD) and so on.
 
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](screenshots/Dashboard.png)
 
 ## Disclaimer & Trademarks
 
@@ -103,7 +103,7 @@ Simple metrics and toggles for quick changes.
 - **Page-container tray** — the QuickSettings grid is the default page of an in-tray NavigationView; a Display button navigates (with the page transition animation) to a Display page carrying the refresh-rate row, the laptop-panel color-calibration profile row, the runtime Nvidia Optimus switch (iGPU / Auto / dGPU power saving, Hybrid mode only) and the MiniLED local dimming toggle (MiniLED panels only), with the sections scrolling inside the page; a back button returns to the grid
 - **Title-bar hand-over button** — a button in the main window's title bar minimizes the main window and opens the mini-tray, mirroring a left-click on the tray icon
 
-![Tray](screenshots/tray-qs.png)
+![Tray](screenshots/Tray-QS.png)
 
 ### Dashboard
 
@@ -127,7 +127,7 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 - **Custom presets** — Up to 5 custom presets can be set up (mirrored by another set when Power Boost Mode is ON)
 - **Preset backup & import** — Export and restore all custom presets and adaptive mode profiles
 
-![Presets](screenshots/presets.png)
+![Presets](screenshots/Presets.png)
 
 ### Performance Button
 
@@ -153,7 +153,7 @@ Intelligent, game-aware performance optimization that automatically adjusts sett
 - **Light Bar** - per-game customization of the light bar
 - **Per-game presets** — Automatic profile switching when games launch or close
 
-![Adaptive](screenshots/adaptive.png)
+![Adaptive](screenshots/Adaptive.png)
 
 ### Game Overlay
 
@@ -188,7 +188,7 @@ Set-and-forget rules that apply presets automatically when system state changes.
 - **Refresh Rate when Plugged In** — Set the internal panel's refresh rate when connected to power (internal panel only; "No change" is the default)
 - **Power Tuning Guardian** — Opt-in (off by default), per feature: re-applies the preset's GPU power ceiling (TGP / Dynamic Boost) and/or CPU power limits (PL1 / PL2) when the firmware reports a third-party program reset them — verified by an EC register re-read before the toast
 
-![Auto](screenshots/automations.png)
+![Auto](screenshots/Automations.png)
 
 ### Fan Control
 
@@ -202,7 +202,7 @@ Full control over system fan curves with real-time temperature monitoring.
 - **Smart Fan Mode** — forces all the fans to use the same temperature source - CPU,GPU or the Hottest of the two
 - **Stock-preset gating** — fan curve customization (page, tray, resume) is Custom-preset only; stock presets leave the fans to the firmware's own per-mode table and show a "Stock Preset Active" notice
 
-![Fan Control](screenshots/fan-control.png)
+![Fan Control](screenshots/Fan-Control.png)
 
 ### Keyboard
 
@@ -219,7 +219,7 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 - **BetterRGB Streamer Engine** — opt-in software mode ported from [BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive): 14 effects rendered in software and streamed to the ITE `0xFF03` RGB interface at 15/30/45/60 FPS, with a full per-effect control set, software brightness, keypress-driven reactive effects, an AC auto-policy, sleep/wake resume and a watchdog that falls back to Hardware MCU. The reference's technical detail, and the runtime behaviour in full, are in [docs/betterrgb-streamer.md](docs/betterrgb-streamer.md)
 - White-backlight-only mode for keyboards without RGB
 
-![Keyboard - Normal](screenshots/keybaord-normal.png)
+![Keyboard ](screenshots/Keyboard.png)
 
 ### Light Bar
 
@@ -232,7 +232,7 @@ RGB light bar control with multiple effects and color options.
 - Speed slider for animated effects
 - Fixed rainbow palette for Wave and Marquee effects
 
-![Light Bar](screenshots/light-bar.png)
+![Light Bar](screenshots/Light-Bar.png)
 
 ### Battery
 
@@ -245,7 +245,7 @@ Battery charging management and live telemetry from the EC.
   - Power source indicator (AC / battery)
 - Manual refresh button
 
-![Battery](screenshots/battery.png)
+![Battery](screenshots/Battery.png)
 
 ### Display
 
@@ -259,7 +259,7 @@ GPU display mode, GPU power management, and display panel controls (Uniwill EC h
 
 Panel detach, deferred writes, the exact `mscms` sequence and the MUX/NVRAM handshake are documented in [docs/display-panel-control.md](docs/display-panel-control.md).
 
-![Display](screenshots/display.png)
+![Display](screenshots/Display.png)
 
 ### Flydigi Cooler
 
@@ -275,7 +275,7 @@ Control Flydigi laptop cooling pads via BLE (BS1) and HID (BS2, BS2 Pro, BS3, BS
 - Live RPM and temperature readback
 - Dual protocol support — HID (BS2/BS2 Pro/BS3) and BLE (BS1)
 
-![Flydigi](screenshots/flydigi.png)
+![Flydigi](screenshots/Flydigi-1.png)
 
 ### Hydro UI
 
@@ -288,7 +288,7 @@ Full control of LCT liquid cooling systems (e.g. XMG Oasis) via Bluetooth Low En
 - Auto-connect on system startup and auto-reconnect after system resume
 - **Smart Mode** — Set lower and upper temperature thresholds, at which the pump/fan slow down, speed up or turn off/on
 
-![Hydro UI](screenshots/hydro-ui.png)
+![Hydro UI](screenshots/Hydro-UI.png)
 
 ### Settings
 
@@ -303,7 +303,7 @@ Application preferences, diagnostics, updates, and embedded system information.
 - **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug); the app and engine logs live in `%LOCALAPPDATA%\UCU\logs`
 - **System Information** — Device, processor, memory, and battery specs with detailed RAM timings and SPD data
 
-![Settings](screenshots/settings-1.png)
+![Settings](screenshots/Settings-1.png)
 
 ### About
 
@@ -318,9 +318,10 @@ Application info and project resources.
 
 | Screenshot | Screenshot |
 | --- | --- |
-| ![V-F curve editor](screenshots/gpu-curve.png)<br>The V-F curve editor — Presets | ![BetterRGB streamer](screenshots/keyboard-betterrgb.png)<br>The BetterRGB streamer — Keyboard |
-| ![Per-key RGB editor](screenshots/keyboard-per-key.png)<br>The per-key RGB editor — Keyboard | ![Overlay in game](screenshots/overlay.png)<br>The overlay in game — Game Overlay |
-| ![Settings, continued](screenshots/settings-2.png)<br>Settings, continued — Settings | |
+| ![CPU tuning](screenshots/Presets-CPU.png)<br>CPU tuning — Presets | ![GPU tuning and curve](screenshots/Presets-GPU.png)<br>GPU tuning and V-F curve — Presets |
+| ![Per-key RGB editor](screenshots/Keyboard-Per-Key.png)<br>The per-key RGB editor — Keyboard | ![BetterRGB streamer](screenshots/Keyboard-BetterRGB.png)<br>The BetterRGB streamer — Keyboard |
+| ![Flydigi cooler, RGB](screenshots/Flydigi-2.png)<br>Cooler RGB and device settings — Flydigi Cooler | ![Overlay in game](screenshots/Overlay.png)<br>The overlay in game — Game Overlay |
+| ![Settings, continued](screenshots/Settings-2.png)<br>Settings, continued — Settings | ![Settings, diagnostics](screenshots/Settings-3.png)<br>Diagnostics and system information — Settings |
 
 ## Prerequisites
 
