@@ -452,7 +452,10 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static string GetVersionString()
         {
             var version = Assembly.GetEntryAssembly()?.GetName().Version;
-            return version != null ? $"v{version}" : string.Empty;
+            // Three parts on purpose: the product version is a.b.c, and the SDK's
+            // fourth (revision) digit is always 0 - showing it implies a precision
+            // the release line does not have.
+            return version != null ? $"v{version.ToString(3)}" : string.Empty;
         }
 
         internal static async Task ApplyOnStart()

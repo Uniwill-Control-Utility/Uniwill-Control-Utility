@@ -187,7 +187,7 @@ namespace Uniwill_Control_Utility.Services
 
             return new DiagnosticsSnapshot
             {
-                UcuVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown",
+                UcuVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "unknown",
                 Os = $"{RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})",
                 Cpu = ReadCpuName(),
                 Engine = engineLine,

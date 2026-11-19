@@ -35,7 +35,8 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private static string GetAssemblyVersion()
         {
-            return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? String.Empty;
+            // a.b.c: the SDK's fourth (revision) digit is always 0.
+            return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? String.Empty;
         }
 
         [RelayCommand]

@@ -19,7 +19,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var version = Assembly.GetEntryAssembly()?.GetName().Version;
                 if (version is null)
                     return string.Empty;
-                return version.ToString();
+                // a.b.c: the derived fourth (revision) digit is always 0.
+                return version.ToString(3);
             }
         }
 
