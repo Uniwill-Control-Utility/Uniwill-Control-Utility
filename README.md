@@ -10,7 +10,6 @@ UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ
 
 ## Disclaimer & Trademarks
 
-
 * **This project is still very much a WORK IN PROGRESS** - Although a lot of attention and time has been invested into polishing this app, one should still expect some (minor) bugs
 * **Unofficial Software:** This project is an independent, community-driven, free and open-source utility. It is **not** affiliated with, endorsed by, or sponsored by XMG, Uniwill, Tongfang, Flydigi or any laptop/cooler brand/reseller mentioned above.
 * **Trademarks:** All product names, logos, images, brands, trademarks, and registered trademarks are property of their respective owners. Their use here is strictly for identification and compatibility purposes.
@@ -47,7 +46,6 @@ If you come across any issues or errors, please [open an issue on GitHub](https:
 
 ## How were the features achieved?
 
-
 A fair amount of research into other projects that have been mentioned in the Credits section.
 
 Without the hard work of all those developers, most of the features would have been either harder or impossible to implement.
@@ -68,7 +66,6 @@ AI was used to:
 
 ## Pull Requests
 
-
 PRs with additional (well-structured and tested) features and bug fixes are more than welcome.
 
 Especially since I use (local) AI myself, I honestly do not mind features/code created with the assistance of it as long as:
@@ -76,42 +73,19 @@ Especially since I use (local) AI myself, I honestly do not mind features/code c
 - it doesn't break any of the existing features or UI
 - the code is not of ***horrible*** quality
 
-## Features replicated from XMG's Control Center
+## What UCU does that the OEM utility does not
 
- - Performance profiles
- - Keyboard global/per-key RGB control
- - Light Bar RGB control
- - Liquid Cooler control
- - CPU and GPU Fan Control
- - Battery control
- - MiniLED Local Dimming control
- - Display refresh rate control (laptop panel only)
- - Display color calibration control (Default / sRGB / DCI-P3 / Adobe RGB)
- - GPU MUX switch control (Hybrid / dGPU Only / iGPU Only)
- - GPU Power Saving (On / Off / Auto)
- - Performance button preset switching (physical Performance/Q-key button)
- - Device Manager hardware toggles (Wi-Fi / Bluetooth radios, webcam PnP enable/disable, touchpad controll)
- - CPU Advanced Performance Menu unlock in BIOS (Intel only, allows e.g. CPU/RAM clock/voltage control)
- - Q-Key/Performance Button intercept (for power preset switching)
+**Parity with XMG's Control Center** — performance profiles, keyboard global/per-key RGB, light bar, liquid cooler, CPU and GPU fan curves, battery charge limit, MiniLED local dimming, panel refresh rate and colour calibration (Default / sRGB / DCI-P3 / Adobe RGB), the GPU MUX switch (Hybrid / dGPU Only / iGPU Only), GPU Power Saving (On / Off / Auto), the physical Performance/Q-key button, the Wi-Fi / Bluetooth / webcam / touchpad switches, and the BIOS Advanced Performance Menu unlock (Intel only). **Parity with Flydigi Space Center** for the cooler: BS1, BS2, BS2 Pro, BS3 and BS3 Pro, preset and custom fan curves, RGB, and auto power-on.
 
-## Features replicated from Flydigi Space Center
+**Beyond both:**
 
- - Flydigi BS1, BS2, BS2 Pro, BS3 and BS3 Pro support
- - pre-set and custom fan curves
- - RGB control
- - auto power-on
-
-## Additional features
-
- - Per-game presets of above features (except the battery, of course)
- - Automatic performance profile application based on the charger being (un)plugged
- - Automatic GPU preference application based on the charger being (un)plugged (Hybrid mode)
- - Extra RGB effects/directions for the keyboard
- - BetterRGB software streamer engine (adaptive 15–60 FPS, default 30, on the ITE 0xFF03 RGB interface, AC auto-policy, wake resume) for the keyboard and light bar
- - System tray controls for Power profile, Hydro UI, Fan and Flydigi control
- - Smart Hydro UI - turn the pump on/off and the fan up/down (noise optimization)
- - Smart Fan Mode - all fans now use one temperature sensor as the reference
- - Stock presets assert through the EC's own OEM mode engine (no power-register writes), so their power limits come from the firmware's factory table exactly like the official Control Center
+- Per-game presets of everything above except the battery, plus automatic preset, GPU-preference and refresh-rate changes when the charger is (un)plugged or the system resumes
+- **Extra GPU power** (Power boost mode) — a driver-level GPU power ceiling above the EC's stock TGP, which neither OEM utility offers
+- BetterRGB software streamer for the keyboard (adaptive 15–60 FPS on the ITE `0xFF03` interface, AC auto-policy, wake resume)
+- Stock presets asserted through the EC's own OEM mode engine, so their power limits come from the firmware's factory table exactly like the official Control Center — and Custom presets that stay in our control
+- Smart Hydro UI (pump and fan noise optimisation), Smart Fan Mode (all fans on one reference sensor), and extra RGB effects/directions for the keyboard
+- Opt-in Power Tuning Guardian, which re-applies the preset's power ceilings when another program resets them
+- System tray controls for preset, Hydro UI, fan and Flydigi, plus a Performance-button cycle over UCU's own presets
 
 ## App Features
 
@@ -132,8 +106,6 @@ At-a-glance system overview showing your device's specifications and live hardwa
 - Live CPU, GPU, memory, and battery telemetry cards (GPU metrics fall back to the iGPU when the dGPU is unavailable)
 - Quick-launch device controls for Flydigi coolers and Hydro UI watercoolers (when supported)
 
-![Dashboard](screenshots/dashboard.png)
-
 ### Presets
 
 One-click tuning profiles and granular hardware controls for CPU, GPU, and system power management. This is a mix of XMG Control Center's and MSI Afterburner main features.
@@ -149,8 +121,6 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 - **Preset backup & import** — Export and restore all custom presets and adaptive mode profiles
 
 ![Presets](screenshots/presets.png)
-
-![GPU Curve](screenshots/gpu-curve.png)
 
 ### Performance Button
 
@@ -198,8 +168,6 @@ Click-through in-game performance overlay, rendered natively by RivaTuner Statis
 
 ![OSD](screenshots/OSD.png)
 
-![Overlay](screenshots/overlay.png)
-
 ### Automations
 
 Set-and-forget rules that apply presets automatically when system state changes.
@@ -231,7 +199,6 @@ Full control over system fan curves with real-time temperature monitoring.
 
 ### Keyboard
 
-
 Per-key and global RGB keyboard backlight control via the ITE HID controller.
 
 - **Effects mode** — Multiple animation types (Static, Rainbow, Wave, Breathing, Ripple, Aurora, Spark, Random) with speed control
@@ -242,17 +209,12 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 - Auto Off When Unplugged — opt-in toggle: backlight turns off while the laptop is unplugged (on battery) and restores the saved lighting when plugged in (works in both per-key and effects modes, including the BetterRGB streamer)
 - Keyboard Backlight power row (first row, mirroring the Light Bar page): the single off switch — when OFF, every other control on the page is hidden; the mini-tray Keyboard RGB button mirrors this same PowerOn state, and both pages re-sync their controls when the tray or Adaptive writes state (SettingsChanged notifications)
 - Bottom bar (action buttons + picker) shows only in Per-Key RGB mode — no streamer-status strip in effects/BetterRGB modes
-- **BetterRGB Streamer Engine** — opt-in software mode ported from the open-source [BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive) engine: all 14 effects (breathing, wave, sparkle, reactive, wheel, lightning, flame, raindrop, matrix, static, ripple, rainbow, quicksand, current) rendered in software and streamed on the dedicated ITE 0xFF03 RGB interface with the reference's interleaved 512-byte framing, at 15/30/45/60 FPS (button-selected, default 30; the pacer self-degrades if the device lags). Its own Effects card carries the full reference control set per effect (speeds, smoothness, widths, densities, multi-color palettes capped per effect — up to 5 for Raindrop, 3 for Matrix/Quicksand/Current, 7 for Static where the color count IS the zone count, random-color toggles, reactive duration, matrix styles, and Wave direction arrow buttons at 45° increments) — the firmware Effects card stays separate. 3–100 software brightness, keypress-driven reactive/ripple via the system key-state hook, AC auto-policy (plugged → streamer, on battery → firmware effects at 0% CPU), sleep/wake resume, a 3-attempt watchdog that falls back to Hardware MCU, and a live status line (running FPS + frame counter). On a normal UCU exit the engine hands the keyboard a static white firmware effect at the second-lowest brightness (in-memory only, never persisted) so the keyboard never goes black. Off by default — the hardware path is byte-identical
+- **BetterRGB Streamer Engine** — opt-in software mode ported from [BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive): 14 effects rendered in software and streamed to the ITE `0xFF03` RGB interface at 15/30/45/60 FPS, with a full per-effect control set, software brightness, keypress-driven reactive effects, an AC auto-policy, sleep/wake resume and a watchdog that falls back to Hardware MCU. The reference's technical detail, and the runtime behaviour in full, are in [docs/betterrgb-streamer.md](docs/betterrgb-streamer.md)
 - White-backlight-only mode for keyboards without RGB
 
 ![Keyboard - Normal](screenshots/keybaord-normal.png)
 
-![Keyboard - BetterRGB](screenshots/keyboard-betterrgb.png)
-
-![Per-Key Keyboard](screenshots/keyboard-per-key.png)
-
 ### Light Bar
-
 
 RGB light bar control with multiple effects and color options.
 
@@ -266,7 +228,6 @@ RGB light bar control with multiple effects and color options.
 ![Light Bar](screenshots/light-bar.png)
 
 ### Battery
-
 
 Battery charging management and live telemetry from the EC.
 
@@ -286,13 +247,14 @@ GPU display mode, GPU power management, and display panel controls (Uniwill EC h
 - **GPU Display Mode** (MUX switch) — Choose **Hybrid (NVIDIA Optimus)**, **dGPU Only**, or **iGPU Only**, with a visual MUX diagram. The choice is persisted to UEFI NVRAM so it survives restarts, and a system reboot is required for the physical MUX change to take effect.
 - **GPU Power Saving** (Hybrid mode only) — Live discrete-GPU power control without rebooting: **On (Power Saving)** disables the dGPU via PnP hotswap and routes rendering to the iGPU for maximum savings, **Off (Performance)** re-enables the dGPU, and **Auto** lets Windows/NVIDIA Optimus decide per application.
 - **MiniLED Local Dimming** (MiniLED panels only) — Toggle the panel's local dimming, verified with an EC register readback.
-- **Display Refresh Rate** (panels offering multiple rates) — Switch the refresh rate of the **laptop panel only** (never an external monitor) through the Windows display-mode pathway (`EnumDisplaySettings`/`ChangeDisplaySettingsEx`). The panel is addressed by device name, so the write lands on it whether it is primary or secondary, and Windows' per-display registry carries the mode across primary/secondary switches. When only an external monitor is in use and the panel is detached (GDI hides it), the panel's known rate set is still offered, the last known rate stays selected, and a new selection is deferred — it is applied once the panel reattaches. Rates the panel does not report are hidden and the visible buttons spread evenly across the row.
-- **Color Calibration** (panels with Windows' ICC profiles) — Associate a Windows ICC color profile with the **laptop panel only** (never an external monitor): **Default** (uncalibrated), **sRGB**, **P3** (Display P3), or **Adobe RGB**, applied through the genuine Windows color-engine switch — `mscms.dll` `InstallColorProfile` + `WcsSetDefaultColorProfile` at SYSTEM_WIDE and CURRENT_USER scope (the exact sequence XMG Control Center's `GCUUtil.exe` runs), against the built-in spool profiles (`sRGB.icm`, `DCIP3.icm`, `AdobeRGB.icm`). Unlike a bare `ICM\ProfileAssociations` registry write (which only relabels the selection), this forces Windows' color engine to reload and actually repaint the panel. When the panel is detached (external-only), the last known profile stays selected and a new selection is deferred — it is applied once the panel reattaches.
+- **Display Refresh Rate** (panels offering multiple rates) — Switch the refresh rate of the **laptop panel only** (never an external monitor) through the Windows display-mode pathway, addressed by device name so it lands on the panel whether primary or secondary.
+- **Color Calibration** (panels with Windows' ICC profiles) — Associate a Windows ICC profile with the **laptop panel only**: **Default** (uncalibrated), **sRGB**, **P3** (Display P3), or **Adobe RGB**, applied through the genuine Windows colour-engine switch (`mscms.dll`) rather than a registry relabel.
+
+Panel detach, deferred writes, the exact `mscms` sequence and the MUX/NVRAM handshake are documented in [docs/display-panel-control.md](docs/display-panel-control.md).
 
 ![Display](screenshots/display.png)
 
 ### Flydigi Cooler
-
 
 Control Flydigi laptop cooling pads via BLE (BS1) and HID (BS2, BS2 Pro, BS3, BS3 Pro).
 
@@ -323,7 +285,6 @@ Full control of LCT liquid cooling systems (e.g. XMG Oasis) via Bluetooth Low En
 
 ### Settings
 
-
 Application preferences, diagnostics, updates, and embedded system information.
 
 - **Application behaviour** — Display language, start on boot, startup delay, startup progress window, start minimised, minimise instead of closing, the quick-controls pop-up and notification pop-up toggles, reapply GPU clock offsets / CPU Curve Optimizer at startup, and auto-start Adaptive Mode
@@ -346,15 +307,21 @@ Application info and project resources.
 - **Third-party libraries** — The open-source libraries UCU builds on
 - **Support** — An optional way to support the project
 
-## Prerequisites
+### More screenshots
 
+| Screenshot | Screenshot |
+| --- | --- |
+| ![V-F curve editor](screenshots/gpu-curve.png)<br>The V-F curve editor — Presets | ![BetterRGB streamer](screenshots/keyboard-betterrgb.png)<br>The BetterRGB streamer — Keyboard |
+| ![Per-key RGB editor](screenshots/keyboard-per-key.png)<br>The per-key RGB editor — Keyboard | ![Overlay in game](screenshots/overlay.png)<br>The overlay in game — Game Overlay |
+| ![Settings, continued](screenshots/settings-2.png)<br>Settings, continued — Settings | |
+
+## Prerequisites
 
 UCU targets **Windows 11 (build 22621 or newer), x64** — the app is built against that SDK version, so older builds are not supported. Administrative rights are needed the first time the engine service is installed.
 
 Beyond that, the following have to be present and configured before first use:
 
 ### .NET 10 Desktop Runtime (x64)
-
 
 The app is built framework-dependent, so it needs the **.NET 10 Desktop Runtime**:
 
@@ -365,7 +332,6 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 The release's **Uniwill-Control-Utility-win-Setup.exe** installs it for you when missing, then installs the app. If you install from the MSI directly, install this runtime first; without it the app cannot start.
 
 ### UWACPIDriver.sys (Uniwill EC Driver)
-
 
 UCU communicates with the Uniwill Embedded Controller through the `UWACPIDriver.sys` kernel driver. Check if it's already present at:
 
@@ -379,19 +345,15 @@ If the file exists, you're good to go. If it doesn't, install the official Contr
 
 ### Pawn.IO
 
-
 [Pawn.IO](https://github.com/JamesCJ60/Pawn.IO) is required for AMD Ryzen CPU tuning features (power limits, Curve Optimizer, TjMax). Download and install it from the [releases page](https://github.com/JamesCJ60/Pawn.IO/releases).
 
 ### RivaTuner Statistics Server (RTSS)
-
 
 RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on-screen display (OSD), which handles all in-game rendering — so the entire overlay (including FPS) depends on RTSS being installed and running. Download it from the [RivaTuner website](https://www.guru3d.com/download/rivatuner-statistics-server-download/).
 
 ## Installation
 
-
 ### Recommended: installer
-
 
 1. Head over to the [Releases](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases) page
 2. Download and run **Uniwill-Control-Utility-win-Setup.exe** (the installer bootstrapper: it installs the .NET 10 Desktop Runtime if the machine lacks it, then the app). Already have the runtime, or deploying from a script? **Uniwill-Control-Utility-win.msi** installs the app alone; it needs .NET 10 Desktop Runtime present. Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"`.
@@ -399,11 +361,9 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 
 ### No portable build
 
-
 There is no zip download. The engine runs as a machine-wide Windows service (`UCUEngine`) so the app itself stays unelevated, and an unpacked copy has no update or removal story of its own - deleting the folder leaves the service registered and pointing at a path that no longer exists. If you still run an old extracted copy, install the MSI: it re-points the service at the Program Files layout, and the old folder can then be deleted.
 
 ### Upgrading
-
 
 Install the newer **Uniwill-Control-Utility-win.msi** (or the `Setup` bootstrapper) over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`).
 
@@ -419,13 +379,11 @@ Two cases still need a manual uninstall first:
 
 ### Uninstalling
 
-
 Settings → Apps → Installed apps → **Uniwill Control Utility** → Uninstall. That runs `Uninstall.exe`, which closes the app, removes the MSI product, **stops and deletes the `UCUEngine` service**, and clears the leftover registration and install folder.
 
 Deleting the install folder by hand does **not** remove the service: it keeps running against a missing image, and `sc delete UCUEngine` from an elevated prompt is the manual fallback.
 
 ### Antivirus & SmartScreen (security-product-guarded machines)
-
 
 UCU is a free tool and ships **unsigned** — publisher certificates cost money, and this project doesn't have one. Two practical consequences:
 
@@ -440,7 +398,6 @@ The fix on such machines is an **application-level allowlist** for both images i
 This is the same allowlist commercial control centers rely on — theirs ride on a paid publisher certificate instead, which UCU deliberately doesn't buy.
 
 ## Building & packaging (maintainers)
-
 
 ```powershell
 dotnet tool restore
@@ -459,11 +416,9 @@ For those who want to use color correction profiles, you need to:
 
 ## License
 
-
 UCU is released under the **GNU General Public License v3.0** — see [LICENSE](LICENSE). A modified build you distribute has to carry the same license and make its source available.
 
 ## Credits
-
 
 UCU builds on the work of many open-source projects and reverse-engineering efforts. We thank the authors of the following projects for their contributions:
 
@@ -485,13 +440,14 @@ UCU builds on the work of many open-source projects and reverse-engineering effo
 
 ### Device Protocol References
 
-- [THRM (GitHub)](https://github.com/TIANLI0/THRM) (user and repository gone at the time of writing - October 4th 2026) by TIANLI0 — Primary reference for the Flydigi `5A A5` cooler protocol. Provided the most complete documentation of the frame format, RGB upload sequence, and gear RPM table.
-- [watercooler-manager (GitHub)](https://github.com/tomups/watercooler-manager) by tomups — Primary reference for the LCT watercooler BLE protocol. The Python implementation confirmed the Nordic UART UUIDs, frame format, and command byte values.
-- [UCC (GitHub)](https://github.com/nanomatters/ucc) by nanomatters — Reference for the LCT watercooler protocol (BLE connection lifecycle, error recovery, state management) and for the ITE 8291 keyboard HID controller protocol (HID device enumeration, ACPI interface, zone-based control commands).
-- [tuxedo-drivers (GitLab)](https://gitlab.com/tuxedocomputers/development/packages/tuxedo-drivers) by TUXEDO Computers — Authoritative reference for the ITE 8291 per-key RGB protocol. The Linux kernel driver (`src/ite_8291/ite_8291.c`) provided the exact byte layouts for UserMode entry, row announcement, and the 65-byte BGR-planar output report format. Also provided the EC register definitions (`src/uniwill_interfaces.h`) for NVIDIA GPU power control on Schenker/XMG laptops (cTGP/TPP/DB offset registers and the `0x0743` enable register).
-- [BetterRGB-ITE8291-Adaptive (GitHub)](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive) by ZavierChen — Primary reference for UCU's BetterRGB software streamer engine. Its `better_rgb.c` established the RGB runtime-mode negotiation on the ITE 0xFF03/MI_01 HID interface, the synchronous interleaved 512-byte frame transport (one SetFeature + eight 65-byte writes per frame), the 102-entry KEYMAP frame layout, and the full per-effect animation math (14 of the reference's 16 effects ported into UCU's software renderer — Touch Current and Screen Ambient were dropped).
+- **[THRM](https://github.com/TIANLI0/THRM)** by TIANLI0 (repository gone as of October 4th 2026) — the Flydigi `5A A5` cooler protocol.
+- **[watercooler-manager](https://github.com/tomups/watercooler-manager)** by tomups — the LCT watercooler BLE protocol.
+- **[UCC](https://github.com/nanomatters/ucc)** by nanomatters — LCT watercooler lifecycle and the ITE 8291 keyboard HID protocol.
+- **[tuxedo-drivers](https://gitlab.com/tuxedocomputers/development/packages/tuxedo-drivers)** by TUXEDO Computers — the ITE 8291 per-key RGB byte layouts and the Uniwill EC registers for NVIDIA GPU power control.
+- **[BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive)** by ZavierChen — UCU's BetterRGB streamer engine.
+- **MechControl** (decompiled) — Okashira (defty1234), fork by [Heavyfail](https://github.com/Heavyfail) — the global keyboard effects protocol, MiniLED local dimming, and the `UWACPIDriver.sys` IOCTL codes.
+- **XMG Control Center / GCUService.exe** (decompiled) — GPU power EC sequences and the NVRAM variables behind GPU mode persistence.
+- **[OpenRevo](https://github.com/faintonce/open-revo)** by faintonce — the `OemMagicVariable` offset and gatekeeper handshake, the EC OEM mode engine behind UCU's stock presets, and the device-switch registry behind the key locks and AC recovery.
 
-- **MechControl** (decompiled, closed-source) — Original by Okashira (Discord: defty1234), fork by [Heavyfail (GitHub)](https://github.com/Heavyfail). Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports), MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern), and UWACPIDriver.sys IOCTL codes (0x9C40A488/0x9C40A48C) for direct EC access.
-- **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis), and NVRAM GUID/variable names for GPU mode persistence.
-- **[OpenRevo (GitHub)](https://github.com/faintonce/open-revo)** by faintonce — Mechrevo control center (Rust/Tauri), a sibling of UCU's target on the same Uniwill EC family. Used for runtime NVRAM probing to determine the correct offset (98) within `OemMagicVariable` for BIOS-visible GPU MUX mode switching — without this, UCU's NVRAM writes would not have been recognized by the BIOS. Its mode-apply path was also decompiled for the EC OEM mode engine (the per-mode `0x0751` fan-control literals that recolor the Q-key LED, the `0x0787` commit write, the `0x0741` manual-control gate, and the fact that stock modes write **no** power registers at all), which is what UCU's stock presets now assert through, and for the Performance-button intercept architecture behind UCU's own button handling. Its NVRAM gatekeeper handshake — the `OemMagicDoor`=0x01 unlock that must precede every `OemMagicVariable` write on the 50-series chassis generation (`driver\uefi_nvram.rs`) — is ported into UCU's NVRAM write path (U-106). Its power-contract healing pattern (the `heal_gpu_power_contract`/`heal_cpu_power_contract` commands in `commands\tuning_cmd.rs`) is re-implemented — Rust not copied — as UCU's opt-in Power Tuning Guardian (U-107): app-side drift detection against the EC's power-truth registers behind per-feature toggles, with the engine replaying the preset pipeline's own activation sequence. Its device-switch registry (`config\ec_registry.json`: AC-recovery bit on `0x0726`, Fn lock on `0x074E`, win-lock status/trigger pair on `0x0768`/`0x0767`, the trigger-fire driver calls in `driver\wmi_ec.rs`) is re-implemented as UCU's Windows key lock, Fn key lock, and AC power recovery rows in Settings → Hardware management (U-108) — every register semantics field-probed on the lab box (`docs\acpi\SwitchDiagnostic`) before shipping a write path, including the discovery that the win-lock trigger is a debounced toggle, not a state write.
+What each one documented, and which part of UCU it produced, is in [docs/device-protocol-references.md](docs/device-protocol-references.md).
 
