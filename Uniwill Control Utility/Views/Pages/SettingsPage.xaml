@@ -737,7 +737,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)"
+                                                   Text="Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbPowerBoostMode"

@@ -898,7 +898,7 @@
   "Set the internal panel's refresh rate when running on battery power": "バッテリー駆動時の内蔵パネルのリフレッシュレートを設定します",
   "Set the temperature (°C) at which each fan speed zone activates": "各ファン速度ゾーンが有効になる温度 (°C) を設定します",
   "Set the temperature (°C) at which each fan speed zone activates.": "各ファン速度ゾーンがアクティブになる温度 (°C) を設定します。",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "TDP と TGP スライダーの上限を 250W に設定します (実際に適用するには改造が必要で、Dynamic Boost が無効になります)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "CPU と GPU の上限を標準より引き上げ、プリセットページで「GPU の追加電力」を解放します",
   "Settings": "設定",
   "Settings and persistent application data": "設定と永続的なアプリケーションデータ",
   "Settings Reapplied": "設定を再適用しました",

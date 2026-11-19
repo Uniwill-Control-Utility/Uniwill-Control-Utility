@@ -426,7 +426,7 @@
   "Serilog": "Serilog",
   "Set the internal panel's refresh rate when connected to power": "Set the internal panel's refresh rate when connected to power",
   "Set the internal panel's refresh rate when running on battery power": "Set the internal panel's refresh rate when running on battery power",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page",
   "Settings and persistent application data": "Settings and persistent application data",
   "Settings Reapplied!": "Settings Reapplied!",
   "Short": "Short",

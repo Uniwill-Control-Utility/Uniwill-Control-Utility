@@ -898,7 +898,7 @@
   "Set the internal panel's refresh rate when running on battery power": "Itakda ang refresh rate ng internal panel kapag tumatakbo sa lakas ng baterya",
   "Set the temperature (°C) at which each fan speed zone activates": "Itakda ang temperatura (°C) kung kailan mag-a-activate ang bawat zone ng bilis ng fan",
   "Set the temperature (°C) at which each fan speed zone activates.": "Itakda ang temperatura (°C) kung kailan mag-a-activate ang bawat zone ng bilis ng fan.",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "Itinakda ang mga limit ng TDP at TGP slider sa 250W (ngunit nangangailangan ng mods para talagang mailapat at dinidisable ang Dynamic Boost)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "Itinataas ang CPU at GPU limit lampas sa stock at ina-unlock ang Karagdagang GPU power sa page ng Presets",
   "Settings": "Mga Setting",
   "Settings and persistent application data": "Mga setting at persistent na data ng application",
   "Settings Reapplied": "Muling na-apply ang mga setting",

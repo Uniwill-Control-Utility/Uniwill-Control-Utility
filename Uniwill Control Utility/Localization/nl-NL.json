@@ -898,7 +898,7 @@
   "Set the internal panel's refresh rate when running on battery power": "Stel de vernieuwingsfrequentie van het interne paneel in bij werken op batterijstroom",
   "Set the temperature (°C) at which each fan speed zone activates": "Stel de temperatuur (°C) in waarbij elke ventilatorsnelheidszone wordt geactiveerd",
   "Set the temperature (°C) at which each fan speed zone activates.": "Stel de temperatuur (°C) in waarbij elke ventilatorsnelheidszone wordt geactiveerd.",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "Stelt de schuifregellimieten van TDP en TGP in op 250W (vereist echter mods om echt te worden toegepast en schakelt Dynamic Boost uit)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "Verhoogt de CPU- en GPU-limieten boven de standaardwaarden en ontgrendelt Extra GPU-vermogen op de pagina Presets",
   "Settings": "Instellingen",
   "Settings and persistent application data": "Instellingen en permanente applicatiegegevens",
   "Settings Reapplied": "Instellingen opnieuw toegepast",

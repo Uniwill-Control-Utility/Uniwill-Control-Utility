@@ -898,7 +898,7 @@
   "Set the internal panel's refresh rate when running on battery power": "Ustaw częstotliwość odświeżania wbudowanego panelu podczas pracy na baterii",
   "Set the temperature (°C) at which each fan speed zone activates": "Ustaw temperaturę (°C), przy której włącza się każda strefa prędkości wentylatora",
   "Set the temperature (°C) at which each fan speed zone activates.": "Ustaw temperaturę (°C), przy której włącza się każda strefa prędkości wentylatora.",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "Ustawia limity suwaków TDP i TGP na 250W (ale wymaga modyfikacji, aby rzeczywiście zadziałało, i wyłącza Dynamic Boost)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "Podnosi limity CPU i GPU powyżej fabrycznych i odblokowuje Dodatkową moc GPU na stronie Presety",
   "Settings": "Ustawienia",
   "Settings and persistent application data": "Ustawienia i trwałe dane aplikacji",
   "Settings Reapplied": "Ponownie zastosowano ustawienia",

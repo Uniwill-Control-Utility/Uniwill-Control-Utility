@@ -898,7 +898,7 @@
   "Set the internal panel's refresh rate when running on battery power": "ตั้งอัตรารีเฟรชของจอภาพภายในเมื่อใช้พลังงานแบตเตอรี่",
   "Set the temperature (°C) at which each fan speed zone activates": "กำหนดอุณหภูมิ (°C) ที่แต่ละโซนความเร็วพัดลมจะเริ่มทำงาน",
   "Set the temperature (°C) at which each fan speed zone activates.": "กำหนดอุณหภูมิ (°C) ที่แต่ละโซนความเร็วพัดลมจะเริ่มทำงาน",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "ตั้งขีดจำกัดแถบเลื่อน TDP และ TGP เป็น 250W (แต่ต้องมีการปรับแต่งจึงจะมีผลจริง และจะปิดใช้งาน Dynamic Boost)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "เพิ่มขีดจำกัด CPU และ GPU เกินค่าเดิม และปลดล็อกกำลังไฟ GPU เพิ่มเติมในหน้าพรีเซ็ต",
   "Settings": "การตั้งค่า",
   "Settings and persistent application data": "การตั้งค่าและข้อมูลถาวรของแอปพลิเคชัน",
   "Settings Reapplied": "ใช้การตั้งค่าใหม่อีกครั้ง",

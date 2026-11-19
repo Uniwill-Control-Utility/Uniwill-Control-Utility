@@ -898,7 +898,7 @@
   "Set the internal panel's refresh rate when running on battery power": "設置使用電池供電時內建面板的更新率",
   "Set the temperature (°C) at which each fan speed zone activates": "設置每個風扇轉速區域激活時的溫度 (°C)",
   "Set the temperature (°C) at which each fan speed zone activates.": "設置每個風扇轉速區域激活時的溫度 (°C)。",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "將 TDP 和 TGP 滑塊上限設為 250W (但需要修改才能真正生效，並且會禁用動態加速)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "將 CPU 和 GPU 上限提高到出廠值以上，並在預設頁面解鎖額外 GPU 功耗",
   "Settings": "設置",
   "Settings and persistent application data": "設置和持久應用程式數據",
   "Settings Reapplied": "已重新套用設置",

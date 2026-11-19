@@ -898,7 +898,7 @@
   "Set the internal panel's refresh rate when running on battery power": "बैटरी पावर पर चलते समय आंतरिक पैनल का रिफ्रेश रेट सेट करें",
   "Set the temperature (°C) at which each fan speed zone activates": "वह तापमान (°C) सेट करें जिस पर प्रत्येक फैन गति क्षेत्र सक्रिय होता है",
   "Set the temperature (°C) at which each fan speed zone activates.": "वह तापमान (°C) निर्धारित करें जिस पर प्रत्येक फैन गति क्षेत्र (Zone) सक्रिय होता है।",
-  "Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)": "TDP और TGP स्लाइडर सीमाएँ 250W पर सेट करता है (लेकिन इसके सच में लागू होने के लिए मॉड की आवश्यकता है और डायनामिक बूस्ट अक्षम हो जाता है)",
+  "Raises the CPU and GPU limits beyond stock and unlocks Extra GPU power on the Presets page": "CPU और GPU सीमाएँ स्टॉक से अधिक बढ़ाता है और प्रीसेट (Presets) पृष्ठ पर अतिरिक्त GPU पावर अनलॉक करता है",
   "Settings": "सेटिंग्स",
   "Settings and persistent application data": "सेटिंग्स और स्थायी एप्लिकेशन डेटा",
   "Settings Reapplied": "सेटिंग्स पुनः लागू की गईं",
