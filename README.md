@@ -8,9 +8,8 @@ UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ
 
 ![Dashboard](screenshots/dashboard.png)
 
+## Disclaimer & Trademarks
 
-
-##  Disclaimer & Trademarks
 
 * **This project is still very much a WORK IN PROGRESS** - Although a lot of attention and time has been invested into polishing this app, one should still expect some (minor) bugs
 * **Unofficial Software:** This project is an independent, community-driven, free and open-source utility. It is **not** affiliated with, endorsed by, or sponsored by XMG, Uniwill, Tongfang, Flydigi or any laptop/cooler brand/reseller mentioned above.
@@ -19,8 +18,8 @@ UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ
 
 If you come across any issues or errors, please [open an issue on GitHub](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/issues).
 
-
 ## Which hardware has this tool been tested on?
+
  - **XMG Neo 16 (A25)**
     - CPU: **AMD Ryzen 9 9955HX3D**
     - GPU: **NVIDIA GeForce RTX 5090 Laptop**
@@ -48,6 +47,7 @@ If you come across any issues or errors, please [open an issue on GitHub](https:
 
 ## How were the features achieved?
 
+
 A fair amount of research into other projects that have been mentioned in the Credits section.
 
 Without the hard work of all those developers, most of the features would have been either harder or impossible to implement.
@@ -56,7 +56,8 @@ During my personal debugging/tinkering, I happened to stumble upon additional fe
 
 And truth be told, a local AI agent/model was a game-changer when it came to discovering how everything ticked, which brings me to the next point.
 
-## AI  Disclaimer
+## AI Disclaimer
+
 For those who want to know, **Qwen3.6-27B** (Qwen Code harness) was used for the majority of the project, but recently there was a switch to **Qwen3.8 Flash Next** (Claude Code harness).
 
 AI was used to:
@@ -67,6 +68,7 @@ AI was used to:
 
 ## Pull Requests
 
+
 PRs with additional (well-structured and tested) features and bug fixes are more than welcome.
 
 Especially since I use (local) AI myself, I honestly do not mind features/code created with the assistance of it as long as:
@@ -75,6 +77,7 @@ Especially since I use (local) AI myself, I honestly do not mind features/code c
 - the code is not of ***horrible*** quality
 
 ## Features replicated from XMG's Control Center
+
  - Performance profiles
  - Keyboard global/per-key RGB control
  - Light Bar RGB control
@@ -92,12 +95,14 @@ Especially since I use (local) AI myself, I honestly do not mind features/code c
  - Q-Key/Performance Button intercept (for power preset switching)
 
 ## Features replicated from Flydigi Space Center
+
  - Flydigi BS1, BS2, BS2 Pro, BS3 and BS3 Pro support
  - pre-set and custom fan curves
  - RGB control
  - auto power-on
 
-## Additional features 
+## Additional features
+
  - Per-game presets of above features (except the battery, of course)
  - Automatic performance profile application based on the charger being (un)plugged
  - Automatic GPU preference application based on the charger being (un)plugged (Hybrid mode)
@@ -108,9 +113,9 @@ Especially since I use (local) AI myself, I honestly do not mind features/code c
  - Smart Fan Mode - all fans now use one temperature sensor as the reference
  - Stock presets assert through the EC's own OEM mode engine (no power-register writes), so their power limits come from the firmware's factory table exactly like the official Control Center
 
-# App Features
+## App Features
 
-### **Tray Widget**
+### Tray Widget
 
 Simple metrics and toggles for quick changes.
 
@@ -119,7 +124,7 @@ Simple metrics and toggles for quick changes.
 
 ![Tray](screenshots/tray-qs.png)
 
-### **Dashboard**
+### Dashboard
 
 At-a-glance system overview showing your device's specifications and live hardware metrics.
 
@@ -129,7 +134,7 @@ At-a-glance system overview showing your device's specifications and live hardwa
 
 ![Dashboard](screenshots/dashboard.png)
 
-### **Presets**
+### Presets
 
 One-click tuning profiles and granular hardware controls for CPU, GPU, and system power management. This is a mix of XMG Control Center's and MSI Afterburner main features.
 
@@ -139,6 +144,7 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 - **CPU Power Tuning** (AMD) — Sustained Power Limit (SPL), Fast Power Limit (FPL), TjMax, and Curve Optimizer (AMD only)
 - **Intel Tuning** — PL1, PL2 power limits
 - **GPU Tuning** (NVIDIA) — GPU TGP, Dynamic Boost, Dynamic Boost Offset, Core/Memory Clock Offsets, and V-F Curve Editor (a fully working curve editor for undervolting)
+- **Extra GPU power** (Power boost mode) — raises the GPU's power ceiling above the EC's stock TGP: version-pinned VBIOS records, the EC's own cTGP offset, a driver-level power request and the platform's power budget, each written with a readback check, plus the rail currents (NVVDD / MSVDD / board input) that `Apply limits` saves machine-wide. The EC's cTGP stays the envelope — a preset that lowers it clamps the unlock down, never the other way round — and `Restore stock` returns every record. Off unless Settings → Power boost mode is enabled, which asks for a one-time risk acknowledgement.
 - **Custom presets** — Up to 5 custom presets can be set up (mirrored by another set when Power Boost Mode is ON)
 - **Preset backup & import** — Export and restore all custom presets and adaptive mode profiles
 
@@ -146,7 +152,7 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 
 ![GPU Curve](screenshots/gpu-curve.png)
 
-### **Performance Button**
+### Performance Button
 
 Interception of the laptop's physical Performance / Q-key button (Uniwill NB02 hardware), so the button cycles UCU's own presets instead of the firmware's.
 
@@ -156,7 +162,7 @@ Interception of the laptop's physical Performance / Q-key button (Uniwill NB02 h
 - **Manual-control gate** — The press echo only fires while the EC manual-control gate (`0x0741` bit0) is set, so UCU keeps it armed permanently: the button stays live while a Custom preset, custom fan curves, GPU power control or Smart Fan Mode holds manual control, and the EC — not the firmware — owns the mode state
 - **Settings** — "Q-Key button preset switching" (default ON; when OFF the button does nothing — UCU has already taken over the button engine, so the firmware's own cycle is not restored)
 
-### **Adaptive Mode**
+### Adaptive Mode
 
 Intelligent, game-aware performance optimization that automatically adjusts settings based on the active application.
 
@@ -172,7 +178,7 @@ Intelligent, game-aware performance optimization that automatically adjusts sett
 
 ![Adaptive](screenshots/adaptive.png)
 
-### **Game Overlay**
+### Game Overlay
 
 Click-through in-game performance overlay, rendered natively by RivaTuner Statistics Server (RTSS) for real-time tracking while gaming.
 
@@ -194,8 +200,7 @@ Click-through in-game performance overlay, rendered natively by RivaTuner Statis
 
 ![Overlay](screenshots/overlay.png)
 
-
-### **Automations**
+### Automations
 
 Set-and-forget rules that apply presets automatically when system state changes.
 
@@ -210,7 +215,7 @@ Set-and-forget rules that apply presets automatically when system state changes.
 
 ![Auto](screenshots/automations.png)
 
-### **Fan Control**
+### Fan Control
 
 Full control over system fan curves with real-time temperature monitoring.
 
@@ -222,10 +227,10 @@ Full control over system fan curves with real-time temperature monitoring.
 - **Smart Fan Mode** — forces all the fans to use the same temperature source - CPU,GPU or the Hottest of the two
 - **Stock-preset gating** — fan curve customization (page, tray, resume) is Custom-preset only; stock presets leave the fans to the firmware's own per-mode table and show a "Stock Preset Active" notice
 
-
 ![Fan Control](screenshots/fan-control.png)
 
 ### Keyboard
+
 
 Per-key and global RGB keyboard backlight control via the ITE HID controller.
 
@@ -247,6 +252,7 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 ![Per-Key Keyboard](screenshots/keyboard-per-key.png)
 
 ### Light Bar
+
 
 RGB light bar control with multiple effects and color options.
 
@@ -273,7 +279,7 @@ Battery charging management and live telemetry from the EC.
 
 ![Battery](screenshots/battery.png)
 
-### **Display**
+### Display
 
 GPU display mode, GPU power management, and display panel controls (Uniwill EC hardware only).
 
@@ -286,6 +292,7 @@ GPU display mode, GPU power management, and display panel controls (Uniwill EC h
 ![Display](screenshots/display.png)
 
 ### Flydigi Cooler
+
 
 Control Flydigi laptop cooling pads via BLE (BS1) and HID (BS2, BS2 Pro, BS3, BS3 Pro).
 
@@ -301,7 +308,7 @@ Control Flydigi laptop cooling pads via BLE (BS1) and HID (BS2, BS2 Pro, BS3, BS
 
 ![Flydigi](screenshots/flydigi.png)
 
-### Hydro UI 
+### Hydro UI
 
 Full control of LCT liquid cooling systems (e.g. XMG Oasis) via Bluetooth Low Energy.
 
@@ -316,19 +323,21 @@ Full control of LCT liquid cooling systems (e.g. XMG Oasis) via Bluetooth Low En
 
 ### Settings
 
+
 Application preferences, diagnostics, updates, and embedded system information.
 
-- **Application behaviour** — Start on boot, start minimized, minimize-to-tray, reapply settings on start, auto-reapply interval, auto-start Adaptive Mode
+- **Application behaviour** — Display language, start on boot, startup delay, startup progress window, start minimised, minimise instead of closing, the quick-controls pop-up and notification pop-up toggles, reapply GPU clock offsets / CPU Curve Optimizer at startup, and auto-start Adaptive Mode
+- **Thermal failsafe** — Off by default (it costs performance by design): holds the GPU at its base power (Dynamic Boost off) above the GPU temperature threshold and the CPU at 50 W above the CPU one
 - **Preset backup** — Export and import custom and adaptive mode presets as JSON
-- **Feature Control** - enable/disable various pages (e.g. the Flydigi cooler page if you do not need it)
+- **Feature control** — enable/disable sidebar pages (Flydigi, Adaptive, Hydro UI, Light Bar, Overlay, Auto) and the GPU clock / CPU voltage control groups
 - **Advanced features** — Power boost mode, Q-Key button preset switching, and the CPU Advanced Performance Menu unlock (Intel ONLY - BIOS setup exposes the Advanced Performance Menu on next boot)
 - **Hardware management** — Wi-Fi, Bluetooth, webcam, and touchpad toggles, plus firmware-resident device switches: Windows key lock, Fn key lock, and AC power recovery (turn the laptop on when AC is restored) — the lock rows reflect the firmware's own state and survive UCU closing
-- **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug)
+- **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug); the app and engine logs live in `%LOCALAPPDATA%\UCU\logs`
 - **System Information** — Device, processor, memory, and battery specs with detailed RAM timings and SPD data
 
 ![Settings](screenshots/settings-1.png)
 
-### **About**
+### About
 
 Application info and project resources.
 
@@ -339,9 +348,13 @@ Application info and project resources.
 
 ## Prerequisites
 
-UCU requires the following to be installed and configured before first use:
+
+UCU targets **Windows 11 (build 22621 or newer), x64** — the app is built against that SDK version, so older builds are not supported. Administrative rights are needed the first time the engine service is installed.
+
+Beyond that, the following have to be present and configured before first use:
 
 ### .NET 10 Desktop Runtime (x64)
+
 
 The app is built framework-dependent, so it needs the **.NET 10 Desktop Runtime**:
 
@@ -352,6 +365,7 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 The release's **Uniwill-Control-Utility-win-Setup.exe** installs it for you when missing, then installs the app. If you install from the MSI directly, install this runtime first; without it the app cannot start.
 
 ### UWACPIDriver.sys (Uniwill EC Driver)
+
 
 UCU communicates with the Uniwill Embedded Controller through the `UWACPIDriver.sys` kernel driver. Check if it's already present at:
 
@@ -365,40 +379,53 @@ If the file exists, you're good to go. If it doesn't, install the official Contr
 
 ### Pawn.IO
 
+
 [Pawn.IO](https://github.com/JamesCJ60/Pawn.IO) is required for AMD Ryzen CPU tuning features (power limits, Curve Optimizer, TjMax). Download and install it from the [releases page](https://github.com/JamesCJ60/Pawn.IO/releases).
 
 ### RivaTuner Statistics Server (RTSS)
+
 
 RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on-screen display (OSD), which handles all in-game rendering — so the entire overlay (including FPS) depends on RTSS being installed and running. Download it from the [RivaTuner website](https://www.guru3d.com/download/rivatuner-statistics-server-download/).
 
 ## Installation
 
+
 ### Recommended: installer
+
 
 1. Head over to the [Releases](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases) page
 2. Download and run **Uniwill-Control-Utility-win-Setup.exe** (the installer bootstrapper: it installs the .NET 10 Desktop Runtime if the machine lacks it, then the app). Already have the runtime, or deploying from a script? **Uniwill-Control-Utility-win.msi** installs the app alone; it needs .NET 10 Desktop Runtime present. Prefer another folder? Install with `msiexec /i Uniwill-Control-Utility-win.msi VELOPACK_INSTALLDIR="D:\UCU"`.
-3. Updating is the same route: download the newer release's installer (Setup.exe or the MSI) and run it over the installed copy. There is no in-app updater — the About page's **Check for updates** button queries GitHub and, when a newer release exists, offers a link to the release page.
+3. Updating is the same route — see [Upgrading](#upgrading). There is no in-app updater; the About page's **Check for updates** button queries GitHub and, when a newer release exists, offers a link to the release page.
 
 ### No portable build
+
 
 There is no zip download. The engine runs as a machine-wide Windows service (`UCUEngine`) so the app itself stays unelevated, and an unpacked copy has no update or removal story of its own - deleting the folder leaves the service registered and pointing at a path that no longer exists. If you still run an old extracted copy, install the MSI: it re-points the service at the Program Files layout, and the old folder can then be deleted.
 
 ### Upgrading
 
-Install the newer **Uniwill-Control-Utility-win.msi** over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`).
+
+Install the newer **Uniwill-Control-Utility-win.msi** (or the `Setup` bootstrapper) over the installed copy - no uninstall first. The installer closes the running app and engine, replaces the files, and re-registers `UCUEngine` against the new layout; your settings, presets and logs are untouched (`%LOCALAPPDATA%\UCU`).
+
+Settings are carried forward per version: anything the new version's config does not yet hold is adopted from the newest older one, so an update does not reset your toggles, Power boost mode state, or opt-ins. Presets, adaptive profiles and rail limits live outside the config and are never rewritten by an update.
 
 Two cases still need a manual uninstall first:
 
 - a pre-release build carrying the **same version number** (Windows Installer skips files whose version is not greater),
 - a copy that came from an old extracted zip - install the MSI and the service follows.
 
+- a pre-release build carrying the **same version number** (Windows Installer skips files whose version is not greater),
+- a copy that came from an old extracted zip - install the MSI and the service follows.
+
 ### Uninstalling
+
 
 Settings → Apps → Installed apps → **Uniwill Control Utility** → Uninstall. That runs `Uninstall.exe`, which closes the app, removes the MSI product, **stops and deletes the `UCUEngine` service**, and clears the leftover registration and install folder.
 
 Deleting the install folder by hand does **not** remove the service: it keeps running against a missing image, and `sc delete UCUEngine` from an elevated prompt is the manual fallback.
 
 ### Antivirus & SmartScreen (security-product-guarded machines)
+
 
 UCU is a free tool and ships **unsigned** — publisher certificates cost money, and this project doesn't have one. Two practical consequences:
 
@@ -414,6 +441,7 @@ This is the same allowlist commercial control centers rely on — theirs ride on
 
 ## Building & packaging (maintainers)
 
+
 ```powershell
 dotnet tool restore
 .\build\pack.ps1
@@ -421,31 +449,42 @@ dotnet tool restore
 
 The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the release asset: the per-machine **Uniwill-Control-Utility-win.msi** (plus the `Setup` bootstrapper when vpk emits it). vpk's update packages and feed index are deleted by the script — the product has no in-app updater, and installed copies update by running that MSI. There is no portable zip either - the engine is a machine-wide service, so an unpacked copy has no update or removal story. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
 
-## Optional
+## Optional: ICC colour profiles
+
 For those who want to use color correction profiles, you need to:
 1. Download XMG's Control Center (since this one bundles the necessary .icm profiles)
 2. Install it
 3. Check that the 4 .icm files were added in ```C:\Windows\System32\spool\drivers\color```
 4. Uninstall XMG Control Center
 
+## License
+
+
+UCU is released under the **GNU General Public License v3.0** — see [LICENSE](LICENSE). A modified build you distribute has to carry the same license and make its source available.
+
 ## Credits
+
 
 UCU builds on the work of many open-source projects and reverse-engineering efforts. We thank the authors of the following projects for their contributions:
 
 ### Foundation
+
 - [UXTU (GitHub)](https://github.com/JamesCJ60/Universal-x86-Tuning-Utility) — Universal x86 Tuning Utility. UCU is built on top of UXTU's codebase, extending it with Uniwill EC support, Flydigi cooler controls, watercooler management, and a rebranded Fluent Design interface.
 
 ### Contribution
+
 - [noteMASTER11](https://github.com/noteMASTER11) - help with optimizing the fan control EC write flow, dashboard re-design and tray feature suggestion/foundation
 - [Heavyfail](https://github.com/Heavyfail) - help with getting MiniLED Local Dimming control to work
 
 ### Core & Inspiration
+
 - [G-Helper (GitHub)](https://github.com/seerge/g-helper) — Lightweight laptop tuning utility that inspired UCU's design philosophy
 - [LenovoLegionToolkit (GitHub)](https://github.com/LenovoLegionToolkit/LenovoLegionToolkit) — Reference for the color picker UI pattern, fan curve editor approach, and keyboard visualizer layout.
 - [WPF UI (GitHub)](https://github.com/lepoco/wpfui) — Modern Fluent Design UI library used for the UCU interface
 - [Magpie (GitHub)](https://github.com/Blinue/Magpie) — Translation management library used for localization
 
 ### Device Protocol References
+
 - [THRM (GitHub)](https://github.com/TIANLI0/THRM) (user and repository gone at the time of writing - October 4th 2026) by TIANLI0 — Primary reference for the Flydigi `5A A5` cooler protocol. Provided the most complete documentation of the frame format, RGB upload sequence, and gear RPM table.
 - [watercooler-manager (GitHub)](https://github.com/tomups/watercooler-manager) by tomups — Primary reference for the LCT watercooler BLE protocol. The Python implementation confirmed the Nordic UART UUIDs, frame format, and command byte values.
 - [UCC (GitHub)](https://github.com/nanomatters/ucc) by nanomatters — Reference for the LCT watercooler protocol (BLE connection lifecycle, error recovery, state management) and for the ITE 8291 keyboard HID controller protocol (HID device enumeration, ACPI interface, zone-based control commands).
